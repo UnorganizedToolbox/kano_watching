@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="高校数学の実力および得意不得意を診断するWebアプリ">
+  <title>高校数学 実力・得意不得意診断ツール</title>
+  
+  <!-- KaTeX for beautiful math equations -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script type="module" crossorigin src="./assets/index-B-gxopRL.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index--Ln2fNBC.css">
+</head>
+<body>
+
+  <!-- Passcode Lock Screen Overlay -->
+  <div id="passcode-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-primary); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; padding: 2rem;">
+    <div class="card" style="width: 100%; max-width: 380px; text-align: center; background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(20px); border: 1px solid var(--border-glass);">
+      <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
+      <h2 style="font-family: var(--font-title); margin-bottom: 0.5rem;">パスコードの入力</h2>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">このアプリを利用するにはパスコードを入力してください。</p>
+      
+      <input type="password" id="passcode-input" placeholder="4桁のコード" inputmode="numeric" pattern="[0-9]*" style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; text-align: center; font-size: 1.5rem; letter-spacing: 0.5rem; margin-bottom: 1.5rem; outline: none;">
+      
+      <button class="btn btn-primary" id="submit-passcode-btn">🔓 解除する</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo-area">
+        <h1>Math Diagnosis</h1>
+        <p style="font-size: 0.75rem; color: var(--text-muted);">高校数学実力・得意不得意診断</p>
+      </div>
+      <div style="display: flex; gap: 0.5rem;">
+        <button class="btn-icon" id="stats-nav-btn" aria-label="学習統計" style="font-size: 1.1rem; background: transparent; border: none; cursor: pointer; color: var(--text-primary); transition: opacity 0.2s; outline: none;">📊</button>
+        <button class="btn-icon" id="settings-btn" aria-label="設定">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="main-tabs" id="app-main-tabs">
+      <button class="tab-btn active" id="tab-exam-btn">🧠 診断模試</button>
+      <button class="tab-btn" id="tab-pomodoro-btn">⏱️ ポモドーロ</button>
+      <button class="tab-btn" id="tab-question-btn">❓ 質問箱</button>
+    </nav>
+
+    <!-- VIEW 1: SETUP -->
+    <div id="setup-view" class="view active">
+      <!-- Dashboard (Streak, Heatmap & History) -->
+      <div class="card" id="dashboard-card">
+        <h2 class="dashboard-title">📈 学習の記録 (Streak Calendar)</h2>
+        
+        <!-- GitHub style calendar months labels -->
+        <div class="heatmap-header-months" id="heatmap-months-labels">
+          <!-- Rendered in app.js -->
+        </div>
+        <div class="heatmap-outer">
+          <div class="heatmap-grid" id="heatmap-grid-container">
+            <!-- Rendered in app.js (16 weeks of cells) -->
+          </div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.8rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 0.5rem;">
+          <div>合計受験数: <span id="stats-total-tests">0</span>回</div>
+          <div>平均得点率: <span id="stats-avg-score">0</span>%</div>
+        </div>
+
+        <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">過去の診断レポート履歴</h3>
+        <div class="history-container" id="history-list-container">
+          <!-- Past test history list -->
+        </div>
+        
+        <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+          <button class="btn btn-danger" id="clear-history-btn" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; width: auto; height: 32px;">履歴をすべて消去</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>診断の構成</h2>
+        <p style="margin-bottom: 1rem;">テストを行いたい科目と分野を選択してください。選択した分野から問題がランダムに出題されます。40分間で解けるだけ解いてください。</p>
+        
+        <!-- Subject Selection Area -->
+        <div id="subject-selector">
+          <p class="loading-placeholder">データを読み込んでいます...</p>
+        </div>
+      </div>
+      
+      <button class="btn btn-primary" id="start-exam-btn" style="margin-top: 1rem;">
+        🚀 診断模試を開始 (40分)
+      </button>
+    </div>
+
+    <!-- VIEW 2: EXAM (TESTING) -->
+    <div id="exam-view" class="view">
+      <!-- Top navbar with subtle abort-to-home link -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+        <button class="btn btn-secondary" id="abort-exam-btn" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.75rem; height: 30px; margin: 0; background: transparent; border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-muted);">
+          ✕ 中断してホームに戻る
+        </button>
+        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">テスト実施中</div>
+      </div>
+
+      <!-- Timer & Progress -->
+      <div class="timer-container">
+        <div class="timer-text timer-running" id="exam-timer">
+          ⏱️ <span id="timer-display">40:00</span>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">
+          解答済み: <span id="solved-count-display">0</span>問
+        </div>
+      </div>
+
+      <!-- Single Question Display Card -->
+      <div class="card" id="question-list-card">
+        <!-- Paused Mask Overlay -->
+        <div id="exam-paused-mask" style="display: none; text-align: center; padding: 2rem 1rem;">
+          <div style="font-size: 3rem; margin-bottom: 0.8rem; animation: pulse 1s infinite alternate;">⏸️</div>
+          <h3 style="margin-bottom: 0.5rem; font-family: var(--font-title);">一時停止中</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">問題とタイマーを非表示にしています。再開すると続きからスタートします。</p>
+          <button class="btn btn-primary" id="resume-exam-btn" style="width: auto; padding: 0.8rem 2rem;">▶ 試験を再開する</button>
+        </div>
+
+        <!-- Question Body (Hidden when paused) -->
+        <div id="exam-question-body">
+          <div class="question-header" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <div>
+              <div class="question-number" id="current-question-num">大問 1</div>
+              <div class="question-ref" id="current-question-ref">数学Ⅰ - 第1章 数と式</div>
+            </div>
+            <button id="report-issue-btn" class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.15); color: #f87171; padding: 0.35rem 0.7rem; font-size: 0.75rem; font-weight: 500; width: auto; min-width: auto; height: auto;">
+              ⚠️ 不具合報告
+            </button>
+          </div>
+          <div class="question-text" id="current-question-text">
+            <!-- Rendered in app.js -->
+          </div>
+          
+          <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 1rem;">
+            <p style="font-size: 0.8rem; color: var(--text-muted);">
+              ※紙に解答を書いてください。書き終わったら「次の問題へ」を押して進んでください。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exam Controls -->
+      <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem;">
+        <!-- Pagination Row -->
+        <div style="display: flex; gap: 0.6rem;">
+          <button class="btn btn-secondary" id="prev-question-btn" style="flex: 1; padding: 0.8rem 0.3rem; font-size: 0.85rem;" disabled>⬅️ 前の問題</button>
+          <button class="btn btn-primary" id="next-question-btn" style="flex: 1.5; padding: 0.8rem 0.3rem; font-size: 0.85rem;">➡️ 次の問題</button>
+        </div>
+        <!-- Action Row -->
+        <div id="exam-controls-row" style="display: flex; gap: 0.6rem;">
+          <button class="btn btn-secondary" id="pause-exam-btn" style="flex: 1; padding: 0.7rem 0.3rem; font-size: 0.8rem;">⏸ 一時停止</button>
+          <button class="btn btn-secondary" id="finish-exam-btn" style="flex: 1.2; padding: 0.7rem 0.3rem; font-size: 0.8rem; border-color: rgba(239, 68, 68, 0.2); color: #f87171;">⏹ 試験終了・撮影へ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: UPLOAD SOLUTIONS -->
+    <div id="upload-view" class="view">
+      <div class="card">
+        <h2>解答用紙のアップロード</h2>
+        <p style="margin-bottom: 1.2rem;">
+          紙に書いたすべての解答用紙（計算プロセスを含む）をカメラで撮影してアップロードしてください。（複数枚ある場合はまとめて選択できます）
+        </p>
+        
+        <div class="upload-container">
+          <!-- Multi-file upload box -->
+          <div class="upload-box" onclick="triggerMultiFileInput()" id="multi-upload-box">
+            <div class="upload-icon">📷</div>
+            <p style="font-size: 0.95rem; font-weight: 600;">写真を撮影 / 選択</p>
+            <p style="font-size: 0.75rem; color: var(--text-muted);">複数枚の解答用紙を一括で追加できます</p>
+            
+            <!-- Image Gallery Preview -->
+            <div id="multi-preview-gallery" style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 1rem;">
+              <!-- Dynamic previews -->
+            </div>
+          </div>
+          <input type="file" id="multi-file-input" accept="image/*" multiple style="display: none;" onchange="handleMultiFileSelect(event)">
+          
+          <label class="form-label" style="margin-top: 1rem;">指導者用・OCR補足コメント（任意）</label>
+          <textarea class="input-note-box" id="general-note-box" style="min-height: 80px;" placeholder="例：大問1の最終の答えは x=3、大問2の途中式の一部は...等。読み取りが難しそうな箇所があれば補完してください。"></textarea>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem;">
+        <div style="display: flex; gap: 0.8rem;">
+          <button class="btn btn-secondary" id="back-to-exam-btn" style="flex: 1; display: none;">試験に戻る</button>
+          <button class="btn btn-primary" id="start-ocr-btn" style="flex: 2;">🔍 解答の文字起こしを実行</button>
+        </div>
+        <button class="btn btn-secondary" id="direct-input-btn" style="background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2); color: #a5b4fc; padding: 0.8rem; font-size: 0.9rem;">
+          ✍️ 画像なしで直接解答テキストを入力する
+        </button>
+        <button class="btn btn-danger" id="cancel-upload-btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: #f87171; font-size: 0.85rem; padding: 0.7rem; border-style: dashed;">
+          ❌ テストを中断してホームに戻る
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW 4: OCR CORRECTION (TUTOR INTERFACE) -->
+    <div id="correction-view" class="view">
+      <div class="card">
+        <h2>読み取り結果の確認・修正</h2>
+        <p style="margin-bottom: 1.2rem; color: var(--accent-warning); font-size: 0.85rem;">
+          ⚠️ AIが文字起こしした計算過程です。数式の崩れや文字の間違いがある場合は、テキスト部分をタップして直接修正（数式の補完）をお願いします。
+        </p>
+
+        <div class="ocr-block">
+          <div class="ocr-meta">
+            <div class="ocr-title">解答用紙の文字起こしテキスト</div>
+            <div class="ocr-help">クリックして直接修正できます</div>
+          </div>
+          
+          <!-- Unified editable block -->
+          <div class="ocr-editable-text" id="ocr-disp-unified" style="min-height: 250px;" onclick="enterUnifiedEditMode()">
+            <!-- Text rendered from app.js -->
+          </div>
+          <div id="ocr-edit-wrap-unified" style="display: none;">
+            <textarea class="ocr-textarea" id="ocr-textarea-unified" style="min-height: 300px;"></textarea>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+              <button class="btn btn-secondary" onclick="cancelUnifiedEditMode()" style="padding: 0.5rem 1rem; font-size: 0.85rem; width: auto;">キャンセル</button>
+              <button class="btn btn-primary" onclick="saveUnifiedEditMode()" style="padding: 0.5rem 1rem; font-size: 0.85rem; width: auto;">保存して数式を反映</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 0.8rem; margin-top: 1rem;">
+        <button class="btn btn-secondary" id="back-to-upload-btn" style="flex: 1;">↩ 撮影に戻る</button>
+        <button class="btn btn-primary" id="submit-diagnostic-btn" style="flex: 2;">🧠 診断を開始する</button>
+      </div>
+      <button class="btn btn-danger" id="cancel-exam-btn" style="width: 100%; margin-top: 0.6rem; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: #f87171; font-size: 0.85rem; padding: 0.7rem; border-style: dashed;">
+        ❌ テストを中断してホームに戻る
+      </button>
+    </div>
+
+    <!-- VIEW 5: DIAGNOSTIC REPORT -->
+    <div id="report-view" class="view">
+      <!-- Top navbar with back-to-home link to prevent accidental taps -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; padding: 0.2rem 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+        <button class="btn btn-secondary" id="restart-app-btn" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; margin: 0;">
+          ↩️ ホームに戻る
+        </button>
+        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">診断完了レポート</div>
+      </div>
+
+      <div class="card report-header">
+        <h2 style="font-family: var(--font-title); font-size: 1.5rem;">実力診断レポート</h2>
+        <p style="margin-top: 0.3rem;">診断が完了しました。現在の得意得意と学習プランです。</p>
+        
+        <div class="report-score-box">
+          <div style="display: flex; align-items: baseline; justify-content: center;">
+            <div class="report-score-num" id="total-score">--</div>
+            <div class="report-score-max" style="margin-left: 0.3rem; font-size: 1.5rem; font-weight: 700; color: var(--text-secondary);">
+              / <span id="max-score">--</span> 点
+            </div>
+          </div>
+          <div class="report-score-max" id="attempted-summary" style="margin-top: 0.2rem; font-size: 0.8rem;">挑戦した問題数: --問</div>
+        </div>
+      </div>
+
+      <!-- Detail commentary by Question -->
+      <div class="card">
+        <h2 class="report-section-title">🔍 各問の採点・途中式分析</h2>
+        <div id="report-q-results">
+          <!-- Appends grading details per question -->
+        </div>
+      </div>
+
+      <!-- Recommendation & Workbook study mapping -->
+      <div class="card" id="recommendation-card">
+        <!-- Rendered in app.js -->
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1.5rem; padding-bottom: 2rem;">
+        <button class="btn btn-primary" id="download-pdf-btn">
+          📄 PDF・レポートを保存 (印刷)
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW 6: LEARNING STATISTICS -->
+    <div id="stats-view" class="view">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; padding: 0.2rem 0.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+        <button class="btn btn-secondary" onclick="switchView('setup')" style="width: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; margin: 0;">
+          ↩️ ホームに戻る
+        </button>
+        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">📊 個人学習統計</div>
+      </div>
+
+      <!-- School Student Container (Junior High / High School) -->
+      <div id="school-stats-container">
+        <!-- Selectors Card -->
+        <div class="card">
+          <h2 style="font-family: var(--font-title); font-size: 1.2rem; margin-bottom: 1rem;">集計対象の選択</h2>
+          <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 140px;">
+              <label class="form-label" for="stats-subject-select" style="margin-bottom: 0.3rem;">対象教科</label>
+              <select class="form-input" id="stats-subject-select" style="width: 100%; padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div style="flex: 1; min-width: 140px;">
+              <label class="form-label" for="stats-chapter-select" style="margin-bottom: 0.3rem;">対象分野（章）</label>
+              <select class="form-input" id="stats-chapter-select" style="width: 100%; padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance Chart Card -->
+        <div class="card">
+          <h2 style="font-family: var(--font-title); font-size: 1.1rem; margin-bottom: 0.8rem;">📈 成績推移（獲得得点率）</h2>
+          <div id="stats-chart-wrapper" style="width: 100%; background: rgba(15, 23, 42, 0.4); border-radius: 12px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+            <!-- SVG Chart will be injected here -->
+          </div>
+          
+          <div style="margin-top: 1.2rem; background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: 12px; padding: 1rem;">
+            <h3 style="font-size: 0.9rem; margin-bottom: 0.4rem; color: var(--accent-primary);">🧠 学習分析・トレンド評価</h3>
+            <p id="stats-analysis-summary" style="font-size: 0.85rem; line-height: 1.5; color: var(--text-primary); margin: 0;">
+              データが不足しているため評価を表示できません。テストを受講してください。
+            </p>
+          </div>
+
+          <!-- Details Accordion -->
+          <details id="stats-details-accordion" style="margin-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 1rem;">
+            <summary style="cursor: pointer; font-weight: bold; color: var(--accent-primary); font-size: 0.85rem; outline: none; margin-bottom: 0.5rem; user-select: none;">
+              詳細データ分析を表示する ▼
+            </summary>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.6rem; padding: 0.5rem 0.2rem;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 0.3rem;">
+                <span>📊 近似モデル</span>
+                <span id="stats-fit-type" style="font-weight: 600; color: white;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 0.3rem;">
+                <span>📈 成長傾向</span>
+                <span id="stats-trend" style="font-weight: 600; color: white;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 0.3rem;">
+                <span>⏱️ 平均回答時間 / 問</span>
+                <span id="stats-avg-time-q" style="font-weight: 600; color: white;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 0.3rem;">
+                <span>⏱️ 平均回答時間 / 回</span>
+                <span id="stats-avg-time-run" style="font-weight: 600; color: white;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 0.3rem;">
+                <span>⏱️ 平均学習時間 / 日</span>
+                <span id="stats-avg-time-day" style="font-weight: 600; color: white;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 0.3rem;">
+                <span>⏱️ 平均学習時間 / 週</span>
+                <span id="stats-avg-time-week" style="font-weight: 600; color: white;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding-bottom: 0.3rem;">
+                <span>🔥 累計学習時間</span>
+                <span id="stats-total-time" style="font-weight: 600; color: var(--accent-primary);">-</span>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <!-- University Student Container (Advanced Analytics) -->
+      <div id="university-stats-container" style="display: none; display: flex; flex-direction: column; gap: 1rem;">
+        <!-- Overview Metrics Card -->
+        <div class="card" id="uni-overview-card">
+          <h2 style="font-family: var(--font-title); font-size: 1.1rem; margin-bottom: 0.8rem;">📊 自習セッション分析概要</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.8rem;">
+            <div style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem;">⏳ 累計作業時間</div>
+              <div style="font-size: 1.2rem; font-weight: bold; color: var(--accent-primary);" id="uni-total-work-time">0分</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem;">🎯 完了セッション数</div>
+              <div style="font-size: 1.2rem; font-weight: bold; color: #34d399;" id="uni-pomo-count">0回</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem;">⚡ 実質作業効率</div>
+              <div style="font-size: 1.2rem; font-weight: bold; color: #fbbf24;" id="uni-efficiency-rate">0%</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem;">⏱️ 平均セッション</div>
+              <div style="font-size: 1.2rem; font-weight: bold; color: #a78bfa;" id="uni-avg-session">0分</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Circadian Rhythm Heatmap Card -->
+        <div class="card">
+          <h2 style="font-family: var(--font-title); font-size: 1.1rem; margin-bottom: 0.8rem;">🕒 概日活動リズム（時間帯別の自習密度）</h2>
+          <div id="uni-circadian-chart" style="width: 100%; height: 180px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05);">
+            <!-- Hourly Density Chart SVG -->
+          </div>
+        </div>
+
+        <!-- Cumulative Burn-up Chart Card -->
+        <div class="card">
+          <h2 style="font-family: var(--font-title); font-size: 1.1rem; margin-bottom: 0.8rem;">📈 直近7日間の学習進捗累積（バーンアップ）</h2>
+          <div id="uni-burnup-chart" style="width: 100%; height: 220px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05);">
+            <!-- Burnup Chart SVG -->
+          </div>
+        </div>
+
+        <!-- Markov Chain State Transition Matrix Card -->
+        <div class="card">
+          <h2 style="font-family: var(--font-title); font-size: 1.1rem; margin-bottom: 0.4rem;">🔄 科目間状態遷移確率マトリクス（マルコフ連鎖モデル）</h2>
+          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            ある教科の自習を終えた後、次にどの教科（または休憩）へ移行するかの遷移確率を示した統計モデルです。習慣的な勉強パターンを分析します。
+          </p>
+          <div id="uni-markov-matrix-wrapper" style="overflow-x: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; background: rgba(15, 23, 42, 0.2);">
+            <!-- Markov table will be injected here -->
+          </div>
+        </div>
+
+        <!-- fatigue decay scatter plot -->
+        <div class="card">
+          <h2 style="font-family: var(--font-title); font-size: 1.1rem; margin-bottom: 0.4rem;">📈 連続自習サイクルと反応遅延（疲労度減衰分析）</h2>
+          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            連続して作業・休憩サイクルを行った際、セッション終了アラームが鳴ってから反応するまでの遅延（ラグ）の変化を示します。
+          </p>
+          <div id="uni-fatigue-chart" style="width: 100%; height: 200px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; padding: 1rem; border: 1px solid rgba(255,255,255,0.05);">
+            <!-- Fatigue correlation SVG -->
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- VIEW 7: POMODORO TIMER -->
+    <div id="pomodoro-view" class="view">
+      <div class="card" style="text-align: center;">
+        <h2 style="font-family: var(--font-title); font-size: 1.4rem; margin-bottom: 0.5rem;">⏱️ ポモドーロ学習タイマー</h2>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          集中作業（25分）と短い休憩（5分）を交互に繰り返し、リズムよく学習を進めます。
+        </p>
+
+        <!-- Timer Circle and State Pill -->
+        <div class="pomo-circle-wrapper">
+          <div class="pomo-status-pill pomo-status-idle" id="pomo-status">現在の状態: 未開始</div>
+          <div class="pomo-timer-display" id="pomo-display">25:00</div>
+        </div>
+        <div style="margin-top: 0.5rem; margin-bottom: 1.2rem; text-align: center;">
+          <label style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <input type="checkbox" id="pomo-hide-time-checkbox" style="width: 15px; height: 15px; cursor: pointer;">
+            残り時間を隠して目の前の勉強に集中する
+          </label>
+        </div>
+
+        <!-- Task & Subject Selection Form -->
+        <div style="text-align: left; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.8rem;">
+          <div>
+            <label class="form-label" for="pomo-subject-select" style="margin-bottom: 0.3rem; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <span>学習教科</span>
+              <span id="pomo-subject-delete-link" style="font-size: 0.75rem; color: #ef4444; cursor: pointer; display: none; font-weight: normal;">🗑️ 選択中のカスタム科目を削除</span>
+            </label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <select class="form-input" id="pomo-subject-select" style="flex: 1; padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass); margin: 0;">
+                <!-- Populated dynamically in JS -->
+              </select>
+              <button class="btn btn-secondary" id="pomo-add-subject-btn" style="width: 38px; height: 38px; padding: 0; margin: 0; font-size: 1.1rem; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.05); color: white; display: flex; align-items: center; justify-content: center; outline: none; cursor: pointer;">
+                ＋
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="pomo-memo-input" style="margin-bottom: 0.3rem;">学習内容・使用教材</label>
+            <input type="text" class="form-input" id="pomo-memo-input" placeholder="例: チャート式 p.15 練習問題" style="width: 100%; padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);">
+          </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div style="display: flex; gap: 0.8rem; margin-top: 1.5rem; justify-content: center;" id="pomo-controls">
+          <button class="btn btn-primary" id="pomo-start-btn" style="width: auto; padding: 0.6rem 2rem;">🚀 作業開始</button>
+          <button class="btn btn-warning" id="pomo-pause-btn" style="display: none; width: auto; padding: 0.6rem 1.5rem;">⏸️ 一時停止</button>
+          <button class="btn btn-primary" id="pomo-resume-btn" style="display: none; width: auto; padding: 0.6rem 1.5rem;">▶️ 作業再開</button>
+          <button class="btn btn-success" id="pomo-break-btn" style="display: none; width: auto; padding: 0.6rem 1.5rem;">☕ 休憩開始</button>
+          <button class="btn btn-danger" id="pomo-stop-btn" style="display: none; width: auto; padding: 0.6rem 1.5rem;">🏁 終了</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 8: QUESTION BOX -->
+    <div id="question-view" class="view">
+      <div class="card">
+        <h2 style="font-family: var(--font-title); font-size: 1.4rem; margin-bottom: 0.5rem;">❓ 質問箱</h2>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.2rem;">
+          わからない問題の写真と、質問したい内容を入力してください。
+        </p>
+
+        <!-- Question target selection -->
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label class="form-label" for="question-target-select" style="margin-bottom: 0.3rem;">送信先</label>
+          <select class="form-input" id="question-target-select" style="width: 100%; padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);">
+            <option value="tutor">👤 指導者へ質問（メール通知）</option>
+            <option value="ai">🤖 AIに質問（即時ヒント生成）</option>
+          </select>
+        </div>
+
+        <!-- Question text input -->
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label class="form-label" for="question-text-input" style="margin-bottom: 0.3rem;">質問内容</label>
+          <textarea class="form-input" id="question-text-input" rows="4" placeholder="例: この関数の最大値の求め方がわかりません。特に平方完成の最後の計算の部分が..." style="width: 100%; padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass); font-family: var(--font-sans); resize: vertical;"></textarea>
+        </div>
+
+        <!-- Image upload area -->
+        <div class="form-group" style="margin-bottom: 1.2rem;">
+          <label class="form-label" style="margin-bottom: 0.3rem;">問題の写真（任意）</label>
+          <div style="position: relative; border: 2px dashed var(--border-glass); border-radius: 12px; padding: 1.5rem; text-align: center; background: rgba(255,255,255,0.01); cursor: pointer; transition: border-color 0.2s;" id="question-upload-dropzone">
+            <span style="font-size: 1.5rem; display: block; margin-bottom: 0.5rem;">📸</span>
+            <span style="font-size: 0.8rem; color: var(--text-secondary);">タップして写真をアップロードまたは撮影</span>
+            <input type="file" id="question-image-input" accept="image/*" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+          </div>
+          <!-- Image preview -->
+          <div style="margin-top: 0.8rem; display: none; text-align: center;" id="question-preview-wrap">
+            <img id="question-preview-img" style="max-width: 100%; max-height: 250px; border-radius: 8px; border: 1px solid var(--border-glass);" src="">
+            <button class="btn btn-danger" id="question-remove-image-btn" style="width: auto; padding: 0.3rem 1rem; font-size: 0.75rem; height: 26px; margin-top: 0.5rem; display: inline-block;">画像を削除</button>
+          </div>
+        </div>
+
+        <!-- Submit button -->
+        <button class="btn btn-primary" id="question-submit-btn" style="width: 100%;">📤 質問を送信する</button>
+      </div>
+
+      <!-- AI Response Card -->
+      <div class="card" id="question-ai-response-card" style="display: none; margin-top: 1.2rem; background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.15);">
+        <h3 style="font-size: 1rem; color: var(--accent-primary); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+          <span>🤖 AIアシスタントからのヒント回答</span>
+        </h3>
+        <div id="question-ai-response-text" style="font-size: 0.9rem; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; overflow-x: auto;">
+          <!-- AI response goes here -->
+        </div>
+      </div>
+
+      <!-- Past Questions & Answers List -->
+      <div class="card" style="margin-top: 1.2rem;">
+        <h3 style="font-family: var(--font-title); font-size: 1.1rem; margin-bottom: 0.8rem; display: flex; align-items: center; justify-content: space-between;">
+          <span>📋 過去の質問と回答履歴</span>
+          <button class="btn btn-secondary" id="refresh-questions-btn" style="width: auto; padding: 0.2rem 0.6rem; font-size: 0.75rem; height: 26px; margin: 0; outline: none;">🔄 更新</button>
+        </h3>
+        <div id="questions-list-container" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 400px; overflow-y: auto; padding-right: 0.2rem;">
+          <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin: 1rem 0;">読み込み中...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal Overlay -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>システム設定</h3>
+        <button class="modal-close" id="close-settings-btn" aria-label="閉じる">×</button>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label" for="api-key-input">Gemini API Key</label>
+        <input type="password" class="form-input" id="api-key-input" placeholder="AIZAaSy...">
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;">
+          ※キーは暗号化されたローカルストレージ（ブラウザ内）にのみ保存されます。
+        </p>
+      </div>
+
+      <div class="form-group" style="margin-top: 1rem;">
+        <label class="form-label" for="student-name-input">生徒名（学習管理用）</label>
+        <input type="text" class="form-input" id="student-name-input" placeholder="例：山田 太郎" style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; outline: none;">
+      </div>
+
+
+
+      <div class="form-group" style="margin-top: 1rem;">
+        <label class="form-label" for="google-sheets-url-input">連携用URL（GAS等によるメール送信先）</label>
+        <input type="password" class="form-input" id="google-sheets-url-input" placeholder="https://script.google.com/macros/s/..." style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; outline: none;">
+        <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.4rem;">
+          ※GASなどのWebアプリURLを設定すると、テスト完了時に結果が自動でメール送信されます。
+        </p>
+      </div>
+
+      <div class="form-group" style="margin-top: 1rem;">
+        <label class="form-label" for="curriculum-mode-input">対象学年・カリキュラム</label>
+        <select class="form-input" id="curriculum-mode-input" style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; outline: none;">
+          <option value="junior_high">中学数学・高校受験対策 (推奨)</option>
+          <option value="high_school">高校数学</option>
+          <option value="university">大学生 (統計管理・自習モード)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1rem;">
+        <div style="display: flex; gap: 0.6rem;">
+          <button class="btn btn-secondary" id="test-connection-btn" style="flex: 1; font-size: 0.8rem; padding: 0.6rem 0.2rem;">接続テスト</button>
+          <button class="btn btn-secondary" id="test-program-btn" style="flex: 1.2; font-size: 0.8rem; padding: 0.6rem 0.2rem; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: #fbbf24;">プログラムテスト</button>
+        </div>
+        <button class="btn btn-primary" id="save-settings-btn" style="width: 100%;">設定を保存</button>
+      </div>
+      
+      <!-- Backup / Restore System -->
+      <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 1.5rem; padding-top: 1.2rem;">
+        <h4 style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.6rem;">データの移行・引き継ぎ</h4>
+        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+          <button class="btn btn-secondary" id="export-backup-btn" style="font-size: 0.85rem; padding: 0.6rem 1rem;">📤 バックアップ書き出し (.json)</button>
+          
+          <button class="btn btn-secondary" onclick="triggerImportBackup()" style="font-size: 0.85rem; padding: 0.6rem 1rem;">📥 バックアップ読み込み (.json)</button>
+          <input type="file" id="import-backup-file" accept=".json" style="display: none;" onchange="handleImportBackup(event)">
+        </div>
+      </div>
+
+      <!-- Textbook Mapping Import System -->
+      <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 1.5rem; padding-top: 1.2rem;">
+        <h4 style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.6rem;">教材マッピング同期</h4>
+        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+          <button class="btn btn-secondary" id="sync-textbook-btn" style="font-size: 0.85rem; padding: 0.6rem 1rem; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #34d399;">📖 教材データをスプレッドシートに同期</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: REPORT ISSUE MODAL -->
+  <div class="modal-overlay" id="report-modal">
+    <div class="modal-container" style="max-width: 450px;">
+      <h3 style="margin-bottom: 0.8rem; font-family: 'Outfit', sans-serif;">⚠️ 問題の不具合報告</h3>
+      <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+        表示の崩れや、問題・解説の誤りがある場合は報告してください。
+      </p>
+      
+      <div class="form-group">
+        <label class="form-label" for="report-type-input">不具合の種類</label>
+        <select class="form-input" id="report-type-input" style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; outline: none;">
+          <option value="math_garbled">数式が文字化けしている</option>
+          <option value="text_error">問題文・解説に誤植や誤りがある</option>
+          <option value="other">その他</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-top: 1rem;">
+        <label class="form-label" for="report-desc-input">具体的な状況（任意）</label>
+        <textarea class="form-input" id="report-desc-input" rows="3" placeholder="例：分数の分母が崩れている、など" style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; resize: none; outline: none;"></textarea>
+      </div>
+
+      <div style="display: flex; gap: 0.6rem; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" onclick="closeReportModal()" style="flex: 1;">キャンセル</button>
+        <button class="btn btn-primary" onclick="submitIssueReport()" style="flex: 1.5; background: #ef4444; border-color: #ef4444;">報告を送信</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Screen Overlay -->
+  <div class="loading-overlay" id="loading-screen">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-title">処理中...</div>
+    <div class="loading-subtext" id="loading-desc">しばらくお待ちください（15〜30秒かかる場合があります）</div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast-notify">メッセージ</div>
+
+  <!-- App Main Javascript Code -->
+</body>
+</html>
