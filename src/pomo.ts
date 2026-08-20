@@ -1,0 +1,442 @@
+import { state } from './state';
+import { DEFAULT_POMO_SUBJECTS } from './constants';
+import { showToast, switchView } from './ui';
+import { formatPomoTime } from './utils';
+import { initAudioContext, playPomoAlert } from './audio';
+import { logPomodoroEventToGas, syncPomodoroLogsFromGas } from './api';
+
+export function initPomodoroUI(): void {
+  if (state.pomoTimerInterval) {
+    clearInterval(state.pomoTimerInterval);
+    state.pomoTimerInterval = null;
+  }
+  state.pomoState = 'idle';
+  state.pomoSecondsLeft = 25 * 60;
+  state.pomoAccumulatedSeconds = 0;
+  
+  const pomoDisplay = document.getElementById('pomo-display');
+  const pomoMemoInput = document.getElementById('pomo-memo-input') as HTMLInputElement;
+  
+  if (pomoDisplay) pomoDisplay.textContent = "25:00";
+  if (pomoMemoInput) pomoMemoInput.value = "";
+  
+  updatePomoUIState();
+}
+
+export function updatePomoUIState(): void {
+  const statusEl = document.getElementById('pomo-status');
+  if (!statusEl) return;
+  
+  statusEl.className = 'pomo-status-pill';
+  
+  if (state.pomoState === 'idle') {
+    statusEl.textContent = '現在の状態: 未開始';
+    statusEl.classList.add('pomo-status-idle');
+  } else if (state.pomoState === 'work') {
+    statusEl.textContent = '現在の状態: 作業中 📝';
+    statusEl.classList.add('pomo-status-work');
+  } else if (state.pomoState === 'work_paused') {
+    statusEl.textContent = '現在の状態: 作業一時停止中 ⏸️';
+    statusEl.classList.add('pomo-status-paused');
+  } else if (state.pomoState === 'break') {
+    statusEl.textContent = '現在の状態: 休憩中 ☕';
+    statusEl.classList.add('pomo-status-break');
+  } else if (state.pomoState === 'break_paused') {
+    statusEl.textContent = '現在の状態: 休憩一時停止中 ⏸️';
+    statusEl.classList.add('pomo-status-paused');
+  } else if (state.pomoState === 'work_complete') {
+    statusEl.textContent = '作業終了！☕ 休憩を開始してください';
+    statusEl.classList.add('pomo-status-paused');
+  } else if (state.pomoState === 'break_complete') {
+    statusEl.textContent = '休憩終了！🚀 作業を開始してください';
+    statusEl.classList.add('pomo-status-work');
+  }
+
+  const startBtn = document.getElementById('pomo-start-btn');
+  const pauseBtn = document.getElementById('pomo-pause-btn');
+  const resumeBtn = document.getElementById('pomo-resume-btn');
+  const breakBtn = document.getElementById('pomo-break-btn');
+  const stopBtn = document.getElementById('pomo-stop-btn');
+
+  if (startBtn && pauseBtn && resumeBtn && breakBtn && stopBtn) {
+    [startBtn, pauseBtn, resumeBtn, breakBtn, stopBtn].forEach(btn => btn.style.display = 'none');
+
+    if (state.pomoState === 'idle') {
+      startBtn.style.display = 'inline-block';
+      startBtn.textContent = '🚀 作業開始';
+    } else if (state.pomoState === 'work') {
+      pauseBtn.style.display = 'inline-block';
+      breakBtn.style.display = 'inline-block';
+      stopBtn.style.display = 'inline-block';
+    } else if (state.pomoState === 'work_paused') {
+      resumeBtn.style.display = 'inline-block';
+      stopBtn.style.display = 'inline-block';
+    } else if (state.pomoState === 'break') {
+      pauseBtn.style.display = 'inline-block';
+      startBtn.style.display = 'inline-block';
+      startBtn.textContent = '🚀 作業開始';
+      stopBtn.style.display = 'inline-block';
+    } else if (state.pomoState === 'break_paused') {
+      resumeBtn.style.display = 'inline-block';
+      stopBtn.style.display = 'inline-block';
+    } else if (state.pomoState === 'work_complete') {
+      breakBtn.style.display = 'inline-block';
+      stopBtn.style.display = 'inline-block';
+    } else if (state.pomoState === 'break_complete') {
+      startBtn.style.display = 'inline-block';
+      startBtn.textContent = '🚀 作業開始';
+      stopBtn.style.display = 'inline-block';
+    }
+  }
+}
+
+export function saveLocalPomoLog(payload: any): void {
+  const logs = JSON.parse(localStorage.getItem('math_pomodoro_history') || '[]');
+  logs.push(payload);
+  localStorage.setItem('math_pomodoro_history', JSON.stringify(logs));
+}
+
+export async function syncPomodoroLogsFromSheet(): Promise<void> {
+  const sheetsUrl = localStorage.getItem('math_google_sheets_url');
+  if (!sheetsUrl) return;
+  
+  const studentName = localStorage.getItem('math_student_name') || '未設定';
+  
+  try {
+    const logs = await syncPomodoroLogsFromGas(sheetsUrl, studentName);
+    const localLogs = JSON.parse(localStorage.getItem('math_pomodoro_history') || '[]');
+    const timestamps = new Set(localLogs.map((l: any) => l.timestamp));
+    let newCount = 0;
+    
+    logs.forEach(log => {
+      if (!timestamps.has(log.timestamp)) {
+        localLogs.push(log);
+        newCount++;
+      }
+    });
+    
+    if (newCount > 0) {
+      localLogs.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      localStorage.setItem('math_pomodoro_history', JSON.stringify(localLogs));
+      console.log(`Synced ${newCount} new Pomodoro logs from sheet.`);
+    }
+  } catch (err) {
+    console.error("Failed to sync Pomodoro logs from sheet:", err);
+  }
+}
+
+export async function logPomodoroEvent(event: string, elapsedSec: number, lagSec: number = 0): Promise<void> {
+  const studentName = localStorage.getItem('math_student_name') || '未設定';
+  const payload = {
+    action: 'pomodoro_log',
+    timestamp: new Date().toLocaleString('ja-JP'),
+    studentName: studentName,
+    subject: state.pomoSelectedSubject,
+    event: event,
+    elapsedSeconds: elapsedSec,
+    lagSeconds: lagSec,
+    memo: state.pomoMemo
+  };
+
+  saveLocalPomoLog(payload);
+
+  const sheetsUrl = localStorage.getItem('math_google_sheets_url');
+  if (!sheetsUrl) return;
+
+  try {
+    await logPomodoroEventToGas(sheetsUrl, payload);
+    console.log("Logged pomodoro event:", event, "with elapsed:", elapsedSec, "lag:", lagSec);
+  } catch (err) {
+    console.error("Failed to log pomodoro event:", err);
+  }
+}
+
+export function startPomoTimerTick(): void {
+  if (state.pomoTimerInterval) {
+    clearInterval(state.pomoTimerInterval);
+  }
+  
+  state.pomoStateStartTime = Date.now();
+  state.pomoTimerStartSecondsLeft = state.pomoSecondsLeft;
+  const initialAccumulated = state.pomoAccumulatedSeconds;
+  
+  state.pomoTimerInterval = window.setInterval(() => {
+    const elapsedRealSeconds = Math.floor((Date.now() - state.pomoStateStartTime) / 1000);
+    state.pomoSecondsLeft = state.pomoTimerStartSecondsLeft - elapsedRealSeconds;
+    state.pomoAccumulatedSeconds = initialAccumulated + elapsedRealSeconds;
+    
+    const displayEl = document.getElementById('pomo-display');
+    if (state.pomoSecondsLeft > 0) {
+      if (displayEl) displayEl.textContent = formatPomoTime(state.pomoSecondsLeft);
+    } else {
+      state.pomoSecondsLeft = 0;
+      state.pomoAccumulatedSeconds = initialAccumulated + state.pomoTimerStartSecondsLeft;
+      if (state.pomoTimerInterval) {
+        clearInterval(state.pomoTimerInterval);
+        state.pomoTimerInterval = null;
+      }
+      
+      playPomoAlert();
+      state.pomoZeroTimestamp = Date.now();
+      
+      if (state.pomoState === 'work') {
+        logPomodoroEvent('一時停止', state.pomoAccumulatedSeconds, 0);
+        state.pomoState = 'work_complete';
+        state.pomoSecondsLeft = 5 * 60;
+      } else if (state.pomoState === 'break') {
+        logPomodoroEvent('一時停止', state.pomoAccumulatedSeconds, 0);
+        state.pomoState = 'break_complete';
+        state.pomoSecondsLeft = 25 * 60;
+      }
+      
+      if (displayEl) displayEl.textContent = formatPomoTime(state.pomoSecondsLeft);
+      updatePomoUIState();
+    }
+  }, 1000);
+}
+
+export function saveAndLogOnClose(): void {
+  if ((state.pomoState === 'work' || state.pomoState === 'break') && state.pomoAccumulatedSeconds > 0) {
+    const eventName = (state.pomoState === 'work') ? '自動一時停止（離脱）' : '自動休憩一時停止（離脱）';
+    const sheetsUrl = localStorage.getItem('math_google_sheets_url');
+    if (sheetsUrl) {
+      const studentName = localStorage.getItem('math_student_name') || '未設定';
+      const payload = {
+        action: 'pomodoro_log',
+        timestamp: new Date().toLocaleString('ja-JP'),
+        studentName: studentName,
+        subject: state.pomoSelectedSubject,
+        event: eventName,
+        elapsedSeconds: state.pomoAccumulatedSeconds,
+        lagSeconds: 0,
+        memo: state.pomoMemo + ' (ブラウザ終了/タブ切替による自動記録)'
+      };
+      
+      fetch(sheetsUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        keepalive: true,
+        body: JSON.stringify(payload)
+      });
+      
+      if (state.pomoTimerInterval) {
+        clearInterval(state.pomoTimerInterval);
+        state.pomoTimerInterval = null;
+      }
+      state.pomoState = (state.pomoState === 'work') ? 'work_paused' : 'break_paused';
+      state.pomoSecondsLeft = state.pomoTimerStartSecondsLeft - Math.floor((Date.now() - state.pomoStateStartTime) / 1000);
+      if (state.pomoSecondsLeft < 0) state.pomoSecondsLeft = 0;
+      state.pomoAccumulatedSeconds = 0;
+      updatePomoUIState();
+    }
+  }
+}
+
+export function stopPomoOnLeave(): void {
+  if (state.pomoState !== 'idle') {
+    if (state.pomoTimerInterval) {
+      clearInterval(state.pomoTimerInterval);
+      state.pomoTimerInterval = null;
+    }
+    let lagSec = 0;
+    if ((state.pomoState === 'work_complete' || state.pomoState === 'break_complete') && state.pomoZeroTimestamp > 0) {
+      lagSec = Math.round((Date.now() - state.pomoZeroTimestamp) / 1000);
+    }
+    logPomodoroEvent('終了', state.pomoAccumulatedSeconds, lagSec);
+    state.pomoState = 'idle';
+    state.pomoSecondsLeft = 25 * 60;
+    state.pomoAccumulatedSeconds = 0;
+    state.pomoZeroTimestamp = 0;
+    
+    const displayEl = document.getElementById('pomo-display');
+    if (displayEl) displayEl.textContent = "25:00";
+    updatePomoUIState();
+  }
+}
+
+export function renderPomoSubjects(): void {
+  const select = document.getElementById('pomo-subject-select') as HTMLSelectElement;
+  if (!select) return;
+  
+  const currentVal = select.value;
+  select.innerHTML = '';
+  
+  DEFAULT_POMO_SUBJECTS.forEach(sub => {
+    const opt = document.createElement('option');
+    opt.value = sub;
+    opt.textContent = sub;
+    select.appendChild(opt);
+  });
+  
+  const customSubjects = JSON.parse(localStorage.getItem('math_custom_subjects') || '[]');
+  customSubjects.forEach((sub: string) => {
+    const opt = document.createElement('option');
+    opt.value = sub;
+    opt.textContent = sub;
+    select.appendChild(opt);
+  });
+  
+  if (currentVal && select.querySelector(`option[value="${currentVal}"]`)) {
+    select.value = currentVal;
+  }
+  
+  toggleSubjectDeleteLink();
+}
+
+export function toggleSubjectDeleteLink(): void {
+  const select = document.getElementById('pomo-subject-select') as HTMLSelectElement;
+  const link = document.getElementById('pomo-subject-delete-link');
+  if (!select || !link) return;
+  
+  const isCustom = !DEFAULT_POMO_SUBJECTS.includes(select.value);
+  link.style.display = isCustom ? 'inline-block' : 'none';
+}
+
+export function setupPomodoroHandlers(): void {
+  const selectEl = document.getElementById('pomo-subject-select');
+  if (selectEl) {
+    selectEl.addEventListener('change', () => {
+      toggleSubjectDeleteLink();
+    });
+  }
+  
+  const addBtn = document.getElementById('pomo-add-subject-btn');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      const name = prompt('追加する新しい科目名を入力してください：');
+      if (!name) return;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      
+      const customSubjects = JSON.parse(localStorage.getItem('math_custom_subjects') || '[]');
+      if (DEFAULT_POMO_SUBJECTS.includes(trimmed) || customSubjects.includes(trimmed)) {
+        showToast('その科目は既に登録されています。', 'warning');
+        return;
+      }
+      
+      customSubjects.push(trimmed);
+      localStorage.setItem('math_custom_subjects', JSON.stringify(customSubjects));
+      
+      renderPomoSubjects();
+      const select = document.getElementById('pomo-subject-select') as HTMLSelectElement;
+      if (select) select.value = trimmed;
+      toggleSubjectDeleteLink();
+      showToast(`新しく「${trimmed}」を追加しました。`, 'success');
+    });
+  }
+  
+  const deleteLink = document.getElementById('pomo-subject-delete-link');
+  if (deleteLink) {
+    deleteLink.addEventListener('click', () => {
+      const select = document.getElementById('pomo-subject-select') as HTMLSelectElement;
+      if (!select) return;
+      const val = select.value;
+      if (!confirm(`カスタム科目「${val}」を削除しますか？`)) return;
+      
+      let customSubjects = JSON.parse(localStorage.getItem('math_custom_subjects') || '[]');
+      customSubjects = customSubjects.filter((sub: string) => sub !== val);
+      localStorage.setItem('math_custom_subjects', JSON.stringify(customSubjects));
+      
+      renderPomoSubjects();
+      showToast('科目を削除しました。');
+    });
+  }
+
+  document.getElementById('pomo-start-btn')?.addEventListener('click', () => {
+    initAudioContext();
+    const select = document.getElementById('pomo-subject-select') as HTMLSelectElement;
+    const memo = document.getElementById('pomo-memo-input') as HTMLInputElement;
+    
+    state.pomoSelectedSubject = select ? select.value : '数学';
+    state.pomoMemo = memo ? memo.value.trim() : '';
+    
+    let lagSec = 0;
+    if (state.pomoState === 'break_complete' && state.pomoZeroTimestamp > 0) {
+      lagSec = Math.round((Date.now() - state.pomoZeroTimestamp) / 1000);
+    }
+    
+    if (state.pomoState === 'break') {
+      logPomodoroEvent('一時停止', state.pomoAccumulatedSeconds, 0);
+    }
+    
+    state.pomoSecondsLeft = 25 * 60;
+    state.pomoState = 'work';
+    logPomodoroEvent('作業開始', 0, lagSec);
+    state.pomoZeroTimestamp = 0;
+    
+    updatePomoUIState();
+    startPomoTimerTick();
+  });
+
+  document.getElementById('pomo-pause-btn')?.addEventListener('click', () => {
+    initAudioContext();
+    if (state.pomoTimerInterval) {
+      clearInterval(state.pomoTimerInterval);
+      state.pomoTimerInterval = null;
+    }
+    
+    logPomodoroEvent('一時停止', state.pomoAccumulatedSeconds, 0);
+    
+    state.pomoState = (state.pomoState === 'work') ? 'work_paused' : 'break_paused';
+    updatePomoUIState();
+  });
+
+  document.getElementById('pomo-resume-btn')?.addEventListener('click', () => {
+    initAudioContext();
+    logPomodoroEvent('作業再開', 0, 0);
+    state.pomoState = (state.pomoState === 'work_paused') ? 'work' : 'break';
+    
+    updatePomoUIState();
+    startPomoTimerTick();
+  });
+
+  document.getElementById('pomo-break-btn')?.addEventListener('click', () => {
+    initAudioContext();
+    const select = document.getElementById('pomo-subject-select') as HTMLSelectElement;
+    const memo = document.getElementById('pomo-memo-input') as HTMLInputElement;
+    
+    state.pomoSelectedSubject = select ? select.value : '数学';
+    state.pomoMemo = memo ? memo.value.trim() : '';
+    
+    let lagSec = 0;
+    if (state.pomoState === 'work_complete' && state.pomoZeroTimestamp > 0) {
+      lagSec = Math.round((Date.now() - state.pomoZeroTimestamp) / 1000);
+    }
+    
+    if (state.pomoState === 'work') {
+      logPomodoroEvent('一時停止', state.pomoAccumulatedSeconds, 0);
+    }
+    
+    state.pomoSecondsLeft = 5 * 60;
+    state.pomoState = 'break';
+    logPomodoroEvent('休憩開始', 0, lagSec);
+    state.pomoZeroTimestamp = 0;
+    
+    updatePomoUIState();
+    startPomoTimerTick();
+  });
+
+  document.getElementById('pomo-stop-btn')?.addEventListener('click', () => {
+    initAudioContext();
+    if (state.pomoTimerInterval) {
+      clearInterval(state.pomoTimerInterval);
+      state.pomoTimerInterval = null;
+    }
+    
+    let lagSec = 0;
+    if ((state.pomoState === 'work_complete' || state.pomoState === 'break_complete') && state.pomoZeroTimestamp > 0) {
+      lagSec = Math.round((Date.now() - state.pomoZeroTimestamp) / 1000);
+    }
+    
+    logPomodoroEvent('終了', state.pomoAccumulatedSeconds, lagSec);
+    
+    state.pomoState = 'idle';
+    state.pomoSecondsLeft = 25 * 60;
+    state.pomoAccumulatedSeconds = 0;
+    state.pomoZeroTimestamp = 0;
+    
+    const display = document.getElementById('pomo-display');
+    if (display) display.textContent = "25:00";
+    updatePomoUIState();
+  });
+}
