@@ -2,6 +2,7 @@ import { DEFAULT_API_KEY } from './constants';
 import { showToast, showLoader, hideLoader, closeModal, applyCurriculumModeUI } from './ui';
 import { testGeminiApiKey, testGasConnection, testGasEmailProgram, syncTextbookMappingToGas } from './api';
 import { renderDashboard } from './stats';
+import { updatePomoUIState } from './pomo';
 
 // Declaring external rendering dependencies that will be bound from main
 let renderSubjectSelectorRef: (() => void) | null = null;
@@ -62,6 +63,7 @@ export function saveApiKey(): void {
     renderDashboard();
   }
   applyCurriculumModeUI();
+  updatePomoUIState();
 }
 
 export async function testApiConnection(): Promise<void> {

@@ -57,17 +57,24 @@ export function updatePomoUIState(): void {
   const resumeBtn = document.getElementById('pomo-resume-btn');
   const breakBtn = document.getElementById('pomo-break-btn');
   const stopBtn = document.getElementById('pomo-stop-btn');
+  const devBtn = document.getElementById('pomo-dev-test-btn');
 
   if (startBtn && pauseBtn && resumeBtn && breakBtn && stopBtn) {
     [startBtn, pauseBtn, resumeBtn, breakBtn, stopBtn].forEach(btn => btn.style.display = 'none');
+    if (devBtn) devBtn.style.display = 'none';
+
+    const studentName = localStorage.getItem('math_student_name') || '';
+    const isDev = (studentName === 'Schlödinger' || studentName === 'Schldinger');
 
     if (state.pomoState === 'idle') {
       startBtn.style.display = 'inline-block';
       startBtn.textContent = '🚀 作業開始';
+      if (isDev && devBtn) devBtn.style.display = 'inline-block';
     } else if (state.pomoState === 'work') {
       pauseBtn.style.display = 'inline-block';
       breakBtn.style.display = 'inline-block';
       stopBtn.style.display = 'inline-block';
+      if (isDev && devBtn) devBtn.style.display = 'inline-block';
     } else if (state.pomoState === 'work_paused') {
       resumeBtn.style.display = 'inline-block';
       stopBtn.style.display = 'inline-block';
@@ -76,6 +83,7 @@ export function updatePomoUIState(): void {
       startBtn.style.display = 'inline-block';
       startBtn.textContent = '🚀 作業開始';
       stopBtn.style.display = 'inline-block';
+      if (isDev && devBtn) devBtn.style.display = 'inline-block';
     } else if (state.pomoState === 'break_paused') {
       resumeBtn.style.display = 'inline-block';
       stopBtn.style.display = 'inline-block';
@@ -444,5 +452,24 @@ export function setupPomodoroHandlers(): void {
     const display = document.getElementById('pomo-display');
     if (display) display.textContent = "25:00";
     updatePomoUIState();
+  });
+
+  document.getElementById('pomo-dev-test-btn')?.addEventListener('click', () => {
+    initAudioContext();
+    if (state.pomoState === 'idle' || state.pomoState === 'work_complete' || state.pomoState === 'break_complete') {
+      state.pomoSecondsLeft = 2;
+      state.pomoState = 'work';
+      logPomodoroEvent('作業開始', 0, 0);
+      updatePomoUIState();
+      startPomoTimerTick();
+      state.pomoStateStartTime = Date.now();
+      state.pomoTimerStartSecondsLeft = 2;
+      showToast('テスト：2秒の作業タイマーを開始しました。');
+    } else if (state.pomoState === 'work' || state.pomoState === 'break') {
+      state.pomoSecondsLeft = 2;
+      state.pomoStateStartTime = Date.now();
+      state.pomoTimerStartSecondsLeft = 2;
+      showToast('テスト：タイマーを残り2秒に短縮しました。');
+    }
   });
 }
