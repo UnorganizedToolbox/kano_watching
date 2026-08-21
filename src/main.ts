@@ -26,7 +26,7 @@ import {
   restoreSession,
   resetSession
 } from './exam';
-import { setupPomodoroHandlers, renderPomoSubjects, saveAndLogOnClose, initPomodoroUI, stopPomoOnLeave } from './pomo';
+import { setupPomodoroHandlers, renderPomoSubjects, saveAndLogOnClose, initPomodoroUI } from './pomo';
 import { setupQuestionHandlers, initQuestionUI } from './question';
 
 declare global {
@@ -287,10 +287,3 @@ window.addEventListener('pagehide', () => {
   saveAndLogOnClose();
 });
 
-// Tab visibility tracking
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    // Stop pomodoro logging or track timing if necessary
-    stopPomoOnLeave();
-  }
-});
