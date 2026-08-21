@@ -2,7 +2,7 @@ import { state } from './state';
 import { DEFAULT_POMO_SUBJECTS } from './constants';
 import { showToast, switchView } from './ui';
 import { formatPomoTime } from './utils';
-import { initAudioContext, playPomoAlert } from './audio';
+import { initAudioContext, playPomoAlert, startSilentLoop, stopSilentLoop } from './audio';
 import { logPomodoroEventToGas, syncPomodoroLogsFromGas } from './api';
 
 export function initPomodoroUI(): void {
@@ -155,6 +155,8 @@ export function startPomoTimerTick(): void {
   if (state.pomoTimerInterval) {
     clearInterval(state.pomoTimerInterval);
   }
+  
+  startSilentLoop();
   
   state.pomoStateStartTime = Date.now();
   state.pomoTimerStartSecondsLeft = state.pomoSecondsLeft;
@@ -375,6 +377,8 @@ export function setupPomodoroHandlers(): void {
       state.pomoTimerInterval = null;
     }
     
+    stopSilentLoop();
+    
     logPomodoroEvent('一時停止', state.pomoAccumulatedSeconds, 0);
     
     state.pomoState = (state.pomoState === 'work') ? 'work_paused' : 'break_paused';
@@ -422,6 +426,8 @@ export function setupPomodoroHandlers(): void {
       clearInterval(state.pomoTimerInterval);
       state.pomoTimerInterval = null;
     }
+    
+    stopSilentLoop();
     
     let lagSec = 0;
     if ((state.pomoState === 'work_complete' || state.pomoState === 'break_complete') && state.pomoZeroTimestamp > 0) {
