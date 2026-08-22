@@ -149,6 +149,11 @@ window.submitPasscode = submitPasscode;
 // Event Listeners registration
 // -------------------------------------------------------------
 function setupEventListeners(): void {
+  // Tab Navigation click handlers
+  document.getElementById('tab-exam-btn')?.addEventListener('click', () => switchView('setup'));
+  document.getElementById('tab-pomodoro-btn')?.addEventListener('click', () => switchView('pomodoro'));
+  document.getElementById('tab-question-btn')?.addEventListener('click', () => switchView('question'));
+
   // Passcode listeners
   document.getElementById('submit-passcode-btn')?.addEventListener('click', window.submitPasscode);
   document.getElementById('passcode-input')?.addEventListener('keypress', (e: KeyboardEvent) => {
