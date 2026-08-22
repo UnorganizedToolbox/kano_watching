@@ -64,7 +64,7 @@ export function updatePomoUIState(): void {
     if (devBtn) devBtn.style.display = 'none';
 
     const studentName = localStorage.getItem('math_student_name') || '';
-    const isDev = (studentName === 'Schlödinger' || studentName === 'Schldinger' || studentName === 'Schrödinger');
+    const isDev = (studentName === 'Schlödinger');
 
     if (state.pomoState === 'idle') {
       startBtn.style.display = 'inline-block';
