@@ -7,3 +7,5 @@ __pycache__/
 *.tmp
 node_modules/
 dist/
+app_original_js_backup.js
+grill_context_docs.md
