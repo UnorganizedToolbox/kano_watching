@@ -10,7 +10,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return new Response(
       JSON.stringify({
         status: 'error',
-        message: 'Cloudflare環境変数 [GAS_URL] が設定されていません。管理画面から設定してください。'
+        message: 'Cloudflare環境変数 [GAS_URL] が設定されていません。Pages管理画面の「設定」➔「環境変数」で本番環境に設定し、再デプロイしてください。'
       }),
       {
         status: 500,
@@ -21,12 +21,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
   try {
     const bodyText = await request.text();
+    
+    // Explicitly add redirect follow to handle GAS 302 redirects
     const response = await fetch(gasUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: bodyText
+      body: bodyText,
+      redirect: 'follow'
     });
 
     const resBody = await response.text();
@@ -37,10 +40,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       }
     });
   } catch (err: any) {
+    const maskedUrl = gasUrl.length > 15 ? `${gasUrl.substring(0, 15)}...${gasUrl.substring(gasUrl.length - 5)}` : 'Invalid URL';
     return new Response(
       JSON.stringify({
         status: 'error',
-        message: `GASプロキシサーバーエラー: ${err.message || err}`
+        message: `GASプロキシサーバーエラー: ${err.message || err} (転送先: ${maskedUrl})`
       }),
       {
         status: 500,
