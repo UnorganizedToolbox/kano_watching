@@ -258,6 +258,12 @@ function setupEventListeners(): void {
 // App Initializer
 // -------------------------------------------------------------
 async function initApp(): Promise<void> {
+  // Synchronize Vite environment variable for GAS URL to localStorage automatically
+  const envGasUrl = import.meta.env.VITE_GAS_URL;
+  if (envGasUrl) {
+    localStorage.setItem('math_google_sheets_url', envGasUrl);
+  }
+
   // Bind subject selector rendering back to settings
   setRenderSubjectSelector(renderSubjectSelector);
   

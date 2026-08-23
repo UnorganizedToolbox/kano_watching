@@ -182,6 +182,43 @@ function doPost(e) {
     }
 
     // --------------------------------------------
+    // B2. 一時テストアカウント（Admin / Test）の作成 - 認証バイパス
+    // --------------------------------------------
+    if (data.action === "create_temp_test_admin_accounts") {
+      var configSheet = ss.getSheetByName("⚙️ アカウント設定");
+      if (!configSheet) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "アカウント設定シートがありません。" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      var rows = configSheet.getDataRange().getValues();
+      var testExists = false;
+      var adminExists = false;
+      var testId = "std_test";
+      var adminId = "std_admin";
+      
+      for (var i = 1; i < rows.length; i++) {
+        if (rows[i][0] === testId) testExists = true;
+        if (rows[i][0] === adminId) adminExists = true;
+      }
+      
+      var nowStr = new Date().toLocaleString("ja-JP");
+      
+      if (!testExists) {
+        configSheet.appendRow([testId, "Test", "ktgiyey@gmail.com", "有効", nowStr]);
+      }
+      if (!adminExists) {
+        configSheet.appendRow([adminId, "Admin", "ktgiyey@gmail.com", "有効", nowStr]);
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        testId: testId,
+        adminId: adminId
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // --------------------------------------------
     // 以降のアクションはすべて「生徒ID」による認証を必須とする
     // --------------------------------------------
     var userAuth = authenticateUser(ss, data.studentId);
@@ -195,7 +232,68 @@ function doPost(e) {
     data.email = userAuth.email;
     
     var emailList = getNotificationEmails(ss, data.studentId, data.email);
-    
+
+    // --------------------------------------------
+    // B3. Test / Admin のテストデータとログの完全消去 (管理者機能)
+    // --------------------------------------------
+    if (data.action === "delete_test_admin_logs") {
+      // Admin 権限チェック (ログイン名が Admin であること)
+      if (userAuth.studentName !== "Admin") {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "この操作を実行する権限がありません。" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      var targetNames = ["test", "admin"];
+      var sheets = ss.getSheets();
+      
+      for (var s = 0; s < sheets.length; s++) {
+        var sheet = sheets[s];
+        var sheetName = sheet.getName();
+        
+        // 1. 生徒個別の詳細シートの削除 (👤 std_test_Test や 👤 std_admin_Admin など)
+        var isTargetSheet = false;
+        targetNames.forEach(function(tName) {
+          if (sheetName.toLowerCase().indexOf(tName) !== -1) {
+            isTargetSheet = true;
+          }
+        });
+        
+        if (isTargetSheet && sheetName.indexOf("👤") === 0) {
+          ss.deleteSheet(sheet);
+          continue;
+        }
+        
+        // 2. その他のログシート内の行削除と行詰め
+        var lastRow = sheet.getLastRow();
+        if (lastRow < 2) continue;
+        
+        var values = sheet.getDataRange().getValues();
+        // 下から逆順ループで行削除
+        for (var r = lastRow; r >= 2; r--) {
+          var rowData = values[r - 1];
+          var shouldDelete = false;
+          
+          for (var c = 0; c < rowData.length; c++) {
+            var valStr = String(rowData[c]).toLowerCase();
+            if (valStr === "test" || valStr === "admin" || valStr === "std_test" || valStr === "std_admin") {
+              shouldDelete = true;
+              break;
+            }
+          }
+          
+          if (shouldDelete) {
+            sheet.deleteRow(r);
+          }
+        }
+      }
+      
+      // 総合サマリー数式を再構成
+      updateSummarySheet(ss);
+      
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "テストデータを削除し行詰めを完了しました。" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // --------------------------------------------
     // C. Question Box (question_to_tutor)
     // --------------------------------------------

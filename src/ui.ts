@@ -21,7 +21,7 @@ function getViews(): Record<ViewName, HTMLElement> {
 }
 
 export function switchView(viewName: ViewName): void {
-  const isDev = localStorage.getItem('math_student_name') === 'Schlödinger';
+  const isDev = localStorage.getItem('math_student_name') === 'Admin';
   const targetView = isDev ? 'debug' : viewName;
 
   const views = getViews();
@@ -124,7 +124,7 @@ export function showToast(message: string, type: ToastType = 'info'): void {
 }
 
 export function applyCurriculumModeUI(): void {
-  const isDev = localStorage.getItem('math_student_name') === 'Schlödinger';
+  const isDev = localStorage.getItem('math_student_name') === 'Admin';
   if (isDev) {
     switchView('debug');
     return;

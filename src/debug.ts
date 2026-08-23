@@ -5,8 +5,7 @@ import { playPomoAlert, startBgmPlayback, stopBgmPlayback, unlockAudio } from '.
 import { testGeminiApiKey, testGasEmailProgram, sendResultEmailToGas } from './api';
 
 export function setupDebugHandlers(): void {
-  const isDev = localStorage.getItem('math_student_name') === 'Schlödinger';
-  if (!isDev) return;
+  // Bind listeners unconditionally on startup so they function after Admin login
 
   // 1. Timer tests
   document.getElementById('debug-timer-2s-btn')?.addEventListener('click', () => {
@@ -80,7 +79,7 @@ export function setupDebugHandlers(): void {
     }
     
     // 100% 正答率のダミーテスト結果を送信
-    const studentName = localStorage.getItem('math_student_name') || 'Schlödinger';
+    const studentName = localStorage.getItem('math_student_name') || 'Admin';
     const dummyReport = {
       totalScore: 100,
       questions: [
@@ -122,7 +121,7 @@ export function setupDebugHandlers(): void {
       showToast('デバッグエラー: スプレッドシートURLが未設定です。', 'danger');
       return;
     }
-    const studentName = localStorage.getItem('math_student_name') || 'Schlödinger';
+    const studentName = localStorage.getItem('math_student_name') || 'Admin';
     
     showToast('デバッグ: GASメール送信テストを実行中...');
     try {
@@ -149,26 +148,45 @@ export function setupDebugHandlers(): void {
     }
   });
 
-  // 4. Name change / general mode switcher
-  const changeNameBtn = document.getElementById('debug-save-name-btn');
-  const changeNameInput = document.getElementById('debug-change-name-input') as HTMLInputElement;
-  if (changeNameBtn && changeNameInput) {
-    changeNameBtn.addEventListener('click', () => {
-      const newName = changeNameInput.value.trim();
-      if (!newName) {
-        showToast('名前を入力してください。', 'warning');
-        return;
-      }
-      if (newName === 'Schlödinger') {
-        showToast('すでに開発者モードです。', 'warning');
+  // 4. Test & Admin data clear action
+  const deleteLogsBtn = document.getElementById('debug-delete-test-logs-btn');
+  if (deleteLogsBtn) {
+    deleteLogsBtn.addEventListener('click', async () => {
+      const sheetsUrl = localStorage.getItem('math_google_sheets_url');
+      if (!sheetsUrl) {
+        showToast('連携用URLが設定されていません。', 'danger');
         return;
       }
       
-      localStorage.setItem('math_student_name', newName);
-      showToast(`名前を「${newName}」に変更しました。一般モードへ戻るためリロードします...`, 'success');
-      setTimeout(() => {
-        location.reload();
-      }, 1500);
+      if (!confirm('本当に Test と Admin の全学習記録をスプレッドシート上から削除しますか？\n（この操作は元に戻せません。空き行は自動で詰められます）')) {
+        return;
+      }
+      
+      const btn = deleteLogsBtn as HTMLButtonElement;
+      btn.disabled = true;
+      showToast('テストデータをクリア中...');
+      
+      try {
+        const response = await fetch(sheetsUrl, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'delete_test_admin_logs'
+          })
+        });
+        if (!response.ok) {
+          throw new Error(`接続エラー: ${response.statusText}`);
+        }
+        const resJson = await response.json();
+        if (resJson.status !== 'success') {
+          throw new Error(resJson.message || 'データ削除処理に失敗しました。');
+        }
+        
+        showToast('Test & Admin のテスト履歴を完全消去しました。', 'success');
+      } catch (err: any) {
+        showToast(`エラー: ${err.message}`, 'danger');
+      } finally {
+        btn.disabled = false;
+      }
     });
   }
 

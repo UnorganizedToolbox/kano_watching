@@ -313,6 +313,14 @@ export function setupAuthHandlers(): void {
         showToast('お名前を入力してください。', 'warning');
         return;
       }
+      
+      // Validation to block "test" and "admin" strings
+      const lowerName = name.toLowerCase();
+      if (lowerName.includes('test') || lowerName.includes('admin')) {
+        showToast('使用禁止文字が含まれています。', 'warning');
+        return;
+      }
+
       if (!email) {
         showToast('メールアドレスを入力してください。', 'warning');
         return;
@@ -333,6 +341,47 @@ export function setupAuthHandlers(): void {
       } catch (err: any) {
         hideLoader();
         showToast(err.message || '利用申請の送信に失敗しました。', 'danger');
+      }
+    };
+  }
+
+  // 5. Temporary Test Account Creator (Admin / Test accounts setup)
+  const btnCreateTemp = document.getElementById('auth-create-temp-btn');
+  if (btnCreateTemp) {
+    btnCreateTemp.onclick = async () => {
+      const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
+      if (!sheetsUrl) {
+        showToast('連携用URLが設定されていません。環境変数をご確認ください。', 'warning');
+        return;
+      }
+      
+      showLoader('アカウント作成中...', 'Test & Admin アカウントを登録中...');
+      
+      try {
+        const response = await fetch(sheetsUrl, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'create_temp_test_admin_accounts'
+          })
+        });
+        if (!response.ok) {
+          throw new Error(`接続エラー: ${response.statusText}`);
+        }
+        const resJson = await response.json();
+        if (resJson.status !== 'success') {
+          throw new Error(resJson.message || '作成に失敗しました。');
+        }
+        
+        hideLoader();
+        alert(`一時テストアカウントを作成しました！\n\n【一般用】\n生徒名: Test\n生徒ID: ${resJson.testId}\n\n【管理者用】\n生徒名: Admin\n生徒ID: ${resJson.adminId}\n\n上記のIDを入力してログインしてください。`);
+        
+        // Fill input automatically with testId
+        const inputId = document.getElementById('auth-student-id-input') as HTMLInputElement;
+        if (inputId) inputId.value = resJson.testId;
+        
+      } catch (err: any) {
+        hideLoader();
+        showToast(err.message || 'アカウント作成に失敗しました。', 'danger');
       }
     };
   }
