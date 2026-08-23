@@ -14,6 +14,7 @@ function getViews(): Record<ViewName, HTMLElement> {
       stats: document.getElementById('stats-view')!,
       pomodoro: document.getElementById('pomodoro-view')!,
       question: document.getElementById('question-view')!,
+      settings: document.getElementById('settings-view')!,
       debug: document.getElementById('debug-view')!
     };
   }

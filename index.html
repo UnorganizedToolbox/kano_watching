@@ -61,9 +61,13 @@
         
         <!-- Login Form -->
         <div id="auth-login-form">
-          <div class="form-group" style="text-align: left; margin-bottom: 1.2rem;">
+          <div class="form-group" style="text-align: left; margin-bottom: 1rem;">
             <label class="form-label" for="auth-student-id-input">生徒ID</label>
-            <input type="text" class="form-input" id="auth-student-id-input" placeholder="std_xxxxxxxx" style="width: 100%; box-sizing: border-box; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; outline: none;">
+            <input type="text" class="form-input" id="auth-student-id-input" placeholder="std_xxxxxxxx" style="width: 100%; box-sizing: border-box; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); color: var(--text-primary); outline: none;">
+          </div>
+          <div class="form-group" style="text-align: left; margin-bottom: 1.2rem;">
+            <label class="form-label" for="auth-student-password-input">パスワード</label>
+            <input type="password" class="form-input" id="auth-student-password-input" placeholder="5桁のパスワード" style="width: 100%; box-sizing: border-box; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); color: var(--text-primary); outline: none;">
           </div>
           <button class="btn btn-primary" id="auth-login-btn" style="width: 100%;">ログイン</button>
         </div>
@@ -599,34 +603,88 @@
     </div>
   </div>
 
-  <!-- Settings Modal Overlay -->
-  <div class="modal-overlay" id="settings-modal">
-    <div class="modal-container">
-      <div class="modal-header">
-        <h3>システム設定</h3>
-        <button class="modal-close" id="close-settings-btn" aria-label="閉じる">×</button>
-      </div>
-      
+    <!-- VIEW 8: SETTINGS (独立ビュー) -->
+  <div id="settings-view" class="view">
+    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+      <button class="btn btn-secondary" id="back-settings-btn" style="width: auto; padding: 0.5rem 1rem; font-size: 0.85rem; height: 36px; margin: 0; display: flex; align-items: center; gap: 0.3rem;">
+        ◀ 戻る
+      </button>
+      <h2 style="margin: 0; font-family: var(--font-title); font-size: 1.4rem;">⚙️ システム設定</h2>
+    </div>
+
+    <div class="card">
+      <h3>基本設定</h3>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.2rem;">GeminiのAPIキーおよびカリキュラム（対象学年）を選択してください。</p>
+
       <div class="form-group">
         <label class="form-label" for="api-key-input">Gemini API Key</label>
-        <input type="password" class="form-input" id="api-key-input" placeholder="AIZAaSy...">
+        <input type="password" class="form-input" id="api-key-input" placeholder="AIZAaSy..." style="width: 100%; box-sizing: border-box; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); color: var(--text-primary); outline: none;">
         <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;">
           ※キーは暗号化されたローカルストレージ（ブラウザ内）にのみ保存されます。
         </p>
       </div>
 
-      <div class="form-group" style="margin-top: 1rem;">
-        <label class="form-label" for="student-name-input">生徒名（学習管理用・変更不可）</label>
-        <input type="text" class="form-input" id="student-name-input" placeholder="例：山田 太郎" style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; outline: none;" disabled>
+      <div class="form-group" style="margin-top: 1.2rem;">
+        <label class="form-label" for="curriculum-mode-input">対象学年・カリキュラム</label>
+        <select class="form-input" id="curriculum-mode-input" style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); color: var(--text-primary); outline: none;">
+          <option value="junior_high">中学数学・高校受験対策 (推奨)</option>
+          <option value="high_school">高校数学</option>
+          <option value="university">大学生 (統計管理・自習モード)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; gap: 0.6rem; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" id="test-connection-btn" style="flex: 1; font-size: 0.85rem; padding: 0.7rem; height: auto;">接続テスト</button>
+        <button class="btn btn-secondary" id="test-program-btn" style="flex: 1.2; font-size: 0.85rem; padding: 0.7rem; background: rgba(245, 158, 11, 0.06); border-color: rgba(245, 158, 11, 0.15); color: var(--accent-warning); height: auto;">プログラムテスト</button>
+      </div>
+    </div>
+
+    <!-- パスワード変更ブロック -->
+    <div class="card" style="margin-top: 1.2rem;">
+      <h3>🔑 パスワード変更</h3>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.2rem;">ログイン用のパスワードを再設定できます。</p>
+
+      <div class="form-group">
+        <label class="form-label" for="change-pass-current">現在のパスワード</label>
+        <input type="password" class="form-input" id="change-pass-current" placeholder="現在のパスワードを入力" style="width: 100%; box-sizing: border-box; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); color: var(--text-primary); outline: none;">
       </div>
 
       <div class="form-group" style="margin-top: 1rem;">
-        <label class="form-label">ログインID情報</label>
+        <label class="form-label" for="change-pass-new">新しいパスワード</label>
+        <input type="password" class="form-input" id="change-pass-new" placeholder="新しいパスワードを入力" style="width: 100%; box-sizing: border-box; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); color: var(--text-primary); outline: none;">
+      </div>
+
+      <div class="form-group" style="margin-top: 1rem;">
+        <label class="form-label" for="change-pass-new-confirm">新しいパスワード (再入力)</label>
+        <input type="password" class="form-input" id="change-pass-new-confirm" placeholder="新しいパスワードをもう一度入力" style="width: 100%; box-sizing: border-box; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); color: var(--text-primary); outline: none;">
+      </div>
+
+      <button class="btn btn-primary" id="change-password-btn" style="width: 100%; margin-top: 1.2rem; height: auto;">パスワードを更新する</button>
+    </div>
+
+    <!-- アカウント＆ログイン情報ブロック -->
+    <div class="card" style="margin-top: 1.2rem;">
+      <h3>👤 ログインアカウント情報</h3>
+      <div class="form-group" style="margin-top: 0.8rem;">
+        <label class="form-label" for="student-name-input">ログイン名（生徒名・変更不可）</label>
+        <input type="text" class="form-input" id="student-name-input" placeholder="例：山田 太郎" style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); color: var(--text-primary); outline: none;" disabled>
+      </div>
+
+      <div class="form-group" style="margin-top: 1rem;">
+        <label class="form-label">生徒ID情報</label>
         <div style="display: flex; gap: 0.5rem; align-items: center;">
-          <div id="settings-student-id-display" style="flex: 1; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); font-size: 0.85rem; color: var(--text-secondary); font-family: monospace;">-</div>
+          <div id="settings-student-id-display" style="flex: 1; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); font-size: 0.85rem; color: var(--text-secondary); font-family: monospace;">-</div>
           <button class="btn btn-danger" id="settings-logout-btn" style="width: auto; font-size: 0.75rem; padding: 0.4rem 0.8rem; height: 40px; margin: 0;">ログアウト</button>
         </div>
       </div>
+    </div>
+
+    <!-- 設定保存ボタン -->
+    <button class="btn btn-primary" id="save-settings-btn" style="width: 100%; margin-top: 1.5rem; margin-bottom: 2rem; height: auto;">設定を保存して戻る</button>
+    
+    <!-- 隠しインプット（内部連携用） -->
+    <input type="password" id="google-sheets-url-input" style="display: none;">
+  </div>
 
 
 

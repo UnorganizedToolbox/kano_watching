@@ -168,16 +168,49 @@ function doPost(e) {
     // B. Login Student (ログイン認証) - 認証バイパス
     // --------------------------------------------
     if (data.action === "login_student") {
-      var auth = authenticateUser(ss, data.studentId);
-      if (!auth.success) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: auth.message }))
+      var accountSheet = ss.getSheetByName("⚙️ アカウント設定");
+      if (!accountSheet) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "アカウント設定シートがありません。" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      var rows = accountSheet.getDataRange().getValues();
+      var foundUser = null;
+      var inputId = (data.studentId || "").toString().trim();
+      var inputPass = (data.password || "").toString().trim();
+      
+      for (var i = 1; i < rows.length; i++) {
+        if (rows[i][0].toString().trim() === inputId) {
+          foundUser = {
+            id: rows[i][0],
+            name: rows[i][1],
+            email: rows[i][2],
+            status: rows[i][3] ? rows[i][3].toString().trim() : "有効",
+            password: rows[i][5] ? rows[i][5].toString().trim() : ""
+          };
+          break;
+        }
+      }
+      
+      if (!foundUser) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "生徒IDが見つかりません。" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      if (foundUser.status === "無効") {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "この生徒IDは無効化されています。" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      if (foundUser.password !== inputPass) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "パスワードが一致しません。" }))
           .setMimeType(ContentService.MimeType.JSON);
       }
       
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
-        studentName: auth.studentName,
-        email: auth.email
+        studentName: foundUser.name,
+        email: foundUser.email
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -205,16 +238,17 @@ function doPost(e) {
       var nowStr = new Date().toLocaleString("ja-JP");
       
       if (!testExists) {
-        configSheet.appendRow([testId, "Test", "ktgiyey@gmail.com", "有効", nowStr]);
+        configSheet.appendRow([testId, "Test", "ktgiyey@gmail.com", "有効", nowStr, "12345"]);
       }
       if (!adminExists) {
-        configSheet.appendRow([adminId, "Admin", "ktgiyey@gmail.com", "有効", nowStr]);
+        configSheet.appendRow([adminId, "Admin", "ktgiyey@gmail.com", "有効", nowStr, "12345"]);
       }
       
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
         testId: testId,
-        adminId: adminId
+        adminId: adminId,
+        password: "12345"
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -291,6 +325,54 @@ function doPost(e) {
       updateSummarySheet(ss);
       
       return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "テストデータを削除し行詰めを完了しました。" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // --------------------------------------------
+    // B4. Change Password (パスワード変更)
+    // --------------------------------------------
+    if (data.action === "change_password") {
+      var accountSheet = ss.getSheetByName("⚙️ アカウント設定");
+      if (!accountSheet) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "アカウント設定シートがありません。" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      var rows = accountSheet.getDataRange().getValues();
+      var userRowIndex = -1;
+      var currentStoredPass = "";
+      
+      var targetId = data.studentId.toString().trim();
+      var currentInputPass = (data.currentPassword || "").toString().trim();
+      var newInputPass = (data.newPassword || "").toString().trim();
+      
+      if (!currentInputPass || !newInputPass) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "現在のパスワードと新しいパスワードを両方入力してください。" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      for (var i = 1; i < rows.length; i++) {
+        if (rows[i][0].toString().trim() === targetId) {
+          userRowIndex = i + 1; // 1-indexed
+          currentStoredPass = rows[i][5] ? rows[i][5].toString().trim() : "";
+          break;
+        }
+      }
+      
+      if (userRowIndex === -1) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "対象のアカウントが見つかりません。" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      if (currentStoredPass !== currentInputPass) {
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "現在のパスワードが間違っています。" }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      // Update password cell (F column = index 6)
+      accountSheet.getRange(userRowIndex, 6).setValue(newInputPass);
+      
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "パスワードを更新しました。" }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -572,8 +654,8 @@ function initializeSystem() {
   
   // 3. Account Sheet (⚙️ アカウント設定)
   var accountSheet = ss.insertSheet("⚙️ アカウント設定");
-  accountSheet.appendRow(["生徒ID", "生徒名", "生徒メールアドレス", "アカウント状態", "登録日"]);
-  accountSheet.getRange("A1:E1").setFontWeight("bold").setBackground("#fee2e2");
+  accountSheet.appendRow(["生徒ID", "生徒名", "生徒メールアドレス", "アカウント状態", "登録日", "初期パスワード"]);
+  accountSheet.getRange("A1:F1").setFontWeight("bold").setBackground("#fee2e2");
   
   // 4. Request List Sheet (⚙️ 承認待ちリスト)
   var requestSheet = ss.insertSheet("⚙️ 承認待ちリスト");
@@ -648,10 +730,12 @@ function approveSelectedRequest() {
   
   // 生徒固有ID (推測困難なランダム8文字) の生成
   var studentId = "std_" + generateRandomId(8);
+  // ログイン用の5桁の初期パスワードを生成
+  var initPassword = generateRandomId(5);
   
   // ⚙️ アカウント設定シートに登録
   var accountSheet = ss.getSheetByName("⚙️ アカウント設定");
-  accountSheet.appendRow([studentId, studentName, email, "有効", new Date().toLocaleString("ja-JP")]);
+  accountSheet.appendRow([studentId, studentName, email, "有効", new Date().toLocaleString("ja-JP"), initPassword]);
   
   // ⚙️ 承認待ちリストシートのステータスと発行IDを更新
   sheet.getRange(row, 4).setValue("承認");
@@ -676,10 +760,12 @@ function approveSelectedRequest() {
   var subject = "【数学診断アプリ】利用申請が承認されました";
   var body = studentName + " 様\n\n" +
              "個別指導数学診断アプリの利用申請が承認されました！\n" +
-             "アプリを起動し、ログイン画面で以下の「生徒ID」を入力してログインしてください。\n\n" +
+             "アプリを起動し、ログイン画面で以下の「生徒ID」と「パスワード」を入力してログインしてください。\n\n" +
              "-----------------------------------------\n" +
              "■ ログイン用 生徒ID: " + studentId + "\n" +
+             "■ 初期パスワード: " + initPassword + "\n" +
              "-----------------------------------------\n\n" +
+             "※ ログイン後、セキュリティのため設定画面からパスワードを新しいものへ変更してください。\n\n" +
              "【アプリの初期設定について】\n" +
              "1. アプリへのログイン後、すぐに診断テストや質問箱を利用できます。\n" +
              "2. アプリの診断機能にはAIを使用します。管理者が提供する以下の「共用APIキー」を設定に入力してください：\n" +
@@ -696,7 +782,7 @@ function approveSelectedRequest() {
     body: body
   });
   
-  ui.alert("成功", "生徒「" + studentName + "」を承認し、ID (" + studentId + ") をメール送信しました。", ui.ButtonSet.OK);
+  ui.alert("成功", "生徒「" + studentName + "」を承認し、ID (" + studentId + ") と初期パスワード (" + initPassword + ") をメール送信しました。", ui.ButtonSet.OK);
 }
 
 // ランダム英数字ID生成ヘルパー

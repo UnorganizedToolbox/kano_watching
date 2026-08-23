@@ -436,10 +436,11 @@ export async function requestRegistration(sheetsUrl: string, studentName: string
   return resJson.message;
 }
 
-export async function loginStudent(sheetsUrl: string, studentId: string): Promise<{ studentName: string, email: string }> {
+export async function loginStudent(sheetsUrl: string, studentId: string, password: string): Promise<{ studentName: string, email: string }> {
   const payload = {
     action: 'login_student',
-    studentId: studentId
+    studentId: studentId,
+    password: password
   };
   const response = await fetch(sheetsUrl, {
     method: 'POST',

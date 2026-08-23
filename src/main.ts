@@ -7,7 +7,7 @@ import {
   saveApiKey,
   testApiConnection,
   testProgramExecution,
-  syncTextbookMapping,
+  changePassword,
   autoSyncTextbookMapping,
   setRenderSubjectSelector,
   setupAuthHandlers,
@@ -152,13 +152,26 @@ window.submitPasscode = submitPasscode;
 // Event Listeners registration
 // -------------------------------------------------------------
 function setupEventListeners(): void {
+  const checkExamInProgressAndWarn = (): boolean => {
+    if (state.activeSession && !state.activeSession.isFinished) {
+      showToast('テスト実施中はタブ切り替えができません。一時停止または終了してください。', 'warning');
+      return true;
+    }
+    return false;
+  };
+
   // Tab Navigation click handlers
   document.getElementById('tab-exam-btn')?.addEventListener('click', () => {
+    if (checkExamInProgressAndWarn()) return;
     stopPomoOnLeave();
     switchView('setup');
   });
-  document.getElementById('tab-pomodoro-btn')?.addEventListener('click', () => switchView('pomodoro'));
+  document.getElementById('tab-pomodoro-btn')?.addEventListener('click', () => {
+    if (checkExamInProgressAndWarn()) return;
+    switchView('pomodoro');
+  });
   document.getElementById('tab-question-btn')?.addEventListener('click', () => {
+    if (checkExamInProgressAndWarn()) return;
     stopPomoOnLeave();
     switchView('question');
     initQuestionUI();
@@ -215,19 +228,28 @@ function setupEventListeners(): void {
     });
   }
   
-  // Settings & Backup handlers
-  document.getElementById('settings-btn')?.addEventListener('click', () => openModal('settings-modal'));
-  document.getElementById('close-settings-btn')?.addEventListener('click', () => closeModal('settings-modal'));
+  // Settings View Navigation Handlers
+  document.getElementById('settings-btn')?.addEventListener('click', () => {
+    if (state.activeSession && !state.activeSession.isFinished) {
+      showToast('テスト実施中は設定画面を開けません。', 'warning');
+      return;
+    }
+    loadApiKey();
+    switchView('settings');
+  });
+  document.getElementById('back-settings-btn')?.addEventListener('click', () => switchView('setup'));
   document.getElementById('save-settings-btn')?.addEventListener('click', saveApiKey);
   document.getElementById('test-connection-btn')?.addEventListener('click', testApiConnection);
   document.getElementById('test-program-btn')?.addEventListener('click', testProgramExecution);
   document.getElementById('stats-nav-btn')?.addEventListener('click', () => {
+    if (state.activeSession && !state.activeSession.isFinished) {
+      showToast('テスト実施中は統計画面を開けません。', 'warning');
+      return;
+    }
     switchView('stats');
     initStatsPage();
   });
-  
-  document.getElementById('export-backup-btn')?.addEventListener('click', exportBackup);
-  document.getElementById('sync-textbook-btn')?.addEventListener('click', syncTextbookMapping);
+  document.getElementById('change-password-btn')?.addEventListener('click', changePassword);
   document.getElementById('clear-history-btn')?.addEventListener('click', clearHistory);
   
   document.getElementById('report-issue-btn')?.addEventListener('click', () => {
@@ -238,11 +260,6 @@ function setupEventListeners(): void {
   });
   
   document.getElementById('direct-input-btn')?.addEventListener('click', startDirectInput);
-
-  // Close modal when clicking outside
-  document.getElementById('settings-modal')?.addEventListener('click', (e: any) => {
-    if (e.target.id === 'settings-modal') closeModal('settings-modal');
-  });
 
   // LMS Handlers
   setupPomodoroHandlers();

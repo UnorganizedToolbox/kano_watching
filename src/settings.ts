@@ -250,24 +250,31 @@ export function setupAuthHandlers(): void {
   }
   
   // 3. Login Action
-  if (btnLogin && inputStudentId) {
+  const inputPassword = document.getElementById('auth-student-password-input') as HTMLInputElement;
+  if (btnLogin && inputStudentId && inputPassword) {
     btnLogin.onclick = async () => {
       const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
       if (!sheetsUrl) {
-        showToast('「連携用URL」が設定されていません。下部の接続連携設定からURLを登録してください。', 'warning');
+        showToast('連携用URLが設定されていません。', 'warning');
         return;
       }
       
       const studentId = inputStudentId.value.trim();
+      const password = inputPassword.value.trim();
+      
       if (!studentId) {
         showToast('生徒IDを入力してください。', 'warning');
         return;
       }
+      if (!password) {
+        showToast('パスワードを入力してください。', 'warning');
+        return;
+      }
       
-      showLoader('ログイン中...', '生徒IDを照合しています。');
+      showLoader('ログイン中...', '認証情報を照合しています。');
       
       try {
-        const result = await loginStudent(sheetsUrl, studentId);
+        const result = await loginStudent(sheetsUrl, studentId, password);
         
         // Save auth state
         localStorage.setItem('math_student_id', studentId);
@@ -314,9 +321,9 @@ export function setupAuthHandlers(): void {
         return;
       }
       
-      // Validation to block "test" and "admin" strings
+      // Validation to block "test", "admin" and "administrator" exact matches
       const lowerName = name.toLowerCase();
-      if (lowerName.includes('test') || lowerName.includes('admin')) {
+      if (lowerName === 'test' || lowerName === 'admin' || lowerName === 'administrator') {
         showToast('使用禁止文字が含まれています。', 'warning');
         return;
       }
@@ -373,11 +380,13 @@ export function setupAuthHandlers(): void {
         }
         
         hideLoader();
-        alert(`一時テストアカウントを作成しました！\n\n【一般用】\n生徒名: Test\n生徒ID: ${resJson.testId}\n\n【管理者用】\n生徒名: Admin\n生徒ID: ${resJson.adminId}\n\n上記のIDを入力してログインしてください。`);
+        alert(`一時テストアカウントを作成しました！\n\n【一般用】\n生徒名: Test\n生徒ID: ${resJson.testId}\n初期パスワード: ${resJson.password}\n\n【管理者用】\n生徒名: Admin\n生徒ID: ${resJson.adminId}\n初期パスワード: ${resJson.password}\n\nこれらを入力してログインしてください。`);
         
-        // Fill input automatically with testId
+        // Fill inputs automatically with test account credentials
         const inputId = document.getElementById('auth-student-id-input') as HTMLInputElement;
+        const inputPass = document.getElementById('auth-student-password-input') as HTMLInputElement;
         if (inputId) inputId.value = resJson.testId;
+        if (inputPass) inputPass.value = resJson.password;
         
       } catch (err: any) {
         hideLoader();
@@ -400,11 +409,83 @@ export function logoutStudent(): void {
       studentNameInput.disabled = false;
     }
     
-    // Reset login ID input
+    // Reset login ID & password inputs
     const inputStudentId = document.getElementById('auth-student-id-input') as HTMLInputElement;
+    const inputStudentPass = document.getElementById('auth-student-password-input') as HTMLInputElement;
     if (inputStudentId) inputStudentId.value = '';
+    if (inputStudentPass) inputStudentPass.value = '';
     
     showToast('ログアウトしました。');
     switchView('auth');
+  }
+}
+
+export async function changePassword(): Promise<void> {
+  const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
+  const studentId = localStorage.getItem('math_student_id') || '';
+  if (!sheetsUrl || !studentId) {
+    showToast('認証エラー：再ログインしてください。', 'danger');
+    return;
+  }
+
+  const inputCurrent = document.getElementById('change-pass-current') as HTMLInputElement;
+  const inputNew = document.getElementById('change-pass-new') as HTMLInputElement;
+  const inputConfirm = document.getElementById('change-pass-new-confirm') as HTMLInputElement;
+
+  if (!inputCurrent || !inputNew || !inputConfirm) return;
+
+  const currentPass = inputCurrent.value.trim();
+  const newPass = inputNew.value.trim();
+  const confirmPass = inputConfirm.value.trim();
+
+  if (!currentPass) {
+    showToast('現在のパスワードを入力してください。', 'warning');
+    return;
+  }
+  if (!newPass) {
+    showToast('新しいパスワードを入力してください。', 'warning');
+    return;
+  }
+  if (newPass.length < 5) {
+    showToast('パスワードは5文字以上で入力してください。', 'warning');
+    return;
+  }
+  if (newPass !== confirmPass) {
+    showToast('新しいパスワードが再入力の値と一致しません。', 'warning');
+    return;
+  }
+
+  showLoader('パスワード変更中...', 'サーバーと通信しています。');
+
+  try {
+    const response = await fetch(sheetsUrl, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'change_password',
+        studentId: studentId,
+        currentPassword: currentPass,
+        newPassword: newPass
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`接続エラー: ${response.statusText}`);
+    }
+
+    const resJson = await response.json();
+    if (resJson.status !== 'success') {
+      throw new Error(resJson.message || 'パスワード変更処理に失敗しました。');
+    }
+
+    hideLoader();
+    showToast('パスワードを正常に変更しました！', 'success');
+
+    // Clear fields
+    inputCurrent.value = '';
+    inputNew.value = '';
+    inputConfirm.value = '';
+  } catch (err: any) {
+    hideLoader();
+    showToast(err.message || 'パスワードの変更に失敗しました。', 'danger');
   }
 }
