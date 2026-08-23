@@ -26,8 +26,9 @@ import {
   restoreSession,
   resetSession
 } from './exam';
-import { setupPomodoroHandlers, renderPomoSubjects, saveAndLogOnClose, initPomodoroUI } from './pomo';
+import { setupPomodoroHandlers, renderPomoSubjects, saveAndLogOnClose, initPomodoroUI, stopPomoOnLeave } from './pomo';
 import { setupQuestionHandlers, initQuestionUI } from './question';
+import { setupDebugHandlers } from './debug';
 
 declare global {
   interface Window {
@@ -150,9 +151,16 @@ window.submitPasscode = submitPasscode;
 // -------------------------------------------------------------
 function setupEventListeners(): void {
   // Tab Navigation click handlers
-  document.getElementById('tab-exam-btn')?.addEventListener('click', () => switchView('setup'));
+  document.getElementById('tab-exam-btn')?.addEventListener('click', () => {
+    stopPomoOnLeave();
+    switchView('setup');
+  });
   document.getElementById('tab-pomodoro-btn')?.addEventListener('click', () => switchView('pomodoro'));
-  document.getElementById('tab-question-btn')?.addEventListener('click', () => switchView('question'));
+  document.getElementById('tab-question-btn')?.addEventListener('click', () => {
+    stopPomoOnLeave();
+    switchView('question');
+    initQuestionUI();
+  });
 
   // Passcode listeners
   document.getElementById('submit-passcode-btn')?.addEventListener('click', window.submitPasscode);
@@ -237,6 +245,7 @@ function setupEventListeners(): void {
   // LMS Handlers
   setupPomodoroHandlers();
   setupQuestionHandlers();
+  setupDebugHandlers();
 }
 
 // -------------------------------------------------------------

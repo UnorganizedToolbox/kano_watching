@@ -12,17 +12,21 @@ function getViews(): Record<ViewName, HTMLElement> {
       report: document.getElementById('report-view')!,
       stats: document.getElementById('stats-view')!,
       pomodoro: document.getElementById('pomodoro-view')!,
-      question: document.getElementById('question-view')!
+      question: document.getElementById('question-view')!,
+      debug: document.getElementById('debug-view')!
     };
   }
   return viewsCached;
 }
 
 export function switchView(viewName: ViewName): void {
+  const isDev = localStorage.getItem('math_student_name') === 'Schlödinger';
+  const targetView = isDev ? 'debug' : viewName;
+
   const views = getViews();
   Object.keys(views).forEach(name => {
     const key = name as ViewName;
-    if (key === viewName) {
+    if (key === targetView) {
       views[key].classList.add('active');
     } else {
       views[key].classList.remove('active');
@@ -32,7 +36,9 @@ export function switchView(viewName: ViewName): void {
   // Handle Main Tab bar visibility and active state
   const tabContainer = document.getElementById('app-main-tabs');
   if (tabContainer) {
-    if (viewName === 'setup' || viewName === 'pomodoro' || viewName === 'question' || viewName === 'stats') {
+    if (isDev) {
+      tabContainer.style.display = 'none';
+    } else if (viewName === 'setup' || viewName === 'pomodoro' || viewName === 'question' || viewName === 'stats') {
       tabContainer.style.display = 'flex';
       
       // Deactivate all tab buttons
@@ -117,6 +123,12 @@ export function showToast(message: string, type: ToastType = 'info'): void {
 }
 
 export function applyCurriculumModeUI(): void {
+  const isDev = localStorage.getItem('math_student_name') === 'Schlödinger';
+  if (isDev) {
+    switchView('debug');
+    return;
+  }
+
   const mode = localStorage.getItem('math_curriculum_mode') || 'junior_high';
   const tabExam = document.getElementById('tab-exam-btn');
   const statsNavBtn = document.getElementById('stats-nav-btn');
@@ -132,7 +144,13 @@ export function applyCurriculumModeUI(): void {
     
     // Auto route to pomodoro if we are in setup/exam and in university mode
     const activeView = document.querySelector('.view.active');
-    if (activeView && (activeView.id === 'setup-view' || activeView.id === 'exam-view')) {
+    if (activeView && (
+      activeView.id === 'setup-view' || 
+      activeView.id === 'exam-view' || 
+      activeView.id === 'upload-view' || 
+      activeView.id === 'correction-view' || 
+      activeView.id === 'report-view'
+    )) {
       switchView('pomodoro');
     }
   } else {

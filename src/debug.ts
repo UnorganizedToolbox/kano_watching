@@ -1,0 +1,203 @@
+import { state } from './state';
+import { showToast } from './ui';
+import { startPomoTimerTick, stopPomoOnLeave } from './pomo';
+import { playPomoAlert, startBgmPlayback, stopBgmPlayback, unlockAudio } from './audio';
+import { testGeminiApiKey, testGasEmailProgram, sendResultEmailToGas } from './api';
+
+export function setupDebugHandlers(): void {
+  const isDev = localStorage.getItem('math_student_name') === 'Schlödinger';
+  if (!isDev) return;
+
+  // 1. Timer tests
+  document.getElementById('debug-timer-2s-btn')?.addEventListener('click', () => {
+    unlockAudio();
+    state.pomoSecondsLeft = 2;
+    state.pomoState = 'work';
+    state.pomoStateStartTime = Date.now();
+    state.pomoTimerStartSecondsLeft = 2;
+    startPomoTimerTick();
+    showToast('デバッグ: 2秒タイマーを開始しました。');
+  });
+
+  document.getElementById('debug-timer-15m-btn')?.addEventListener('click', () => {
+    unlockAudio();
+    state.pomoSecondsLeft = 15 * 60;
+    state.pomoState = 'work';
+    state.pomoStateStartTime = Date.now();
+    state.pomoTimerStartSecondsLeft = 15 * 60;
+    startPomoTimerTick();
+    showToast('デバッグ: 15分タイマーを開始しました。');
+  });
+
+  document.getElementById('debug-timer-25m-btn')?.addEventListener('click', () => {
+    unlockAudio();
+    state.pomoSecondsLeft = 25 * 60;
+    state.pomoState = 'work';
+    state.pomoStateStartTime = Date.now();
+    state.pomoTimerStartSecondsLeft = 25 * 60;
+    startPomoTimerTick();
+    showToast('デバッグ: 25分タイマーを開始しました。');
+  });
+
+  document.getElementById('debug-timer-stop-btn')?.addEventListener('click', () => {
+    stopPomoOnLeave();
+    showToast('デバッグ: タイマーを停止しました。');
+  });
+
+  // 2. Sound tests
+  document.getElementById('debug-sound-alert-btn')?.addEventListener('click', () => {
+    unlockAudio();
+    playPomoAlert(true); // force play!
+    showToast('デバッグ: アラーム音テスト再生を指示しました。');
+  });
+
+  document.getElementById('debug-sound-bgm-start-btn')?.addEventListener('click', () => {
+    unlockAudio();
+    startBgmPlayback();
+    showToast('デバッグ: BGM再生を開始しました。');
+  });
+
+  document.getElementById('debug-sound-bgm-stop-btn')?.addEventListener('click', () => {
+    stopBgmPlayback();
+    showToast('デバッグ: BGM再生を停止しました。');
+  });
+
+  // 3. API / GAS tests
+  document.getElementById('debug-gas-send-exam-btn')?.addEventListener('click', async () => {
+    const sheetsUrl = localStorage.getItem('math_google_sheets_url');
+    if (!sheetsUrl) {
+      showToast('デバッグエラー: スプレッドシートURLが未設定です。', 'danger');
+      return;
+    }
+    
+    // 100% 正答率のダミーテスト結果を送信
+    const studentName = localStorage.getItem('math_student_name') || 'Schlödinger';
+    const dummyReport = {
+      totalScore: 100,
+      questions: [
+        { id: "debug_q1", score: 25, isCorrect: true, commentary: "デバッグ送信: 完璧な記述です。" },
+        { id: "debug_q2", score: 25, isCorrect: true, commentary: "デバッグ送信: 途中式も完璧です。" },
+        { id: "debug_q3", score: 25, isCorrect: true, commentary: "デバッグ送信: 正しい展開です。" },
+        { id: "debug_q4", score: 25, isCorrect: true, commentary: "デバッグ送信: 答えが正確に導かれています。" }
+      ],
+      weaknesses: "デバッグ送信: 弱点はありません。非常に優秀な成績です。",
+      recommendation: "デバッグ送信: 次の章へ進んでください。"
+    };
+    
+    const payload = {
+      action: 'submit_exam_result',
+      timestamp: new Date().toLocaleString('ja-JP'),
+      studentName: studentName,
+      curriculumMode: localStorage.getItem('math_curriculum_mode') || 'junior_high',
+      subjectName: 'デバッグ数学（100%送信）',
+      score: 100,
+      maxScore: 100,
+      duration: '0分2秒',
+      weaknesses: dummyReport.weaknesses,
+      recommendation: dummyReport.recommendation,
+      reportJson: JSON.stringify(dummyReport)
+    };
+    
+    showToast('デバッグ: 100%正答率でのGAS送信を試みています...');
+    try {
+      await sendResultEmailToGas(sheetsUrl, payload);
+      showToast('デバッグ: GAS送信リクエストを投げました (opaque)。', 'success');
+    } catch (e: any) {
+      showToast(`デバッグエラー: ${e.message}`, 'danger');
+    }
+  });
+
+  document.getElementById('debug-gas-email-btn')?.addEventListener('click', async () => {
+    const sheetsUrl = localStorage.getItem('math_google_sheets_url');
+    if (!sheetsUrl) {
+      showToast('デバッグエラー: スプレッドシートURLが未設定です。', 'danger');
+      return;
+    }
+    const studentName = localStorage.getItem('math_student_name') || 'Schlödinger';
+    
+    showToast('デバッグ: GASメール送信テストを実行中...');
+    try {
+      await testGasEmailProgram(sheetsUrl, studentName);
+      showToast('デバッグ: ダミーメールテストリクエストを投げました (opaque)。', 'success');
+    } catch (e: any) {
+      showToast(`デバッグエラー: ${e.message}`, 'danger');
+    }
+  });
+
+  document.getElementById('debug-gemini-test-btn')?.addEventListener('click', async () => {
+    const apiKey = localStorage.getItem('gemini_api_key');
+    if (!apiKey) {
+      showToast('デバッグエラー: Gemini APIキーが未設定です。', 'danger');
+      return;
+    }
+    
+    showToast('デバッグ: Gemini API接続確認中...');
+    try {
+      await testGeminiApiKey(apiKey);
+      showToast('デバッグ: Gemini API接続成功！', 'success');
+    } catch (e: any) {
+      showToast(`デバッグエラー: ${e.message}`, 'danger');
+    }
+  });
+
+  // 4. Name change / general mode switcher
+  const changeNameBtn = document.getElementById('debug-save-name-btn');
+  const changeNameInput = document.getElementById('debug-change-name-input') as HTMLInputElement;
+  if (changeNameBtn && changeNameInput) {
+    changeNameBtn.addEventListener('click', () => {
+      const newName = changeNameInput.value.trim();
+      if (!newName) {
+        showToast('名前を入力してください。', 'warning');
+        return;
+      }
+      if (newName === 'Schlödinger') {
+        showToast('すでに開発者モードです。', 'warning');
+        return;
+      }
+      
+      localStorage.setItem('math_student_name', newName);
+      showToast(`名前を「${newName}」に変更しました。一般モードへ戻るためリロードします...`, 'success');
+      setTimeout(() => {
+        location.reload();
+      }, 1500);
+    });
+  }
+
+  // Start state logging loop
+  startDebugConsoleLogger();
+}
+
+function startDebugConsoleLogger(): void {
+  const consoleEl = document.getElementById('debug-console-log') as HTMLTextAreaElement;
+  if (!consoleEl) return;
+
+  const logState = () => {
+    const debugInfo = {
+      timestamp: new Date().toLocaleTimeString(),
+      state: {
+        pomoState: state.pomoState,
+        pomoSecondsLeft: state.pomoSecondsLeft,
+        pomoAccumulatedSeconds: state.pomoAccumulatedSeconds,
+        pomoBgmUrl: state.pomoBgmUrl ? '(BLOB URL: ' + state.pomoBgmUrl.substring(0, 30) + '...)' : null,
+        pomoBgmFileName: state.pomoBgmFileName,
+        activeSession: state.activeSession ? {
+          currentQuestionIndex: state.activeSession.currentQuestionIndex,
+          elapsedSeconds: state.activeSession.elapsedSeconds,
+          isPaused: state.activeSession.isPaused,
+          isFinished: state.activeSession.isFinished
+        } : null
+      },
+      localStorage: {
+        math_student_name: localStorage.getItem('math_student_name'),
+        math_google_sheets_url: localStorage.getItem('math_google_sheets_url') ? '設定あり' : '設定なし',
+        gemini_api_key: localStorage.getItem('gemini_api_key') ? '設定あり' : '設定なし',
+        math_curriculum_mode: localStorage.getItem('math_curriculum_mode')
+      }
+    };
+
+    consoleEl.value = JSON.stringify(debugInfo, null, 2);
+  };
+
+  logState();
+  setInterval(logState, 1000);
+}

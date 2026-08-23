@@ -2,7 +2,7 @@ import { state } from './state';
 import { DEFAULT_POMO_SUBJECTS } from './constants';
 import { showToast, switchView } from './ui';
 import { formatPomoTime } from './utils';
-import { initAudioContext, playPomoAlert, startSilentLoop, stopSilentLoop } from './audio';
+import { initAudio, unlockAudio, startBgmPlayback, pauseBgmPlayback, resumeBgmPlayback, stopBgmPlayback, playPomoAlert, registerTimeUpdateCallback } from './audio';
 import { logPomodoroEventToGas, syncPomodoroLogsFromGas } from './api';
 
 export function initPomodoroUI(): void {
@@ -159,28 +159,23 @@ export async function logPomodoroEvent(event: string, elapsedSec: number, lagSec
   }
 }
 
-export function startPomoTimerTick(): void {
-  if (state.pomoTimerInterval) {
-    clearInterval(state.pomoTimerInterval);
-  }
+export function tickPomoTimer(): void {
+  if (state.pomoState !== 'work' && state.pomoState !== 'break') return;
+
+  const elapsedRealSeconds = Math.floor((Date.now() - state.pomoStateStartTime) / 1000);
+  const nextSecondsLeft = state.pomoTimerStartSecondsLeft - elapsedRealSeconds;
   
-  startSilentLoop();
-  
-  state.pomoStateStartTime = Date.now();
-  state.pomoTimerStartSecondsLeft = state.pomoSecondsLeft;
-  const initialAccumulated = state.pomoAccumulatedSeconds;
-  
-  state.pomoTimerInterval = window.setInterval(() => {
-    const elapsedRealSeconds = Math.floor((Date.now() - state.pomoStateStartTime) / 1000);
-    state.pomoSecondsLeft = state.pomoTimerStartSecondsLeft - elapsedRealSeconds;
-    state.pomoAccumulatedSeconds = initialAccumulated + elapsedRealSeconds;
+  if (nextSecondsLeft !== state.pomoSecondsLeft) {
+    state.pomoSecondsLeft = nextSecondsLeft >= 0 ? nextSecondsLeft : 0;
+    
+    // Calculate accumulated seconds for log
+    const prevAccumulated = state.pomoAccumulatedSeconds;
+    state.pomoAccumulatedSeconds = Math.max(prevAccumulated, state.pomoTimerStartSecondsLeft - state.pomoSecondsLeft);
     
     const displayEl = document.getElementById('pomo-display');
     if (state.pomoSecondsLeft > 0) {
       if (displayEl) displayEl.textContent = formatPomoTime(state.pomoSecondsLeft);
     } else {
-      state.pomoSecondsLeft = 0;
-      state.pomoAccumulatedSeconds = initialAccumulated + state.pomoTimerStartSecondsLeft;
       if (state.pomoTimerInterval) {
         clearInterval(state.pomoTimerInterval);
         state.pomoTimerInterval = null;
@@ -202,7 +197,24 @@ export function startPomoTimerTick(): void {
       if (displayEl) displayEl.textContent = formatPomoTime(state.pomoSecondsLeft);
       updatePomoUIState();
     }
-  }, 1000);
+  }
+}
+
+export function startPomoTimerTick(): void {
+  if (state.pomoTimerInterval) {
+    clearInterval(state.pomoTimerInterval);
+  }
+  
+  startBgmPlayback();
+  
+  state.pomoStateStartTime = Date.now();
+  state.pomoTimerStartSecondsLeft = state.pomoSecondsLeft;
+  
+  // Register HTML5 audio timeupdate events for background ticking
+  registerTimeUpdateCallback(tickPomoTimer);
+  
+  // Foreground smooth setInterval ticking
+  state.pomoTimerInterval = window.setInterval(tickPomoTimer, 1000);
 }
 
 export function saveAndLogOnClose(): void {
@@ -353,7 +365,7 @@ export function setupPomodoroHandlers(): void {
   }
 
   document.getElementById('pomo-start-btn')?.addEventListener('click', () => {
-    initAudioContext();
+    unlockAudio();
     const select = document.getElementById('pomo-subject-select') as HTMLSelectElement;
     const memo = document.getElementById('pomo-memo-input') as HTMLInputElement;
     
@@ -379,13 +391,13 @@ export function setupPomodoroHandlers(): void {
   });
 
   document.getElementById('pomo-pause-btn')?.addEventListener('click', () => {
-    initAudioContext();
+    unlockAudio();
     if (state.pomoTimerInterval) {
       clearInterval(state.pomoTimerInterval);
       state.pomoTimerInterval = null;
     }
     
-    stopSilentLoop();
+    pauseBgmPlayback();
     
     logPomodoroEvent('一時停止', state.pomoAccumulatedSeconds, 0);
     
@@ -394,7 +406,7 @@ export function setupPomodoroHandlers(): void {
   });
 
   document.getElementById('pomo-resume-btn')?.addEventListener('click', () => {
-    initAudioContext();
+    unlockAudio();
     logPomodoroEvent('作業再開', 0, 0);
     state.pomoState = (state.pomoState === 'work_paused') ? 'work' : 'break';
     
@@ -403,7 +415,7 @@ export function setupPomodoroHandlers(): void {
   });
 
   document.getElementById('pomo-break-btn')?.addEventListener('click', () => {
-    initAudioContext();
+    unlockAudio();
     const select = document.getElementById('pomo-subject-select') as HTMLSelectElement;
     const memo = document.getElementById('pomo-memo-input') as HTMLInputElement;
     
@@ -429,13 +441,13 @@ export function setupPomodoroHandlers(): void {
   });
 
   document.getElementById('pomo-stop-btn')?.addEventListener('click', () => {
-    initAudioContext();
+    unlockAudio();
     if (state.pomoTimerInterval) {
       clearInterval(state.pomoTimerInterval);
       state.pomoTimerInterval = null;
     }
     
-    stopSilentLoop();
+    stopBgmPlayback();
     
     let lagSec = 0;
     if ((state.pomoState === 'work_complete' || state.pomoState === 'break_complete') && state.pomoZeroTimestamp > 0) {
@@ -455,7 +467,7 @@ export function setupPomodoroHandlers(): void {
   });
 
   document.getElementById('pomo-dev-test-btn')?.addEventListener('click', () => {
-    initAudioContext();
+    unlockAudio();
     if (state.pomoState === 'idle' || state.pomoState === 'work_complete' || state.pomoState === 'break_complete') {
       state.pomoSecondsLeft = 2;
       state.pomoState = 'work';
@@ -472,4 +484,54 @@ export function setupPomodoroHandlers(): void {
       showToast('テスト：タイマーを残り2秒に短縮しました。');
     }
   });
+
+  // BGM file change/clear handlers
+  const bgmFileInput = document.getElementById('pomo-bgm-file') as HTMLInputElement;
+  const bgmClearBtn = document.getElementById('pomo-bgm-clear-btn') as HTMLElement;
+  const bgmStatusEl = document.getElementById('pomo-bgm-status') as HTMLElement;
+  
+  if (bgmFileInput) {
+    bgmFileInput.addEventListener('change', (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      
+      if (state.pomoBgmUrl) {
+        URL.revokeObjectURL(state.pomoBgmUrl);
+      }
+      
+      state.pomoBgmUrl = URL.createObjectURL(file);
+      state.pomoBgmFileName = file.name;
+      
+      if (bgmStatusEl) {
+        bgmStatusEl.textContent = `選択中: ${file.name}`;
+        bgmStatusEl.style.color = 'var(--accent-success)';
+      }
+      if (bgmClearBtn) {
+        bgmClearBtn.style.display = 'inline-block';
+      }
+      showToast(`BGMに「${file.name}」を設定しました。`, 'success');
+      unlockAudio();
+    });
+  }
+  
+  if (bgmClearBtn) {
+    bgmClearBtn.addEventListener('click', () => {
+      if (state.pomoBgmUrl) {
+        URL.revokeObjectURL(state.pomoBgmUrl);
+      }
+      state.pomoBgmUrl = null;
+      state.pomoBgmFileName = null;
+      
+      if (bgmFileInput) bgmFileInput.value = '';
+      if (bgmStatusEl) {
+        bgmStatusEl.textContent = '※未設定の場合、無音ループでバックグラウンド実行を維持します。';
+        bgmStatusEl.style.color = '';
+      }
+      bgmClearBtn.style.display = 'none';
+      showToast('BGMを解除しました。');
+      
+      stopBgmPlayback();
+      unlockAudio();
+    });
+  }
 }

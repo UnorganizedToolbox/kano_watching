@@ -471,6 +471,14 @@
             <label class="form-label" for="pomo-memo-input" style="margin-bottom: 0.3rem;">学習内容・使用教材</label>
             <input type="text" class="form-input" id="pomo-memo-input" placeholder="例: チャート式 p.15 練習問題" style="width: 100%; padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);">
           </div>
+          <div>
+            <label class="form-label" for="pomo-bgm-file" style="margin-bottom: 0.3rem; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <span>作業用BGM (ローカル音声ファイル)</span>
+              <span id="pomo-bgm-clear-btn" style="font-size: 0.75rem; color: #ef4444; cursor: pointer; display: none; font-weight: normal;">🗑️ BGMを解除</span>
+            </label>
+            <input type="file" id="pomo-bgm-file" accept="audio/*" class="form-input" style="width: 100%; padding: 0.6rem; font-size: 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);">
+            <div id="pomo-bgm-status" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">※未設定の場合、無音ループでバックグラウンド実行を維持します。</div>
+          </div>
         </div>
 
         <!-- Control Buttons -->
@@ -619,6 +627,70 @@
     </div>
   </div>
 
+  <!-- VIEW 9: DEBUG / DEVELOPER PANEL -->
+  <div id="debug-view" class="view">
+    <div class="card">
+      <h2 style="font-family: var(--font-title); font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--accent-warning);">🛠️ デバッグ・テストダッシュボード (Schlödinger)</h2>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+        この画面は開発者モード専用です。各種機能の動作検証やバグ発見に利用してください。
+      </p>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; text-align: left;">
+        
+        <!-- Timer Test Section -->
+        <div class="card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">⏱️ タイマーテスト</h3>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <button class="btn btn-primary" id="debug-timer-2s-btn">⚡ 2秒タイマー開始</button>
+            <button class="btn btn-secondary" id="debug-timer-15m-btn">🕐 15分タイマー開始</button>
+            <button class="btn btn-secondary" id="debug-timer-25m-btn">⏳ 25分タイマー開始</button>
+            <button class="btn btn-danger" id="debug-timer-stop-btn">🛑 タイマー停止</button>
+          </div>
+        </div>
+
+        <!-- Sound & Alert Test Section -->
+        <div class="card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">🔊 音声・アラームテスト</h3>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <button class="btn btn-primary" id="debug-sound-alert-btn">🔔 アラーム通知音を再生 (3回ビープ)</button>
+            <button class="btn btn-secondary" id="debug-sound-bgm-start-btn">🎵 BGM（または無音）再生開始</button>
+            <button class="btn btn-danger" id="debug-sound-bgm-stop-btn">🔇 BGM再生停止</button>
+          </div>
+        </div>
+
+        <!-- API & GAS Test Section -->
+        <div class="card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">🌐 API・外部連携テスト</h3>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <button class="btn btn-primary" id="debug-gas-send-exam-btn">📧 診断結果を100%正答率でGAS送信</button>
+            <button class="btn btn-secondary" id="debug-gas-email-btn">🧪 GAS接続＆ダミーメール送信テスト</button>
+            <button class="btn btn-secondary" id="debug-gemini-test-btn">🤖 Gemini API接続確認</button>
+          </div>
+        </div>
+
+        <!-- State & Config Section -->
+        <div class="card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">⚙️ アカウント設定切り替え</h3>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <div>
+              <label style="font-size: 0.8rem; color: var(--text-muted);">現在の名前: <strong id="debug-current-name">Schlödinger</strong></label>
+            </div>
+            <input type="text" id="debug-change-name-input" class="form-input" placeholder="名前を一般名（例: タロウ）に変更" style="width: 100%; padding: 0.5rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);">
+            <button class="btn btn-warning" id="debug-save-name-btn" style="padding: 0.5rem 1rem;">一般モードに戻る (リロード)</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Debug Info Logs -->
+      <div style="margin-top: 1.5rem; text-align: left;">
+        <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">📋 ローカルストレージ / ステートログ</h3>
+        <textarea id="debug-console-log" readonly style="width: 100%; height: 180px; font-family: monospace; font-size: 0.8rem; padding: 0.8rem; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #10b981; resize: none;"></textarea>
+      </div>
+
+    </div>
+  </div>
+
   <!-- VIEW: REPORT ISSUE MODAL -->
   <div class="modal-overlay" id="report-modal">
     <div class="modal-container" style="max-width: 450px;">
@@ -657,6 +729,11 @@
 
   <!-- Toast Notification -->
   <div class="toast" id="toast-notify">メッセージ</div>
+
+  <!-- App Version Tag -->
+  <div id="app-version-tag" style="position: fixed; bottom: 8px; right: 8px; font-size: 0.7rem; color: rgba(255, 255, 255, 0.4); background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.08); pointer-events: none; z-index: 9999; font-family: 'Outfit', monospace; letter-spacing: 0.5px;">
+    v0.11
+  </div>
 
   <!-- App Main Javascript Code -->
   <script type="module" src="/src/main.ts"></script>

@@ -15,6 +15,8 @@ export const state = {
   pomoSelectedSubject: '数学',
   pomoMemo: '',
   pomoTimerStartSecondsLeft: 25 * 60,
+  pomoBgmUrl: null as string | null,
+  pomoBgmFileName: null as string | null,
   
   // Question Box state
   questionImageBase64: null as string | null
