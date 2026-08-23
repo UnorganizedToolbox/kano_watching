@@ -176,7 +176,6 @@ export function sendWebNotification(title: string, body: string): void {
 
 export function playPomoAlert(forced = false): void {
   try {
-    const isBackground = document.visibilityState === 'hidden';
     const currentPomoState = state.pomoState;
     const title = currentPomoState === 'work' ? '作業終了！☕' : '休憩終了！🚀';
     const body = currentPomoState === 'work' ? '休憩を開始してください。' : '次の作業を開始してください。';
@@ -184,32 +183,29 @@ export function playPomoAlert(forced = false): void {
     // Always trigger push notification
     sendWebNotification(title, body);
 
-    // Audio alarm is ONLY triggered when the page is in the background
-    // (Foreground alerts are notified via web notification / browser alerts to prevent obtrusive sounds)
-    if (isBackground || forced) {
-      // Pause BGM during alert
-      pauseBgmPlayback();
-      
-      initAudio();
-      if (!globalAlertEl) return;
-      
-      const customAlertPath = `${(import.meta as any).env?.BASE_URL || '/'}audio/alarm.mp3`;
-      
-      // Check if custom static alert sound exists, otherwise fallback to base64 beep
-      fetch(customAlertPath, { method: 'HEAD' })
-        .then(res => {
-          if (res.ok) {
-            globalAlertEl!.src = customAlertPath;
-          } else {
-            globalAlertEl!.src = BEEP_WAV_B64;
-          }
-          triggerBeepSequence();
-        })
-        .catch(() => {
+    // Always play alert sound (both foreground and background)
+    // iOS Safari auto-play policy is bypassed since audio is unlocked during timer start
+    pauseBgmPlayback();
+    
+    initAudio();
+    if (!globalAlertEl) return;
+    
+    const customAlertPath = `${(import.meta as any).env?.BASE_URL || '/'}audio/alarm.mp3`;
+    
+    // Check if custom static alert sound exists, otherwise fallback to base64 beep
+    fetch(customAlertPath, { method: 'HEAD' })
+      .then(res => {
+        if (res.ok) {
+          globalAlertEl!.src = customAlertPath;
+        } else {
           globalAlertEl!.src = BEEP_WAV_B64;
-          triggerBeepSequence();
-        });
-    }
+        }
+        triggerBeepSequence();
+      })
+      .catch(() => {
+        globalAlertEl!.src = BEEP_WAV_B64;
+        triggerBeepSequence();
+      });
   } catch (err) {
     console.error("Failed to execute alert sequence:", err);
   }
