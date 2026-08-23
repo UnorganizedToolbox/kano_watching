@@ -207,6 +207,19 @@ export function setupAuthHandlers(): void {
   // Set initial sheets url if any
   const savedUrl = localStorage.getItem('math_google_sheets_url') || '';
   if (inputSheetsUrl) inputSheetsUrl.value = savedUrl;
+
+  // Toggle URL configuration area
+  const btnToggleConfig = document.getElementById('auth-toggle-url-config-btn');
+  const areaConfig = document.getElementById('auth-url-config-area');
+  if (btnToggleConfig && areaConfig) {
+    btnToggleConfig.onclick = () => {
+      if (areaConfig.style.display === 'none') {
+        areaConfig.style.display = 'block';
+      } else {
+        areaConfig.style.display = 'none';
+      }
+    };
+  }
   
   // 1. Tab Switching
   if (tabLogin && tabRegister && formLogin && formRegister) {
