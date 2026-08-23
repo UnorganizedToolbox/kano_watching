@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
-  <script type="module" crossorigin src="./assets/index-Ck3NwtZB.js"></script>
+  <script type="module" crossorigin src="./assets/index-CyxL_-F7.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index--Ln2fNBC.css">
 </head>
 <body>
@@ -82,18 +82,9 @@
           <button class="btn btn-primary" id="auth-register-btn" style="width: 100%;">利用申請を送信する</button>
         </div>
 
-        <!-- Connection setup collapsible -->
-        <div style="margin-top: 2rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 1rem; text-align: left;">
-          <details>
-            <summary style="font-size: 0.75rem; color: var(--text-muted); cursor: pointer; outline: none;">⚙️ 接続連携設定（管理者用）</summary>
-            <div style="margin-top: 0.8rem;">
-              <div class="form-group" style="margin-bottom: 0.8rem;">
-                <label class="form-label" style="font-size: 0.7rem;" for="auth-sheets-url-input">連携用URL（GASウェブアプリ）</label>
-                <input type="password" class="form-input" id="auth-sheets-url-input" placeholder="https://script.google.com/macros/s/..." style="width: 100%; font-size: 0.8rem; box-sizing: border-box; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; outline: none;">
-              </div>
-              <button class="btn btn-secondary" id="auth-save-url-btn" style="font-size: 0.75rem; padding: 0.4rem 1rem; height: auto; width: auto;">URLを保存</button>
-            </div>
-          </details>
+        <!-- Temporary Test Account Creator -->
+        <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 1.2rem;">
+          <button class="btn btn-secondary" id="auth-create-temp-btn" style="width: 100%; font-size: 0.8rem; padding: 0.6rem; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.2); color: #fbbf24; height: auto;">🛠️ 一時テストアカウント (Admin/Test) を作成</button>
         </div>
       </div>
     </div>
@@ -640,12 +631,9 @@
 
 
 
-      <div class="form-group" style="margin-top: 1rem;">
+      <div class="form-group" style="margin-top: 1rem; display: none;">
         <label class="form-label" for="google-sheets-url-input">連携用URL（GAS等によるメール送信先）</label>
         <input type="password" class="form-input" id="google-sheets-url-input" placeholder="https://script.google.com/macros/s/..." style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.05); color: white; outline: none;">
-        <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.4rem;">
-          ※GASなどのWebアプリURLを設定すると、テスト完了時に結果が自動でメール送信されます。
-        </p>
       </div>
 
       <div class="form-group" style="margin-top: 1rem;">
@@ -664,34 +652,15 @@
         </div>
         <button class="btn btn-primary" id="save-settings-btn" style="width: 100%;">設定を保存</button>
       </div>
-      
-      <!-- Backup / Restore System -->
-      <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 1.5rem; padding-top: 1.2rem;">
-        <h4 style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.6rem;">データの移行・引き継ぎ</h4>
-        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-          <button class="btn btn-secondary" id="export-backup-btn" style="font-size: 0.85rem; padding: 0.6rem 1rem;">📤 バックアップ書き出し (.json)</button>
-          
-          <button class="btn btn-secondary" onclick="triggerImportBackup()" style="font-size: 0.85rem; padding: 0.6rem 1rem;">📥 バックアップ読み込み (.json)</button>
-          <input type="file" id="import-backup-file" accept=".json" style="display: none;" onchange="handleImportBackup(event)">
-        </div>
-      </div>
-
-      <!-- Textbook Mapping Import System -->
-      <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 1.5rem; padding-top: 1.2rem;">
-        <h4 style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.6rem;">教材マッピング同期</h4>
-        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-          <button class="btn btn-secondary" id="sync-textbook-btn" style="font-size: 0.85rem; padding: 0.6rem 1rem; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #34d399;">📖 教材データをスプレッドシートに同期</button>
-        </div>
-      </div>
     </div>
   </div>
 
   <!-- VIEW 9: DEBUG / DEVELOPER PANEL -->
   <div id="debug-view" class="view">
     <div class="card">
-      <h2 style="font-family: var(--font-title); font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--accent-warning);">🛠️ デバッグ・テストダッシュボード (Schlödinger)</h2>
+      <h2 style="font-family: var(--font-title); font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--accent-warning);">🛠️ デバッグ・テストダッシュボード (Admin)</h2>
       <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-        この画面は開発者モード専用です。各種機能の動作検証やバグ発見に利用してください。
+        この画面は管理者専用です。各種機能の動作検証やテストデータのクリアに利用してください。
       </p>
 
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; text-align: left;">
@@ -733,18 +702,14 @@
           </div>
         </div>
 
-        <!-- State & Config Section -->
+                <!-- Test & Admin Data Purge Section -->
         <div class="card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem;">
-          <h3 style="font-size: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">⚙️ アカウント設定切り替え</h3>
+          <h3 style="font-size: 1rem; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; color: #f87171;">🚨 テストデータ削除</h3>
           <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-            <div>
-              <label style="font-size: 0.8rem; color: var(--text-muted);">現在の名前: <strong id="debug-current-name">Schlödinger</strong></label>
-            </div>
-            <input type="text" id="debug-change-name-input" class="form-input" placeholder="名前を一般名（例: タロウ）に変更" style="width: 100%; padding: 0.5rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);">
-            <button class="btn btn-warning" id="debug-save-name-btn" style="padding: 0.5rem 1rem;">一般モードに戻る (リロード)</button>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0 0 0.4rem 0;">Test および Admin のスプレッドシート上の全記録（診断履歴、質問、ポモドーロログ等）を一括消去し、空き行を上に詰めます。</p>
+            <button class="btn btn-danger" id="debug-delete-test-logs-btn" style="width: 100%; font-size: 0.8rem; padding: 0.6rem; margin: 0; background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #f87171;">Test & Admin 履歴を完全消去</button>
           </div>
         </div>
-
       </div>
 
       <!-- Debug Info Logs -->
