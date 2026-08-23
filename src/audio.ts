@@ -56,11 +56,28 @@ export function unlockAudio(): void {
         globalBgmEl?.pause();
       }).catch(e => console.warn("BGM unlock soft-play blocked:", e));
     }
+    
     if (globalAlertEl) {
-      globalAlertEl.src = BEEP_WAV_B64;
-      globalAlertEl.play().then(() => {
-        globalAlertEl?.pause();
-      }).catch(e => console.warn("Alert unlock soft-play blocked:", e));
+      const customAlertPath = `${(import.meta as any).env?.BASE_URL || '/'}audio/alarm.mp3`;
+      
+      // Async fetch to set source and unlock in the same user interaction tick
+      fetch(customAlertPath, { method: 'HEAD' })
+        .then(res => {
+          if (globalAlertEl) {
+            globalAlertEl.src = res.ok ? customAlertPath : BEEP_WAV_B64;
+            globalAlertEl.play().then(() => {
+              globalAlertEl?.pause();
+            }).catch(e => console.warn("Alert unlock soft-play blocked:", e));
+          }
+        })
+        .catch(() => {
+          if (globalAlertEl) {
+            globalAlertEl.src = BEEP_WAV_B64;
+            globalAlertEl.play().then(() => {
+              globalAlertEl?.pause();
+            }).catch(e => console.warn("Alert unlock soft-play blocked:", e));
+          }
+        });
     }
   } catch (err) {
     console.error("Failed to unlock audio components:", err);
@@ -188,24 +205,9 @@ export function playPomoAlert(forced = false): void {
     pauseBgmPlayback();
     
     initAudio();
-    if (!globalAlertEl) return;
-    
-    const customAlertPath = `${(import.meta as any).env?.BASE_URL || '/'}audio/alarm.mp3`;
-    
-    // Check if custom static alert sound exists, otherwise fallback to base64 beep
-    fetch(customAlertPath, { method: 'HEAD' })
-      .then(res => {
-        if (res.ok) {
-          globalAlertEl!.src = customAlertPath;
-        } else {
-          globalAlertEl!.src = BEEP_WAV_B64;
-        }
-        triggerBeepSequence();
-      })
-      .catch(() => {
-        globalAlertEl!.src = BEEP_WAV_B64;
-        triggerBeepSequence();
-      });
+    if (globalAlertEl) {
+      triggerBeepSequence();
+    }
   } catch (err) {
     console.error("Failed to execute alert sequence:", err);
   }
