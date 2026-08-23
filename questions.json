@@ -1,0 +1,251 @@
+{
+  "high_school": {
+    "subjects": {
+      "math1": {
+        "name": "数学Ⅰ",
+        "chapters": {
+          "ch1_expressions": {
+            "name": "第1章 数と式",
+            "units": {
+              "u1_calculations": {
+                "name": "第1節 因数分解（たすき掛け）",
+                "questions": [
+                  { "id": "m1_ch1_q1_dynamic", "template": true }
+                ]
+              },
+              "u2_real_numbers": {
+                "name": "第2節 実数と分母の有理化",
+                "questions": [
+                  { "id": "m1_ch1_q2_dynamic", "template": true }
+                ]
+              },
+              "u3_inequalities": {
+                "name": "第3節 1次不等式",
+                "questions": [
+                  { "id": "m1_ch1_q3_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "ch2_sets": {
+            "name": "第2章 集合と命題",
+            "units": {
+              "u1_sets_and_propositions": {
+                "name": "第1節 必要条件と十分条件",
+                "questions": [
+                  { "id": "m1_ch2_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "ch3_functions": {
+            "name": "第3章 2次関数",
+            "units": {
+              "u1_graphs": {
+                "name": "第1節 2次関数のグラフと平方完成",
+                "questions": [
+                  { "id": "m1_ch3_q1_dynamic", "template": true }
+                ]
+              },
+              "u2_inequalities": {
+                "name": "第2節 2次不等式",
+                "questions": [
+                  { "id": "m1_ch3_q2_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "ch4_trigonometry": {
+            "name": "第4章 図形と計量",
+            "units": {
+              "u1_ratio": {
+                "name": "第1節 三角比の相互関係",
+                "questions": [
+                  { "id": "m1_ch4_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "ch5_data": {
+            "name": "第5章 データの分析",
+            "units": {
+              "u1_data_analysis": {
+                "name": "第1節 データの平均値と分散",
+                "questions": [
+                  { "id": "m1_ch5_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "mathA": {
+        "name": "数学A",
+        "chapters": {
+          "ch1_probability": {
+            "name": "第1章 場合の数と確率",
+            "units": {
+              "u1_probability_calc": {
+                "name": "第1節 確率の基本計算",
+                "questions": [
+                  { "id": "ma_ch1_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "ch3_human_activities": {
+            "name": "第3章 整数の性質",
+            "units": {
+              "u1_divisors": {
+                "name": "第1節 ユークリッドの互除法",
+                "questions": [
+                  { "id": "ma_ch3_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "math2": {
+        "name": "数学Ⅱ",
+        "chapters": {
+          "ch1_expressions": {
+            "name": "第1章 式と証明・複素数",
+            "units": {
+              "u3_complex_equations": {
+                "name": "第3節 複素数と2次方程式の解",
+                "questions": [
+                  { "id": "m2_ch1_q2_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "ch2_geometry_equations": {
+            "name": "第2章 図形と方程式",
+            "units": {
+              "u1_points_lines_circles": {
+                "name": "第1節 2直線の関係と垂直条件",
+                "questions": [
+                  { "id": "m2_ch2_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "ch3_trigonometric": {
+            "name": "第3章 三角関数",
+            "units": {
+              "u1_functions": {
+                "name": "第1節 三角関数の基本性質",
+                "questions": [
+                  { "id": "m2_ch3_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "ch4_exponential": {
+            "name": "第4章 指数・対数関数",
+            "units": {
+              "u1_logarithms": {
+                "name": "第1節 対数とその方程式",
+                "questions": [
+                  { "id": "m2_ch4_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "ch5_calculus": {
+            "name": "第5章 微分法と積分法",
+            "units": {
+              "u1_differentiation": {
+                "name": "第1節 接線の方程式",
+                "questions": [
+                  { "id": "m2_ch5_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "mathB": {
+        "name": "数学B",
+        "chapters": {
+          "ch1_sequences": {
+            "name": "第1章 数列",
+            "units": {
+              "u1_arithmetic_geometric": {
+                "name": "第1節 等差数列と等比数列の一般項",
+                "questions": [
+                  { "id": "mb_ch1_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "mathC": {
+        "name": "数学C",
+        "chapters": {
+          "ch1_vectors": {
+            "name": "第1章 平面上のベクトル",
+            "units": {
+              "u1_vectors": {
+                "name": "第1節 ベクトルの成分と内積",
+                "questions": [
+                  { "id": "mc_ch1_q1_dynamic", "template": true }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "junior_high": {
+    "subjects": {
+      "junior_math": {
+        "name": "中学数学 (高校受験対策)",
+        "chapters": {
+          "j1_math": {
+            "name": "中学1年",
+            "units": {
+              "u1_equations": {
+                "name": "1次方程式",
+                "questions": [
+                  { "id": "j1_math_eq_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "j2_math": {
+            "name": "中学2年",
+            "units": {
+              "u1_simultaneous": {
+                "name": "連立方程式",
+                "questions": [
+                  { "id": "j2_math_sim_dynamic", "template": true }
+                ]
+              }
+            }
+          },
+          "j3_math": {
+            "name": "中学3年",
+            "units": {
+              "u1_factoring": {
+                "name": "展開と因数分解",
+                "questions": [
+                  { "id": "j3_math_fac_dynamic", "template": true }
+                ]
+              },
+              "u2_quadratic": {
+                "name": "2次方程式",
+                "questions": [
+                  { "id": "j3_math_quad_dynamic", "template": true }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
