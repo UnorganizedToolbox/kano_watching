@@ -1,10 +1,20 @@
 interface Env {
   GEMINI_API_KEY: string;
+  GEMINI_API_KEY_ADMIN: string;
 }
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
-  const apiKey = env.GEMINI_API_KEY;
+
+  // Read X-Student-Name header to switch keys
+  const studentNameHeader = request.headers.get('X-Student-Name') || '';
+  const studentName = decodeURIComponent(studentNameHeader).trim();
+
+  let apiKey = env.GEMINI_API_KEY;
+
+  if (studentName === 'Admin') {
+    apiKey = env.GEMINI_API_KEY_ADMIN || env.GEMINI_API_KEY;
+  }
 
   if (!apiKey) {
     return new Response(

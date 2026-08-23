@@ -13,7 +13,10 @@ export async function testGeminiApiKey(): Promise<void> {
   };
   const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Student-Name': encodeURIComponent(localStorage.getItem('math_student_name') || '')
+    },
     body: JSON.stringify(payload)
   });
   if (!response.ok) {
@@ -63,7 +66,10 @@ ${questionsListText}
   
   const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Student-Name': encodeURIComponent(localStorage.getItem('math_student_name') || '')
+    },
     body: JSON.stringify(payload)
   });
   
@@ -162,7 +168,10 @@ ${ocrTextUnified || '(解答なし)'}
   
   const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Student-Name': encodeURIComponent(localStorage.getItem('math_student_name') || '')
+    },
     body: JSON.stringify(payload)
   });
   
@@ -195,7 +204,10 @@ export async function askGeminiQuestion(promptText: string, imageBase64: string 
   const payload = { contents: [{ parts }] };
   const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Student-Name': encodeURIComponent(localStorage.getItem('math_student_name') || '')
+    },
     body: JSON.stringify(payload)
   });
   
