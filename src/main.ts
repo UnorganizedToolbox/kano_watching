@@ -1,5 +1,4 @@
 import { state } from './state';
-import { APP_PASSCODE } from './constants';
 import { showToast, switchView, applyCurriculumModeUI } from './ui';
 import { preventMobileZoom } from './utils';
 import {
@@ -32,7 +31,6 @@ import { setupDebugHandlers } from './debug';
 
 declare global {
   interface Window {
-    submitPasscode: () => void;
     toggleUnitList: (subKey: string) => void;
   }
 }
@@ -113,50 +111,13 @@ export function toggleUnitList(subKey: string): void {
 // Bind to window for HTML click handlers
 window.toggleUnitList = toggleUnitList;
 
-// -------------------------------------------------------------
-// Passcode Authentication
-// -------------------------------------------------------------
-export function checkPasscode(): void {
-  const saved = localStorage.getItem('math_app_passcode');
-  const screen = document.getElementById('passcode-screen');
-  if (screen) {
-    if (saved === APP_PASSCODE) {
-      screen.style.display = 'none';
-    } else {
-      screen.style.display = 'flex';
-    }
-  }
-}
 
-export function submitPasscode(): void {
-  const input = document.getElementById('passcode-input') as HTMLInputElement;
-  if (!input) return;
-  
-  const code = input.value.trim();
-  if (code === APP_PASSCODE) {
-    localStorage.setItem('math_app_passcode', code);
-    const screen = document.getElementById('passcode-screen');
-    if (screen) screen.style.display = 'none';
-    showToast('認証に成功しました！', 'success');
-  } else {
-    showToast('パスコードが正しくありません。', 'danger');
-    input.value = '';
-  }
-}
-
-window.submitPasscode = submitPasscode;
 
 // -------------------------------------------------------------
 // Event Listeners registration
 // -------------------------------------------------------------
 function setupEventListeners(): void {
-  // Passcode listeners
-  document.getElementById('submit-passcode-btn')?.addEventListener('click', window.submitPasscode);
-  document.getElementById('passcode-input')?.addEventListener('keypress', (e: KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      window.submitPasscode();
-    }
-  });
+
 
   // ─── Portal Menu Card Navigation ───
   document.getElementById('portal-goto-dashboard-btn')?.addEventListener('click', () => {
@@ -338,7 +299,6 @@ async function initApp(): Promise<void> {
 // Lifecycle triggers
 // -------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
-  checkPasscode();
   initApp();
   preventMobileZoom();
 });
