@@ -252,9 +252,15 @@ export async function testGasEmailProgram(sheetsUrl: string, studentName: string
   };
   const response = await fetch(sheetsUrl, {
     method: 'POST',
-    mode: 'no-cors',
     body: JSON.stringify(dummyPayload)
   });
+  if (!response.ok) {
+    throw new Error(`Google Apps Script接続エラー: ${response.statusText}`);
+  }
+  const gasJson = await response.json();
+  if (gasJson.status !== 'success') {
+    throw new Error(`GASエラー: ${gasJson.message || 'メールテストに失敗しました。'}`);
+  }
 }
 
 export async function syncTextbookMappingToGas(sheetsUrl: string, mappings: any[]): Promise<number> {
@@ -277,11 +283,17 @@ export async function syncTextbookMappingToGas(sheetsUrl: string, mappings: any[
 }
 
 export async function sendResultEmailToGas(sheetsUrl: string, payload: any): Promise<void> {
-  await fetch(sheetsUrl, {
+  const response = await fetch(sheetsUrl, {
     method: 'POST',
-    mode: 'no-cors',
     body: JSON.stringify(payload)
   });
+  if (!response.ok) {
+    throw new Error(`診断結果のGAS送信に失敗しました: ${response.statusText}`);
+  }
+  const resJson = await response.json();
+  if (resJson.status !== 'success') {
+    throw new Error(resJson.message || 'GAS側の送信処理でエラーが発生しました。');
+  }
 }
 
 export async function submitIssueReportToGas(
@@ -345,11 +357,17 @@ export async function submitQuestionToGas(
     text: text,
     imageBase64: imageBase64
   };
-  await fetch(sheetsUrl, {
+  const response = await fetch(sheetsUrl, {
     method: 'POST',
-    mode: 'no-cors',
     body: JSON.stringify(payload)
   });
+  if (!response.ok) {
+    throw new Error(`質問の送信に失敗しました: ${response.statusText}`);
+  }
+  const resJson = await response.json();
+  if (resJson.status !== 'success') {
+    throw new Error(resJson.message || 'GAS側の質問登録に失敗しました。');
+  }
 }
 
 export async function syncPomodoroLogsFromGas(sheetsUrl: string, studentName: string): Promise<any[]> {
@@ -372,9 +390,15 @@ export async function syncPomodoroLogsFromGas(sheetsUrl: string, studentName: st
 }
 
 export async function logPomodoroEventToGas(sheetsUrl: string, payload: any): Promise<void> {
-  await fetch(sheetsUrl, {
+  const response = await fetch(sheetsUrl, {
     method: 'POST',
-    mode: 'no-cors',
     body: JSON.stringify(payload)
   });
+  if (!response.ok) {
+    throw new Error(`ポモドーロログの送信失敗: ${response.statusText}`);
+  }
+  const resJson = await response.json();
+  if (resJson.status !== 'success') {
+    throw new Error(resJson.message || 'GAS側のログ追記でエラーが発生しました。');
+  }
 }

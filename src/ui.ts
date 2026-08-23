@@ -117,7 +117,7 @@ export function showToast(message: string, type: ToastType = 'info'): void {
     clearTimeout(toastTimeout);
   }
   
-  toastTimeout = setTimeout(() => {
+  toastTimeout = window.setTimeout(() => {
     toast.classList.remove('active');
   }, 3000);
 }

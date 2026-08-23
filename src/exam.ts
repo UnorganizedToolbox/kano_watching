@@ -63,9 +63,10 @@ export function startExam(): void {
     if (questions && questions.length > 0) {
       questions.forEach((q: any) => {
         if (q.template) {
-          // Generate 20 random variations of this template question!
-          for (let i = 0; i < 20; i++) {
-            const dynamicQ = generateDynamicQuestion(q.id, i + 1);
+          // Generate 3 random variations (sufficient for a single exam session)
+          for (let i = 0; i < 3; i++) {
+            const seed = Math.floor(Math.random() * 1000) + 1;
+            const dynamicQ = generateDynamicQuestion(q.id, seed);
             pool.push({
               ...dynamicQ,
               subjectName: subjectsSrc[sel.subject].name,
@@ -781,37 +782,42 @@ window.nextQuestion = nextQuestion;
 window.triggerMultiFileInput = () => {
   document.getElementById('multi-file-input')?.click();
 };
-window.handleMultiFileSelect = (e: any) => {
+// Parallel processing helper that preserves file select order
+async function processFiles(files: FileList): Promise<string[]> {
+  const promises = Array.from(files).map(file => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event: any) => {
+        compressImage(event.target.result, 1200, 0.8)
+          .then(resolve)
+          .catch(reject);
+      };
+      reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+      reader.readAsDataURL(file);
+    });
+  });
+  return Promise.all(promises);
+}
+
+window.handleMultiFileSelect = async (e: any) => {
   const files = e.target.files;
   if (!files || files.length === 0) return;
   
-  showLoader('画像処理中...', '画像を圧縮して追加しています。');
+  showLoader('画像処理中...', '画像を正しい順番で圧縮して追加しています。');
   
-  let processedCount = 0;
-  const targetCount = files.length;
-  
-  if (!state.activeSession) return;
-  state.activeSession.images = [];
-  
-  for (let i = 0; i < targetCount; i++) {
-    const file = files[i];
-    const reader = new FileReader();
-    reader.onload = function(event: any) {
-      compressImage(event.target.result, 1200, 0.8).then((compressedBase64) => {
-        if (state.activeSession) {
-          state.activeSession.images.push(compressedBase64);
-        }
-        processedCount++;
-        
-        if (processedCount === targetCount) {
-          saveSessionToStorage();
-          renderMultiPreviewGallery();
-          hideLoader();
-          showToast(`${targetCount}枚の解答用紙を読み込みました。`);
-        }
-      });
-    };
-    reader.readAsDataURL(file);
+  try {
+    const compressedImages = await processFiles(files);
+    if (!state.activeSession) return;
+    
+    state.activeSession.images = compressedImages;
+    saveSessionToStorage();
+    hideLoader();
+    renderMultiPreviewGallery();
+    showToast(`${compressedImages.length}枚の解答用紙を追加しました。`);
+  } catch (err: any) {
+    hideLoader();
+    showToast(`画像処理に失敗しました: ${err.message}`, 'danger');
+    console.error(err);
   }
 };
 window.removeUploadedImage = (e: any, idx: number) => {
