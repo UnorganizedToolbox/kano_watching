@@ -93,19 +93,6 @@
         <!-- Temporary Test Account Creator -->
         <div style="margin-top: 1.8rem; border-top: 1px solid var(--border-light); padding-top: 1.2rem; display: flex; flex-direction: column; gap: 0.8rem;">
           <button class="btn btn-secondary" id="auth-create-temp-btn" style="background: rgba(245, 158, 11, 0.06); border-color: rgba(245, 158, 11, 0.2); color: var(--accent-warning);">🛠️ 一時テストアカウント (Admin/Test) を作成</button>
-          
-          <!-- Manual GAS URL Configuration Fallback (Collapsible) -->
-          <div style="margin-top: 0.5rem; text-align: left;">
-            <button class="btn btn-secondary" id="auth-toggle-url-config-btn" style="font-size: 0.75rem; height: 28px; width: auto; padding: 0 0.6rem; margin: 0 auto; display: block; border-color: var(--border-color); color: var(--text-secondary);">⚙️ 接続連携設定 (手動登録)</button>
-            <div id="auth-url-config-area" style="display: none; margin-top: 0.8rem; padding: 0.8rem; border-radius: 8px; background-color: #f8fafc; border: 1px solid var(--border-color);">
-              <label class="form-label" for="auth-sheets-url-input" style="font-size: 0.75rem;">連携用URL (GAS WebApp URL)</label>
-              <div style="display: flex; gap: 0.4rem;">
-                <input type="password" class="form-input" id="auth-sheets-url-input" placeholder="https://script.google.com/macros/s/.../exec" style="flex: 1; padding: 0.4rem; font-size: 0.8rem;">
-                <button class="btn btn-primary" id="auth-save-url-btn" style="width: auto; height: 32px; font-size: 0.8rem; padding: 0 0.8rem;">保存</button>
-              </div>
-              <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.3rem;">※環境変数が正しくロードされない場合は、上記にGASのデプロイURLを入力して「保存」してください。</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -687,16 +674,7 @@
 
       <div class="card">
         <h3>基本設定</h3>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.2rem;">GeminiのAPIキーおよびカリキュラム（対象学年）を選択してください。</p>
-
-        <div class="form-group">
-          <label class="form-label" for="api-key-input">Gemini API Key</label>
-          <input type="password" class="form-input" id="api-key-input" placeholder="AIZAaSy..." style="width: 100%; box-sizing: border-box; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.03); color: var(--text-primary); outline: none;">
-          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;">
-            ※キーは暗号化されたローカルストレージ（ブラウザ内）にのみ保存されます。<br>
-            ※iPad/iPhoneをご利用の場合、プッシュ通知を受信するには、Safariの共有メニューから「ホーム画面に追加」（PWA化）して起動する必要があります。
-          </p>
-        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.2rem;">カリキュラム（対象学年）を選択してください。</p>
 
         <div class="form-group" style="margin-top: 1.2rem;">
           <label class="form-label" for="curriculum-mode-input">対象学年・カリキュラム</label>

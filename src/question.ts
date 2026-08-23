@@ -86,17 +86,11 @@ export async function handleQuestionSubmission(): Promise<void> {
   }
   
   if (target === 'tutor') {
-    const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-    if (!sheetsUrl) {
-      showToast('連携用URLが設定されていません。システム設定をご確認ください。', 'warning');
-      return;
-    }
-    
     showLoader('送信中...', '質問内容を指導者へメール送信し、スプレッドシートへ記録しています。');
     
     try {
       const studentName = localStorage.getItem('math_student_name') || '未設定';
-      await submitQuestionToGas(sheetsUrl, studentName, text, state.questionImageBase64);
+      await submitQuestionToGas(studentName, text, state.questionImageBase64);
       showToast('指導者へ質問を送信しました！', 'success');
       initQuestionUI();
     } catch (err) {
@@ -106,12 +100,6 @@ export async function handleQuestionSubmission(): Promise<void> {
       hideLoader();
     }
   } else {
-    const apiKey = localStorage.getItem('gemini_api_key') || '';
-    if (!apiKey) {
-      showToast('AI質問を利用するにはAPIキーの設定が必要です。設定ボタンを開いてください。', 'warning');
-      return;
-    }
-    
     showLoader('AIが解答を作成中...', '問題内容を分析して分かりやすいヒントを作成しています。');
     
     const promptText = `あなたはプロの家庭教師です。以下の質問および画像について、生徒が一人で理解できるように、段階的（ステップバイステップ）で分かりやすいヒントと丁寧な解説を日本語で記述してください。解説文の中に数式（LaTeX形式）を適宜用いることができます。数式を使用する場合は $$ ... $$ または $ ... $ で囲んでください。
@@ -120,7 +108,7 @@ export async function handleQuestionSubmission(): Promise<void> {
 ${text || '(質問テキストなし、画像を参照してください)'}`;
     
     try {
-      const aiResponse = await askGeminiQuestion(apiKey, promptText, state.questionImageBase64);
+      const aiResponse = await askGeminiQuestion(promptText, state.questionImageBase64);
       
       const responseTextEl = document.getElementById('question-ai-response-text');
       if (responseTextEl) {
@@ -153,19 +141,12 @@ export async function loadPastQuestions(): Promise<void> {
   const container = document.getElementById('questions-list-container');
   if (!container) return;
   
-  const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-  
-  if (!sheetsUrl) {
-    container.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin: 1rem 0;">連携用URLが設定されていません。システム設定をご確認ください。</p>`;
-    return;
-  }
-  
   container.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin: 1rem 0;">読み込み中...</p>`;
   
   const studentName = localStorage.getItem('math_student_name') || '未設定';
   
   try {
-    const list = await getQuestionsFromGas(sheetsUrl, studentName);
+    const list = await getQuestionsFromGas(studentName);
     
     if (list.length === 0) {
       container.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin: 1rem 0;">過去の質問はありません。</p>`;

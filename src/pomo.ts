@@ -112,13 +112,10 @@ export function saveLocalPomoLog(payload: any): void {
 }
 
 export async function syncPomodoroLogsFromSheet(): Promise<void> {
-  const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-  if (!sheetsUrl) return;
-  
   const studentName = localStorage.getItem('math_student_name') || '未設定';
   
   try {
-    const logs = await syncPomodoroLogsFromGas(sheetsUrl, studentName);
+    const logs = await syncPomodoroLogsFromGas(studentName);
     const localLogs = JSON.parse(localStorage.getItem('math_pomodoro_history') || '[]');
     const timestamps = new Set(localLogs.map((l: any) => l.timestamp));
     let newCount = 0;
@@ -155,11 +152,8 @@ export async function logPomodoroEvent(event: string, elapsedSec: number, lagSec
 
   saveLocalPomoLog(payload);
 
-  const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-  if (!sheetsUrl) return;
-
   try {
-    await logPomodoroEventToGas(sheetsUrl, payload);
+    await logPomodoroEventToGas(payload);
     console.log("Logged pomodoro event:", event, "with elapsed:", elapsedSec, "lag:", lagSec);
   } catch (err) {
     console.error("Failed to log pomodoro event:", err);
@@ -233,37 +227,34 @@ export function startPomoTimerTick(): void {
 export function saveAndLogOnClose(): void {
   if ((state.pomoState === 'work' || state.pomoState === 'break') && state.pomoAccumulatedSeconds > 0) {
     const eventName = (state.pomoState === 'work') ? '自動一時停止（離脱）' : '自動休憩一時停止（離脱）';
-    const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-    if (sheetsUrl) {
-      const studentName = localStorage.getItem('math_student_name') || '未設定';
-      const payload = {
-        action: 'pomodoro_log',
-        timestamp: new Date().toLocaleString('ja-JP'),
-        studentName: studentName,
-        subject: state.pomoSelectedSubject,
-        event: eventName,
-        elapsedSeconds: state.pomoAccumulatedSeconds,
-        lagSeconds: 0,
-        memo: state.pomoMemo + ' (ブラウザ終了/タブ切替による自動記録)'
-      };
-      
-      fetch(sheetsUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        keepalive: true,
-        body: JSON.stringify(payload)
-      });
-      
-      if (state.pomoTimerInterval) {
-        clearInterval(state.pomoTimerInterval);
-        state.pomoTimerInterval = null;
-      }
-      state.pomoState = (state.pomoState === 'work') ? 'work_paused' : 'break_paused';
-      state.pomoSecondsLeft = state.pomoTimerStartSecondsLeft - Math.floor((Date.now() - state.pomoStateStartTime) / 1000);
-      if (state.pomoSecondsLeft < 0) state.pomoSecondsLeft = 0;
-      state.pomoAccumulatedSeconds = 0;
-      updatePomoUIState();
+    const studentName = localStorage.getItem('math_student_name') || '未設定';
+    const payload = {
+      action: 'pomodoro_log',
+      timestamp: new Date().toLocaleString('ja-JP'),
+      studentName: studentName,
+      subject: state.pomoSelectedSubject,
+      event: eventName,
+      elapsedSeconds: state.pomoAccumulatedSeconds,
+      lagSeconds: 0,
+      memo: state.pomoMemo + ' (ブラウザ終了/タブ切替による自動記録)'
+    };
+    
+    fetch('/api/gas', {
+      method: 'POST',
+      mode: 'no-cors',
+      keepalive: true,
+      body: JSON.stringify(payload)
+    });
+    
+    if (state.pomoTimerInterval) {
+      clearInterval(state.pomoTimerInterval);
+      state.pomoTimerInterval = null;
     }
+    state.pomoState = (state.pomoState === 'work') ? 'work_paused' : 'break_paused';
+    state.pomoSecondsLeft = state.pomoTimerStartSecondsLeft - Math.floor((Date.now() - state.pomoStateStartTime) / 1000);
+    if (state.pomoSecondsLeft < 0) state.pomoSecondsLeft = 0;
+    state.pomoAccumulatedSeconds = 0;
+    updatePomoUIState();
   }
 }
 

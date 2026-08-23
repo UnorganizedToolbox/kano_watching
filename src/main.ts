@@ -254,14 +254,9 @@ function setupEventListeners(): void {
       showToast('報告内容を入力してください。', 'warning');
       return;
     }
-    const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
     const studentName = localStorage.getItem('math_student_name') || '匿名';
-    if (!sheetsUrl) {
-      showToast('連携URLが設定されていません。', 'warning');
-      return;
-    }
     try {
-      await fetch(sheetsUrl, {
+      await fetch('/api/gas', {
         method: 'POST',
         body: JSON.stringify({ action: 'report_bug', studentName, description: content })
       });
@@ -285,12 +280,6 @@ function setupEventListeners(): void {
 // App Initializer
 // -------------------------------------------------------------
 async function initApp(): Promise<void> {
-  // Synchronize Vite environment variable for GAS URL to localStorage automatically
-  const envGasUrl = import.meta.env.VITE_GAS_URL;
-  if (envGasUrl) {
-    localStorage.setItem('math_google_sheets_url', envGasUrl);
-  }
-
   // Bind subject selector rendering back to settings
   setRenderSubjectSelector(renderSubjectSelector);
   

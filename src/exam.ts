@@ -447,13 +447,6 @@ export function renderMultiPreviewGallery(): void {
 // OCR Preread API step
 // -------------------------------------------------------------
 export async function runOcrPreRead(): Promise<void> {
-  const apiKey = localStorage.getItem('gemini_api_key') || '';
-  if (!apiKey) {
-    showToast('診断を実行するにはAPIキーの設定が必要です。設定ボタンを開いてください。', 'warning');
-    openModal('settings-modal');
-    return;
-  }
-  
   if (!state.activeSession) return;
   
   if (state.activeSession.images.length === 0) {
@@ -469,7 +462,6 @@ export async function runOcrPreRead(): Promise<void> {
   
   try {
     const text = await ocrPreReadApi(
-      apiKey,
       state.activeSession.images,
       state.activeSession.attemptedQuestions,
       state.activeSession.generalNote
@@ -533,20 +525,12 @@ export function startDirectInput(): void {
 // Final AI Diagnosis
 // -------------------------------------------------------------
 export async function runFinalDiagnosis(): Promise<void> {
-  const apiKey = localStorage.getItem('gemini_api_key') || '';
-  if (!apiKey) {
-    showToast('診断を実行するにはAPIキーの設定が必要です。設定ボタンを開いてください。', 'warning');
-    openModal('settings-modal');
-    return;
-  }
-  
   if (!state.activeSession) return;
   
   showLoader('実力診断中...', 'Gemini AIが計算プロセスを論理分析し、学習プランを作成しています。');
   
   try {
     const rawResultText = await finalDiagnosisApi(
-      apiKey,
       state.activeSession.attemptedQuestions,
       state.activeSession.ocrTextUnified,
       state.activeSession.elapsedSeconds
@@ -598,33 +582,30 @@ export async function runFinalDiagnosis(): Promise<void> {
     localStorage.setItem('math_test_history', JSON.stringify(history));
     
     // Trigger result email to GAS
-    const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-    if (sheetsUrl) {
-      const studentName = localStorage.getItem('math_student_name') || '未設定';
-      const mode = localStorage.getItem('math_curriculum_mode') || 'junior_high';
-      const elapsed = state.activeSession.elapsedSeconds || 0;
-      const min = Math.floor(elapsed / 60);
-      const sec = elapsed % 60;
-      const duration = `${min}分${sec}秒`;
-      
-      const payload = {
-        action: 'submit_exam_result', // Match revised explicit action in GAS
-        timestamp: new Date().toLocaleString('ja-JP'),
-        studentName: studentName,
-        curriculumMode: mode,
-        subjectName: historyItem.subjects.join(', '),
-        score: historyItem.score,
-        maxScore: historyItem.maxScore,
-        duration: duration,
-        weaknesses: historyItem.report.weaknesses || '',
-        recommendation: historyItem.report.recommendation || '',
-        reportJson: JSON.stringify(historyItem.report)
-      };
-      
-      sendResultEmailToGas(sheetsUrl, payload).catch(err => {
-        console.error("Failed to submit result email to GAS:", err);
-      });
-    }
+    const studentName = localStorage.getItem('math_student_name') || '未設定';
+    const mode = localStorage.getItem('math_curriculum_mode') || 'junior_high';
+    const elapsed = state.activeSession.elapsedSeconds || 0;
+    const min = Math.floor(elapsed / 60);
+    const sec = elapsed % 60;
+    const duration = `${min}分${sec}秒`;
+    
+    const payload = {
+      action: 'submit_exam_result', // Match revised explicit action in GAS
+      timestamp: new Date().toLocaleString('ja-JP'),
+      studentName: studentName,
+      curriculumMode: mode,
+      subjectName: historyItem.subjects.join(', '),
+      score: historyItem.score,
+      maxScore: historyItem.maxScore,
+      duration: duration,
+      weaknesses: historyItem.report.weaknesses || '',
+      recommendation: historyItem.report.recommendation || '',
+      reportJson: JSON.stringify(historyItem.report)
+    };
+    
+    sendResultEmailToGas(payload).catch(err => {
+      console.error("Failed to submit result email to GAS:", err);
+    });
     
     hideLoader();
     renderReport();
@@ -737,12 +718,6 @@ export async function submitIssueReport(): Promise<void> {
     return;
   }
   
-  const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-  if (!sheetsUrl) {
-    showToast('連携用URLが設定されていないため送信できません。設定を確認してください。', 'warning');
-    return;
-  }
-  
   showLoader('不具合を報告中...', '指導者へ不具合報告のメール通知を行っています。');
   
   try {
@@ -762,7 +737,7 @@ export async function submitIssueReport(): Promise<void> {
     
     const fullIssueText = `【不具合カテゴリ】: ${type}\n【詳細内容】:\n${text}`;
     
-    await submitIssueReportToGas(sheetsUrl, studentName, fullIssueText, problemText, aiReportText);
+    await submitIssueReportToGas(studentName, fullIssueText, problemText, aiReportText);
     
     hideLoader();
     closeModal('report-modal');

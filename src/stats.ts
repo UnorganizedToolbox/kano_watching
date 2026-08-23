@@ -253,11 +253,9 @@ window.handleImportBackup = function(e: any): void {
 
 
 async function syncLocalPomodoroLogs(): Promise<void> {
-  const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-  if (!sheetsUrl) return;
   const studentName = localStorage.getItem('math_student_name') || '未設定';
   try {
-    const logs = await syncPomodoroLogsFromGas(sheetsUrl, studentName);
+    const logs = await syncPomodoroLogsFromGas(studentName);
     const localLogs = JSON.parse(localStorage.getItem('math_pomodoro_history') || '[]');
     const timestamps = new Set(localLogs.map((l: any) => l.timestamp));
     let newCount = 0;

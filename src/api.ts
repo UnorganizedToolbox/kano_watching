@@ -1,29 +1,28 @@
 import { Question, HistoryItem, ExamSession } from './types';
 
-// Gemini API Endpoint
-const GEMINI_MODEL = "gemini-3.5-flash";
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+// Gemini API Proxy Endpoint
+const GEMINI_API_URL = "/api/gemini";
 
 // -------------------------------------------------------------
-// Gemini API Operations
+// Gemini API Operations (Proxied via Cloudflare Pages Functions)
 // -------------------------------------------------------------
 
-export async function testGeminiApiKey(apiKey: string): Promise<void> {
+export async function testGeminiApiKey(): Promise<void> {
   const payload = {
     contents: [{ parts: [{ text: "Hello. Respond in 3 words." }] }]
   };
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error?.message || `Gemini API接続エラー: ${response.statusText}`);
+    throw new Error(errData.message || `Gemini API接続エラー: ${response.statusText}`);
   }
 }
 
-export async function runOcrPreRead(apiKey: string, images: string[], attemptedQuestions: Question[], generalNote: string): Promise<string> {
+export async function runOcrPreRead(images: string[], attemptedQuestions: Question[], generalNote: string): Promise<string> {
   let questionsListText = '';
   attemptedQuestions.forEach((q, idx) => {
     questionsListText += `大問 ${idx + 1}: ${q.text}\n`;
@@ -62,7 +61,7 @@ ${questionsListText}
     contents: [{ parts }]
   };
   
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -70,7 +69,7 @@ ${questionsListText}
   
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error?.message || `Gemini APIエラー: ${response.statusText}`);
+    throw new Error(errData.message || `Gemini APIエラー: ${response.statusText}`);
   }
   
   const resultJson = await response.json();
@@ -82,7 +81,6 @@ ${questionsListText}
 }
 
 export async function runFinalDiagnosis(
-  apiKey: string,
   attemptedQuestions: Question[],
   ocrTextUnified: string,
   elapsedSeconds: number
@@ -162,7 +160,7 @@ ${ocrTextUnified || '(解答なし)'}
     }
   };
   
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -170,7 +168,7 @@ ${ocrTextUnified || '(解答なし)'}
   
   if (!response.ok) {
     const errorJson = await response.json().catch(() => ({}));
-    const errorDetail = errorJson.error?.message || response.statusText;
+    const errorDetail = errorJson.message || response.statusText;
     throw new Error(`Gemini evaluation failed: ${errorDetail}`);
   }
   
@@ -182,7 +180,7 @@ ${ocrTextUnified || '(解答なし)'}
   return textResponse.trim();
 }
 
-export async function askGeminiQuestion(apiKey: string, promptText: string, imageBase64: string | null): Promise<string> {
+export async function askGeminiQuestion(promptText: string, imageBase64: string | null): Promise<string> {
   const parts: any[] = [{ text: promptText }];
   if (imageBase64) {
     const rawBase64 = imageBase64.split(',')[1];
@@ -195,7 +193,7 @@ export async function askGeminiQuestion(apiKey: string, promptText: string, imag
   }
   
   const payload = { contents: [{ parts }] };
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -203,7 +201,7 @@ export async function askGeminiQuestion(apiKey: string, promptText: string, imag
   
   if (!response.ok) {
     const errorJson = await response.json().catch(() => ({}));
-    const errorDetail = errorJson.error?.message || response.statusText;
+    const errorDetail = errorJson.message || response.statusText;
     throw new Error(`AIのヒント作成失敗: ${errorDetail}`);
   }
   
@@ -215,17 +213,20 @@ export async function askGeminiQuestion(apiKey: string, promptText: string, imag
   return resText.trim();
 }
 
+// Google Sheets (GAS) Web App Proxy Endpoint
+const GAS_PROXY_URL = "/api/gas";
+
 // -------------------------------------------------------------
-// Google Sheets (GAS) Web App Operations
+// Google Sheets (GAS) Web App Operations (Proxied via Cloudflare)
 // -------------------------------------------------------------
 
-export async function testGasConnection(sheetsUrl: string, studentName: string): Promise<void> {
+export async function testGasConnection(studentName: string): Promise<void> {
   const payload = {
     action: 'get_questions',
     studentName: studentName,
     studentId: localStorage.getItem('math_student_id') || ''
   };
-  const response = await fetch(sheetsUrl, {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -238,7 +239,7 @@ export async function testGasConnection(sheetsUrl: string, studentName: string):
   }
 }
 
-export async function testGasEmailProgram(sheetsUrl: string, studentName: string): Promise<void> {
+export async function testGasEmailProgram(studentName: string): Promise<void> {
   const dummyPayload = {
     action: 'submit_exam_result', // Explicit action matches routing fix!
     studentId: localStorage.getItem('math_student_id') || '',
@@ -252,7 +253,7 @@ export async function testGasEmailProgram(sheetsUrl: string, studentName: string
     weaknesses: '【これは自動テストデータです】スプレッドシートの1枚目にサマリーが生成され、2枚目に不具合報告用の空テーブルが作られているか確認してください。',
     recommendation: '無さに動作していれば、この生徒の名前のシート（👤 ' + studentName + '）が追加され、メールが届いています。'
   };
-  const response = await fetch(sheetsUrl, {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify(dummyPayload)
   });
@@ -265,13 +266,13 @@ export async function testGasEmailProgram(sheetsUrl: string, studentName: string
   }
 }
 
-export async function syncTextbookMappingToGas(sheetsUrl: string, mappings: any[]): Promise<number> {
+export async function syncTextbookMappingToGas(mappings: any[]): Promise<number> {
   const payload = {
     action: 'import_textbook_mapping',
     studentId: localStorage.getItem('math_student_id') || '',
     mappings: mappings
   };
-  const response = await fetch(sheetsUrl, {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -285,8 +286,8 @@ export async function syncTextbookMappingToGas(sheetsUrl: string, mappings: any[
   return resJson.count;
 }
 
-export async function sendResultEmailToGas(sheetsUrl: string, payload: any): Promise<void> {
-  const response = await fetch(sheetsUrl, {
+export async function sendResultEmailToGas(payload: any): Promise<void> {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify({
       ...payload,
@@ -303,7 +304,6 @@ export async function sendResultEmailToGas(sheetsUrl: string, payload: any): Pro
 }
 
 export async function submitIssueReportToGas(
-  sheetsUrl: string,
   studentName: string,
   issueText: string,
   problemText: string,
@@ -318,7 +318,7 @@ export async function submitIssueReportToGas(
     problemText: problemText,
     aiReportText: aiReportText
   };
-  const response = await fetch(sheetsUrl, {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -331,13 +331,13 @@ export async function submitIssueReportToGas(
   }
 }
 
-export async function getQuestionsFromGas(sheetsUrl: string, studentName: string): Promise<any[]> {
+export async function getQuestionsFromGas(studentName: string): Promise<any[]> {
   const payload = {
     action: 'get_questions',
     studentId: localStorage.getItem('math_student_id') || '',
     studentName: studentName
   };
-  const response = await fetch(sheetsUrl, {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -352,7 +352,6 @@ export async function getQuestionsFromGas(sheetsUrl: string, studentName: string
 }
 
 export async function submitQuestionToGas(
-  sheetsUrl: string,
   studentName: string,
   text: string,
   imageBase64: string | null
@@ -366,7 +365,7 @@ export async function submitQuestionToGas(
     text: text,
     imageBase64: imageBase64
   };
-  const response = await fetch(sheetsUrl, {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -379,13 +378,13 @@ export async function submitQuestionToGas(
   }
 }
 
-export async function syncPomodoroLogsFromGas(sheetsUrl: string, studentName: string): Promise<any[]> {
+export async function syncPomodoroLogsFromGas(studentName: string): Promise<any[]> {
   const payload = {
     action: 'get_pomodoro_logs',
     studentId: localStorage.getItem('math_student_id') || '',
     studentName: studentName
   };
-  const response = await fetch(sheetsUrl, {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -399,8 +398,8 @@ export async function syncPomodoroLogsFromGas(sheetsUrl: string, studentName: st
   return resJson.logs || [];
 }
 
-export async function logPomodoroEventToGas(sheetsUrl: string, payload: any): Promise<void> {
-  const response = await fetch(sheetsUrl, {
+export async function logPomodoroEventToGas(payload: any): Promise<void> {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify({
       ...payload,
@@ -416,13 +415,13 @@ export async function logPomodoroEventToGas(sheetsUrl: string, payload: any): Pr
   }
 }
 
-export async function requestRegistration(sheetsUrl: string, studentName: string, email: string): Promise<string> {
+export async function requestRegistration(studentName: string, email: string): Promise<string> {
   const payload = {
     action: 'request_registration',
     studentName: studentName,
     email: email
   };
-  const response = await fetch(sheetsUrl, {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify(payload)
   });
@@ -436,13 +435,13 @@ export async function requestRegistration(sheetsUrl: string, studentName: string
   return resJson.message;
 }
 
-export async function loginStudent(sheetsUrl: string, studentId: string, password: string): Promise<{ studentName: string, email: string }> {
+export async function loginStudent(studentId: string, password: string): Promise<{ studentName: string, email: string }> {
   const payload = {
     action: 'login_student',
     studentId: studentId,
     password: password
   };
-  const response = await fetch(sheetsUrl, {
+  const response = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     body: JSON.stringify(payload)
   });

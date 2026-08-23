@@ -72,12 +72,6 @@ export function setupDebugHandlers(): void {
 
   // 3. API / GAS tests
   document.getElementById('debug-gas-send-exam-btn')?.addEventListener('click', async () => {
-    const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-    if (!sheetsUrl) {
-      showToast('デバッグエラー: スプレッドシートURLが未設定です。', 'danger');
-      return;
-    }
-    
     // 100% 正答率のダミーテスト結果を送信
     const studentName = localStorage.getItem('math_student_name') || 'Admin';
     const dummyReport = {
@@ -108,7 +102,7 @@ export function setupDebugHandlers(): void {
     
     showToast('デバッグ: 100%正答率でのGAS送信を試みています...');
     try {
-      await sendResultEmailToGas(sheetsUrl, payload);
+      await sendResultEmailToGas(payload);
       showToast('デバッグ: GAS送信リクエストを投げました (opaque)。', 'success');
     } catch (e: any) {
       showToast(`デバッグエラー: ${e.message}`, 'danger');
@@ -116,16 +110,11 @@ export function setupDebugHandlers(): void {
   });
 
   document.getElementById('debug-gas-email-btn')?.addEventListener('click', async () => {
-    const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-    if (!sheetsUrl) {
-      showToast('デバッグエラー: スプレッドシートURLが未設定です。', 'danger');
-      return;
-    }
     const studentName = localStorage.getItem('math_student_name') || 'Admin';
     
     showToast('デバッグ: GASメール送信テストを実行中...');
     try {
-      await testGasEmailProgram(sheetsUrl, studentName);
+      await testGasEmailProgram(studentName);
       showToast('デバッグ: ダミーメールテストリクエストを投げました (opaque)。', 'success');
     } catch (e: any) {
       showToast(`デバッグエラー: ${e.message}`, 'danger');
@@ -133,15 +122,9 @@ export function setupDebugHandlers(): void {
   });
 
   document.getElementById('debug-gemini-test-btn')?.addEventListener('click', async () => {
-    const apiKey = localStorage.getItem('gemini_api_key');
-    if (!apiKey) {
-      showToast('デバッグエラー: Gemini APIキーが未設定です。', 'danger');
-      return;
-    }
-    
     showToast('デバッグ: Gemini API接続確認中...');
     try {
-      await testGeminiApiKey(apiKey);
+      await testGeminiApiKey();
       showToast('デバッグ: Gemini API接続成功！', 'success');
     } catch (e: any) {
       showToast(`デバッグエラー: ${e.message}`, 'danger');
@@ -152,12 +135,6 @@ export function setupDebugHandlers(): void {
   const deleteLogsBtn = document.getElementById('debug-delete-test-logs-btn');
   if (deleteLogsBtn) {
     deleteLogsBtn.addEventListener('click', async () => {
-      const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-      if (!sheetsUrl) {
-        showToast('連携用URLが設定されていません。', 'danger');
-        return;
-      }
-      
       if (!confirm('本当に Test と Admin の全学習記録をスプレッドシート上から削除しますか？\n（この操作は元に戻せません。空き行は自動で詰められます）')) {
         return;
       }
@@ -167,7 +144,7 @@ export function setupDebugHandlers(): void {
       showToast('テストデータをクリア中...');
       
       try {
-        const response = await fetch(sheetsUrl, {
+        const response = await fetch('/api/gas', {
           method: 'POST',
           body: JSON.stringify({
             action: 'delete_test_admin_logs'
@@ -216,9 +193,8 @@ function startDebugConsoleLogger(): void {
       },
       localStorage: {
         math_student_name: localStorage.getItem('math_student_name'),
-        math_google_sheets_url: localStorage.getItem('math_google_sheets_url') ? '設定あり' : '設定なし',
-        gemini_api_key: localStorage.getItem('gemini_api_key') ? '設定あり' : '設定なし',
-        math_curriculum_mode: localStorage.getItem('math_curriculum_mode')
+        math_curriculum_mode: localStorage.getItem('math_curriculum_mode'),
+        cloudflare_proxy: '有効 (本物の環境変数はCF Pagesで秘匿中)'
       }
     };
 

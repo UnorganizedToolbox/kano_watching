@@ -1,4 +1,3 @@
-import { DEFAULT_API_KEY } from './constants';
 import { showToast, showLoader, hideLoader, applyCurriculumModeUI } from './ui';
 import { testGeminiApiKey, testGasConnection, testGasEmailProgram, syncTextbookMappingToGas } from './api';
 import { renderDashboard } from './stats';
@@ -12,10 +11,6 @@ export function setRenderSubjectSelector(fn: () => void): void {
 }
 
 export function loadApiKey(): void {
-  const apiKey = localStorage.getItem('gemini_api_key') || DEFAULT_API_KEY;
-  const apiKeyInput = document.getElementById('api-key-input') as HTMLInputElement;
-  if (apiKeyInput) apiKeyInput.value = apiKey;
-  
   const mode = localStorage.getItem('math_curriculum_mode') || 'junior_high';
   const modeInput = document.getElementById('curriculum-mode-input') as HTMLSelectElement;
   if (modeInput) modeInput.value = mode;
@@ -23,33 +18,16 @@ export function loadApiKey(): void {
   const studentName = localStorage.getItem('math_student_name') || '';
   const studentNameInput = document.getElementById('student-name-input') as HTMLInputElement;
   if (studentNameInput) studentNameInput.value = studentName;
-
-  const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
-  const sheetsUrlInput = document.getElementById('google-sheets-url-input') as HTMLInputElement;
-  if (sheetsUrlInput) sheetsUrlInput.value = sheetsUrl;
 }
 
 export function saveApiKey(): void {
-  const apiKeyEl = document.getElementById('api-key-input') as HTMLInputElement;
   const studentNameEl = document.getElementById('student-name-input') as HTMLInputElement;
-  const googleSheetsUrlEl = document.getElementById('google-sheets-url-input') as HTMLInputElement;
   const curriculumModeEl = document.getElementById('curriculum-mode-input') as HTMLSelectElement;
   
-  if (!apiKeyEl || !studentNameEl || !googleSheetsUrlEl || !curriculumModeEl) return;
-
-  const apiKey = apiKeyEl.value.trim();
-  if (apiKey) {
-    localStorage.setItem('gemini_api_key', apiKey);
-  } else if (!DEFAULT_API_KEY) {
-    showToast('APIキーを入力してください。', 'warning');
-    return;
-  }
+  if (!studentNameEl || !curriculumModeEl) return;
 
   const studentName = studentNameEl.value.trim();
   localStorage.setItem('math_student_name', studentName);
-
-  const sheetsUrl = googleSheetsUrlEl.value.trim();
-  localStorage.setItem('math_google_sheets_url', sheetsUrl);
   
   const mode = curriculumModeEl.value;
   const oldMode = localStorage.getItem('math_curriculum_mode') || 'junior_high';
@@ -67,20 +45,10 @@ export function saveApiKey(): void {
 }
 
 export async function testApiConnection(): Promise<void> {
-  const apiKeyEl = document.getElementById('api-key-input') as HTMLInputElement;
   const studentNameEl = document.getElementById('student-name-input') as HTMLInputElement;
-  const googleSheetsUrlEl = document.getElementById('google-sheets-url-input') as HTMLInputElement;
+  if (!studentNameEl) return;
   
-  if (!apiKeyEl || !studentNameEl || !googleSheetsUrlEl) return;
-  
-  const apiKey = apiKeyEl.value.trim();
   const studentName = studentNameEl.value.trim();
-  const sheetsUrl = googleSheetsUrlEl.value.trim();
-  
-  if (!apiKey) {
-    showToast('APIキーを入力してください。', 'warning');
-    return;
-  }
   if (!studentName) {
     showToast('生徒名を入力してください。', 'warning');
     return;
@@ -89,13 +57,11 @@ export async function testApiConnection(): Promise<void> {
   showLoader('接続テスト中...', 'Gemini APIおよびスプレッドシートへの接続を確認しています。');
   
   try {
-    // 1. Test Gemini API connection
-    await testGeminiApiKey(apiKey);
+    // 1. Test Gemini API connection (Proxied)
+    await testGeminiApiKey();
     
-    // 2. Test Google Sheets GAS connection
-    if (sheetsUrl) {
-      await testGasConnection(sheetsUrl, studentName);
-    }
+    // 2. Test Google Sheets GAS connection (Proxied)
+    await testGasConnection(studentName);
     
     hideLoader();
     showToast('接続に成功しました！', 'success');
@@ -107,27 +73,15 @@ export async function testApiConnection(): Promise<void> {
 }
 
 export async function testProgramExecution(): Promise<void> {
-  const sheetsUrlEl = document.getElementById('google-sheets-url-input') as HTMLInputElement;
   const studentNameEl = document.getElementById('student-name-input') as HTMLInputElement;
-  
-  if (!sheetsUrlEl || !studentNameEl) return;
-  
-  const sheetsUrl = sheetsUrlEl.value.trim();
-  if (!sheetsUrl) {
-    showToast('連携用URL（GASのWebアプリURL）を入力してください。', 'warning');
-    return;
-  }
+  if (!studentNameEl) return;
   
   const studentName = studentNameEl.value.trim() || 'テスト生徒';
-  
-  console.log("Starting GAS Program Execution Test...");
-  console.log("Configured GAS URL:", sheetsUrl);
   
   showLoader('テスト中...', 'GAS経由でスプレッドシートへの記録とメール送信を実行しています。');
   
   try {
-    await testGasEmailProgram(sheetsUrl, studentName);
-    console.log("Fetch request for program test resolved (Opaque response).");
+    await testGasEmailProgram(studentName);
     hideLoader();
     showToast('テストデータを送信しました！メールおよびスプレッドシートをご確認ください。', 'success');
   } catch (error: any) {
@@ -138,12 +92,6 @@ export async function testProgramExecution(): Promise<void> {
 }
 
 export async function syncTextbookMapping(): Promise<void> {
-  const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-  if (!sheetsUrl) {
-    showToast('連携用URL（Googleスプレッドシート）が設定されていません。', 'danger');
-    return;
-  }
-  
   showLoader('教材データを同期中...');
   
   try {
@@ -153,7 +101,7 @@ export async function syncTextbookMapping(): Promise<void> {
     }
     const mappings = await localRes.json();
     
-    const count = await syncTextbookMappingToGas(sheetsUrl, mappings);
+    const count = await syncTextbookMappingToGas(mappings);
     
     localStorage.setItem('textbook_synced_version', '1.0');
     showToast(`教材データ（${count}件）の同期が完了しました！`, 'success');
@@ -166,7 +114,7 @@ export async function syncTextbookMapping(): Promise<void> {
   }
 }
 
-export async function autoSyncTextbookMapping(sheetsUrl: string): Promise<void> {
+export async function autoSyncTextbookMapping(): Promise<void> {
   const syncedVer = localStorage.getItem('textbook_synced_version');
   if (syncedVer === '1.0') return;
   
@@ -174,7 +122,7 @@ export async function autoSyncTextbookMapping(sheetsUrl: string): Promise<void> 
     const localRes = await fetch('textbook_mapping.json');
     if (localRes.ok) {
       const mappings = await localRes.json();
-      const count = await syncTextbookMappingToGas(sheetsUrl, mappings);
+      const count = await syncTextbookMappingToGas(mappings);
       localStorage.setItem('textbook_synced_version', '1.0');
       console.log(`Auto-synced textbook mapping: ${count} items.`);
     }
@@ -266,12 +214,6 @@ export function setupAuthHandlers(): void {
   const inputPassword = document.getElementById('auth-student-password-input') as HTMLInputElement;
   if (btnLogin && inputStudentId && inputPassword) {
     btnLogin.onclick = async () => {
-      const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
-      if (!sheetsUrl) {
-        showToast('連携用URLが設定されていません。', 'warning');
-        return;
-      }
-      
       const studentId = inputStudentId.value.trim();
       const password = inputPassword.value.trim();
       
@@ -287,7 +229,7 @@ export function setupAuthHandlers(): void {
       showLoader('ログイン中...', '認証情報を照合しています。');
       
       try {
-        const result = await loginStudent(sheetsUrl, studentId, password);
+        const result = await loginStudent(studentId, password);
         
         // Save auth state
         localStorage.setItem('math_student_id', studentId);
@@ -321,12 +263,6 @@ export function setupAuthHandlers(): void {
   // 4. Registration Request Action
   if (btnRegister && inputRegName && inputRegEmail) {
     btnRegister.onclick = async () => {
-      const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
-      if (!sheetsUrl) {
-        showToast('「連携用URL」が設定されていません。下部の接続連携設定からURLを登録してください。', 'warning');
-        return;
-      }
-      
       const name = inputRegName.value.trim();
       const email = inputRegEmail.value.trim();
       
@@ -350,7 +286,7 @@ export function setupAuthHandlers(): void {
       showLoader('申請送信中...', '管理者に利用申請を送信しています。');
       
       try {
-        const message = await requestRegistration(sheetsUrl, name, email);
+        const message = await requestRegistration(name, email);
         hideLoader();
         showToast(message || '利用申請を送信しました！', 'success');
         
@@ -370,16 +306,10 @@ export function setupAuthHandlers(): void {
   const btnCreateTemp = document.getElementById('auth-create-temp-btn');
   if (btnCreateTemp) {
     btnCreateTemp.onclick = async () => {
-      const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
-      if (!sheetsUrl) {
-        showToast('連携用URLが設定されていません。環境変数をご確認ください。', 'warning');
-        return;
-      }
-      
       showLoader('アカウント作成中...', 'Test & Admin アカウントを登録中...');
       
       try {
-        const response = await fetch(sheetsUrl, {
+        const response = await fetch('/api/gas', {
           method: 'POST',
           body: JSON.stringify({
             action: 'create_temp_test_admin_accounts'
@@ -435,9 +365,8 @@ export function logoutStudent(): void {
 }
 
 export async function changePassword(): Promise<void> {
-  const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
   const studentId = localStorage.getItem('math_student_id') || '';
-  if (!sheetsUrl || !studentId) {
+  if (!studentId) {
     showToast('認証エラー：再ログインしてください。', 'danger');
     return;
   }
@@ -472,7 +401,7 @@ export async function changePassword(): Promise<void> {
   showLoader('パスワード変更中...', 'サーバーと通信しています。');
 
   try {
-    const response = await fetch(sheetsUrl, {
+    const response = await fetch('/api/gas', {
       method: 'POST',
       body: JSON.stringify({
         action: 'change_password',
