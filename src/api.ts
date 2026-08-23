@@ -222,7 +222,8 @@ export async function askGeminiQuestion(apiKey: string, promptText: string, imag
 export async function testGasConnection(sheetsUrl: string, studentName: string): Promise<void> {
   const payload = {
     action: 'get_questions',
-    studentName: studentName
+    studentName: studentName,
+    studentId: localStorage.getItem('math_student_id') || ''
   };
   const response = await fetch(sheetsUrl, {
     method: 'POST',
@@ -240,6 +241,7 @@ export async function testGasConnection(sheetsUrl: string, studentName: string):
 export async function testGasEmailProgram(sheetsUrl: string, studentName: string): Promise<void> {
   const dummyPayload = {
     action: 'submit_exam_result', // Explicit action matches routing fix!
+    studentId: localStorage.getItem('math_student_id') || '',
     timestamp: new Date().toLocaleString('ja-JP'),
     studentName: studentName,
     curriculumMode: 'junior_high',
@@ -248,7 +250,7 @@ export async function testGasEmailProgram(sheetsUrl: string, studentName: string
     maxScore: 100,
     duration: '15分30秒',
     weaknesses: '【これは自動テストデータです】スプレッドシートの1枚目にサマリーが生成され、2枚目に不具合報告用の空テーブルが作られているか確認してください。',
-    recommendation: '無事に動作していれば、この生徒の名前のシート（👤 ' + studentName + '）が追加され、メールが届いています。'
+    recommendation: '無さに動作していれば、この生徒の名前のシート（👤 ' + studentName + '）が追加され、メールが届いています。'
   };
   const response = await fetch(sheetsUrl, {
     method: 'POST',
@@ -266,6 +268,7 @@ export async function testGasEmailProgram(sheetsUrl: string, studentName: string
 export async function syncTextbookMappingToGas(sheetsUrl: string, mappings: any[]): Promise<number> {
   const payload = {
     action: 'import_textbook_mapping',
+    studentId: localStorage.getItem('math_student_id') || '',
     mappings: mappings
   };
   const response = await fetch(sheetsUrl, {
@@ -285,7 +288,10 @@ export async function syncTextbookMappingToGas(sheetsUrl: string, mappings: any[
 export async function sendResultEmailToGas(sheetsUrl: string, payload: any): Promise<void> {
   const response = await fetch(sheetsUrl, {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      ...payload,
+      studentId: localStorage.getItem('math_student_id') || ''
+    })
   });
   if (!response.ok) {
     throw new Error(`診断結果のGAS送信に失敗しました: ${response.statusText}`);
@@ -305,6 +311,7 @@ export async function submitIssueReportToGas(
 ): Promise<void> {
   const payload = {
     action: 'report_issue',
+    studentId: localStorage.getItem('math_student_id') || '',
     timestamp: new Date().toLocaleString('ja-JP'),
     studentName: studentName,
     issueText: issueText,
@@ -327,6 +334,7 @@ export async function submitIssueReportToGas(
 export async function getQuestionsFromGas(sheetsUrl: string, studentName: string): Promise<any[]> {
   const payload = {
     action: 'get_questions',
+    studentId: localStorage.getItem('math_student_id') || '',
     studentName: studentName
   };
   const response = await fetch(sheetsUrl, {
@@ -351,6 +359,7 @@ export async function submitQuestionToGas(
 ): Promise<void> {
   const payload = {
     action: 'question_to_tutor',
+    studentId: localStorage.getItem('math_student_id') || '',
     timestamp: new Date().toLocaleString('ja-JP'),
     studentName: studentName,
     title: text.substring(0, 30) || '無題の質問',
@@ -373,6 +382,7 @@ export async function submitQuestionToGas(
 export async function syncPomodoroLogsFromGas(sheetsUrl: string, studentName: string): Promise<any[]> {
   const payload = {
     action: 'get_pomodoro_logs',
+    studentId: localStorage.getItem('math_student_id') || '',
     studentName: studentName
   };
   const response = await fetch(sheetsUrl, {
@@ -392,7 +402,10 @@ export async function syncPomodoroLogsFromGas(sheetsUrl: string, studentName: st
 export async function logPomodoroEventToGas(sheetsUrl: string, payload: any): Promise<void> {
   const response = await fetch(sheetsUrl, {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      ...payload,
+      studentId: localStorage.getItem('math_student_id') || ''
+    })
   });
   if (!response.ok) {
     throw new Error(`ポモドーロログの送信失敗: ${response.statusText}`);
@@ -401,4 +414,46 @@ export async function logPomodoroEventToGas(sheetsUrl: string, payload: any): Pr
   if (resJson.status !== 'success') {
     throw new Error(resJson.message || 'GAS側のログ追記でエラーが発生しました。');
   }
+}
+
+export async function requestRegistration(sheetsUrl: string, studentName: string, email: string): Promise<string> {
+  const payload = {
+    action: 'request_registration',
+    studentName: studentName,
+    email: email
+  };
+  const response = await fetch(sheetsUrl, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    throw new Error(`接続エラー: ${response.statusText}`);
+  }
+  const resJson = await response.json();
+  if (resJson.status !== 'success') {
+    throw new Error(resJson.message || '利用申請に失敗しました。');
+  }
+  return resJson.message;
+}
+
+export async function loginStudent(sheetsUrl: string, studentId: string): Promise<{ studentName: string, email: string }> {
+  const payload = {
+    action: 'login_student',
+    studentId: studentId
+  };
+  const response = await fetch(sheetsUrl, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    throw new Error(`接続エラー: ${response.statusText}`);
+  }
+  const resJson = await response.json();
+  if (resJson.status !== 'success') {
+    throw new Error(resJson.message || 'ログインに失敗しました。生徒IDが正しいか確認してください。');
+  }
+  return {
+    studentName: resJson.studentName,
+    email: resJson.email
+  };
 }

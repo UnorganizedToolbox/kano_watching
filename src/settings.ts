@@ -182,3 +182,180 @@ export async function autoSyncTextbookMapping(sheetsUrl: string): Promise<void> 
     console.error("Auto-sync textbook mapping failed:", err);
   }
 }
+
+// -------------------------------------------------------------
+// Student Auth handlers (Login & Registration Request)
+// -------------------------------------------------------------
+import { loginStudent, requestRegistration } from './api';
+import { switchView } from './ui';
+
+export function setupAuthHandlers(): void {
+  const tabLogin = document.getElementById('auth-tab-login');
+  const tabRegister = document.getElementById('auth-tab-register');
+  const formLogin = document.getElementById('auth-login-form');
+  const formRegister = document.getElementById('auth-register-form');
+  
+  const btnLogin = document.getElementById('auth-login-btn');
+  const btnRegister = document.getElementById('auth-register-btn');
+  const btnSaveUrl = document.getElementById('auth-save-url-btn');
+  
+  const inputSheetsUrl = document.getElementById('auth-sheets-url-input') as HTMLInputElement;
+  const inputStudentId = document.getElementById('auth-student-id-input') as HTMLInputElement;
+  const inputRegName = document.getElementById('auth-reg-name-input') as HTMLInputElement;
+  const inputRegEmail = document.getElementById('auth-reg-email-input') as HTMLInputElement;
+  
+  // Set initial sheets url if any
+  const savedUrl = localStorage.getItem('math_google_sheets_url') || '';
+  if (inputSheetsUrl) inputSheetsUrl.value = savedUrl;
+  
+  // 1. Tab Switching
+  if (tabLogin && tabRegister && formLogin && formRegister) {
+    tabLogin.onclick = () => {
+      tabLogin.classList.add('active');
+      tabLogin.style.borderBottom = '2px solid var(--accent-primary)';
+      tabLogin.style.color = 'white';
+      tabRegister.classList.remove('active');
+      tabRegister.style.borderBottom = 'none';
+      tabRegister.style.color = 'var(--text-muted)';
+      formLogin.style.display = 'block';
+      formRegister.style.display = 'none';
+    };
+    
+    tabRegister.onclick = () => {
+      tabRegister.classList.add('active');
+      tabRegister.style.borderBottom = '2px solid var(--accent-primary)';
+      tabRegister.style.color = 'white';
+      tabLogin.classList.remove('active');
+      tabLogin.style.borderBottom = 'none';
+      tabLogin.style.color = 'var(--text-muted)';
+      formLogin.style.display = 'none';
+      formRegister.style.display = 'block';
+    };
+  }
+  
+  // 2. Save Sheets URL
+  if (btnSaveUrl && inputSheetsUrl) {
+    btnSaveUrl.onclick = () => {
+      const url = inputSheetsUrl.value.trim();
+      if (!url) {
+        showToast('URLを入力してください。', 'warning');
+        return;
+      }
+      localStorage.setItem('math_google_sheets_url', url);
+      // Synchronize to settings modal inputs as well
+      const modalSheetsUrlInput = document.getElementById('google-sheets-url-input') as HTMLInputElement;
+      if (modalSheetsUrlInput) modalSheetsUrlInput.value = url;
+      showToast('連携用URLを保存しました！');
+    };
+  }
+  
+  // 3. Login Action
+  if (btnLogin && inputStudentId) {
+    btnLogin.onclick = async () => {
+      const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
+      if (!sheetsUrl) {
+        showToast('「連携用URL」が設定されていません。下部の接続連携設定からURLを登録してください。', 'warning');
+        return;
+      }
+      
+      const studentId = inputStudentId.value.trim();
+      if (!studentId) {
+        showToast('生徒IDを入力してください。', 'warning');
+        return;
+      }
+      
+      showLoader('ログイン中...', '生徒IDを照合しています。');
+      
+      try {
+        const result = await loginStudent(sheetsUrl, studentId);
+        
+        // Save auth state
+        localStorage.setItem('math_student_id', studentId);
+        localStorage.setItem('math_student_name', result.studentName);
+        localStorage.setItem('math_student_email', result.email);
+        
+        // Lock student name input in settings modal
+        const studentNameInput = document.getElementById('student-name-input') as HTMLInputElement;
+        if (studentNameInput) {
+          studentNameInput.value = result.studentName;
+          studentNameInput.disabled = true;
+        }
+        
+        hideLoader();
+        showToast(`ログインに成功しました。お帰りなさい、${result.studentName}さん！`, 'success');
+        
+        // Switch to dashboard view
+        switchView('setup');
+        renderDashboard();
+        applyCurriculumModeUI();
+        updatePomoUIState();
+        
+      } catch (err: any) {
+        hideLoader();
+        showToast(err.message || 'ログインに失敗しました。', 'danger');
+      }
+    };
+  }
+  
+  // 4. Registration Request Action
+  if (btnRegister && inputRegName && inputRegEmail) {
+    btnRegister.onclick = async () => {
+      const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
+      if (!sheetsUrl) {
+        showToast('「連携用URL」が設定されていません。下部の接続連携設定からURLを登録してください。', 'warning');
+        return;
+      }
+      
+      const name = inputRegName.value.trim();
+      const email = inputRegEmail.value.trim();
+      
+      if (!name) {
+        showToast('お名前を入力してください。', 'warning');
+        return;
+      }
+      if (!email) {
+        showToast('メールアドレスを入力してください。', 'warning');
+        return;
+      }
+      
+      showLoader('申請送信中...', '管理者に利用申請を送信しています。');
+      
+      try {
+        const message = await requestRegistration(sheetsUrl, name, email);
+        hideLoader();
+        showToast(message || '利用申請を送信しました！', 'success');
+        
+        // Reset fields and return to login tab
+        inputRegName.value = '';
+        inputRegEmail.value = '';
+        if (tabLogin) (tabLogin as HTMLElement).click();
+        
+      } catch (err: any) {
+        hideLoader();
+        showToast(err.message || '利用申請の送信に失敗しました。', 'danger');
+      }
+    };
+  }
+}
+
+export function logoutStudent(): void {
+  if (confirm('ログアウトしますか？\n（ホームの学習履歴はブラウザに残りますが、再度ログインするまでテストや質問の送信ができなくなります）')) {
+    localStorage.removeItem('math_student_id');
+    localStorage.removeItem('math_student_name');
+    localStorage.removeItem('math_student_email');
+    
+    // Unlock name input but clear it
+    const studentNameInput = document.getElementById('student-name-input') as HTMLInputElement;
+    if (studentNameInput) {
+      studentNameInput.value = '';
+      studentNameInput.disabled = false;
+    }
+    
+    // Reset login ID input
+    const inputStudentId = document.getElementById('auth-student-id-input') as HTMLInputElement;
+    if (inputStudentId) inputStudentId.value = '';
+    
+    showToast('ログアウトしました。');
+    switchView('auth');
+  }
+}

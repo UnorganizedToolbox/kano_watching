@@ -5,6 +5,7 @@ let viewsCached: Record<ViewName, HTMLElement> | null = null;
 function getViews(): Record<ViewName, HTMLElement> {
   if (!viewsCached) {
     viewsCached = {
+      auth: document.getElementById('auth-view')!,
       setup: document.getElementById('setup-view')!,
       exam: document.getElementById('exam-view')!,
       upload: document.getElementById('upload-view')!,
@@ -16,7 +17,7 @@ function getViews(): Record<ViewName, HTMLElement> {
       debug: document.getElementById('debug-view')!
     };
   }
-  return viewsCached;
+  return viewsCached!;
 }
 
 export function switchView(viewName: ViewName): void {

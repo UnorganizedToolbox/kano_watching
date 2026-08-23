@@ -9,7 +9,9 @@ import {
   testProgramExecution,
   syncTextbookMapping,
   autoSyncTextbookMapping,
-  setRenderSubjectSelector
+  setRenderSubjectSelector,
+  setupAuthHandlers,
+  logoutStudent
 } from './settings';
 import { renderDashboard, initStatsPage, clearHistory, exportBackup } from './stats';
 import {
@@ -246,6 +248,10 @@ function setupEventListeners(): void {
   setupPomodoroHandlers();
   setupQuestionHandlers();
   setupDebugHandlers();
+
+  // Auth Handlers
+  setupAuthHandlers();
+  document.getElementById('settings-logout-btn')?.addEventListener('click', logoutStudent);
 }
 
 // -------------------------------------------------------------
@@ -257,6 +263,26 @@ async function initApp(): Promise<void> {
   
   loadApiKey();
   setupEventListeners();
+  
+  // Check login state
+  const studentId = localStorage.getItem('math_student_id') || '';
+  const studentName = localStorage.getItem('math_student_name') || '';
+  
+  if (!studentId) {
+    // Force switch to Auth screen
+    switchView('auth');
+  } else {
+    // Update settings modal inputs with logged-in user details
+    const studentNameInput = document.getElementById('student-name-input') as HTMLInputElement;
+    if (studentNameInput) {
+      studentNameInput.value = studentName;
+      studentNameInput.disabled = true;
+    }
+    const idDisplay = document.getElementById('settings-student-id-display');
+    if (idDisplay) {
+      idDisplay.textContent = studentId;
+    }
+  }
   
   // Load questions database
   try {
