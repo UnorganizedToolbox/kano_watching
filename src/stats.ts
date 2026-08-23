@@ -481,8 +481,8 @@ export function drawCircadianChart(hourCounts: number[]): void {
   for (let i = 0; i <= 4; i++) {
     const y = paddingTop + (height / 4) * i;
     const val = Math.round(maxVal - (maxVal / 4) * i);
-    svgContent += `<line x1="${paddingLeft}" y1="${y}" x2="${width}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
-    svgContent += `<text x="${paddingLeft - 8}" y="${y + 4}" fill="rgba(255,255,255,0.4)" font-size="8" text-anchor="end">${val}</text>`;
+    svgContent += `<line x1="${paddingLeft}" y1="${y}" x2="${width}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`;
+    svgContent += `<text x="${paddingLeft - 8}" y="${y + 4}" fill="#64748b" font-size="8" text-anchor="end">${val}</text>`;
   }
   
   for (let hour = 0; hour < 24; hour++) {
@@ -491,14 +491,14 @@ export function drawCircadianChart(hourCounts: number[]): void {
     const x = paddingLeft + hour * (barWidth + gap);
     const y = paddingTop + height - barHeight;
     
-    const color = count > 0 ? "url(#circadian-grad)" : "rgba(255,255,255,0.05)";
+    const color = count > 0 ? "url(#circadian-grad)" : "#e2e8f0";
     
     svgContent += `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="${color}" rx="3" style="transition: all 0.3s; cursor: pointer;">
       <title>${hour}時: ${count}回開始</title>
     </rect>`;
     
     if (hour % 4 === 0 || hour === 23) {
-      svgContent += `<text x="${x + barWidth/2}" y="${paddingTop + height + 15}" fill="rgba(255,255,255,0.5)" font-size="8" text-anchor="middle">${hour}h</text>`;
+      svgContent += `<text x="${x + barWidth/2}" y="${paddingTop + height + 15}" fill="#64748b" font-size="8" text-anchor="middle">${hour}h</text>`;
     }
   }
   
@@ -550,8 +550,8 @@ export function drawBurnupChart(dailyWorkSeconds: Record<string, number>): void 
   for (let i = 0; i <= 4; i++) {
     const y = paddingTop + (height / 4) * i;
     const val = ((maxVal / 4) * (4 - i)).toFixed(1);
-    svgContent += `<line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
-    svgContent += `<text x="${paddingLeft - 8}" y="${y + 4}" fill="rgba(255,255,255,0.4)" font-size="8" text-anchor="end">${val}h</text>`;
+    svgContent += `<line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`;
+    svgContent += `<text x="${paddingLeft - 8}" y="${y + 4}" fill="#64748b" font-size="8" text-anchor="end">${val}h</text>`;
   }
   
   const getX = (index: number) => paddingLeft + (graphWidth / 6) * index;
@@ -561,7 +561,7 @@ export function drawBurnupChart(dailyWorkSeconds: Record<string, number>): void 
   for (let i = 1; i < 7; i++) {
     targetPath += ` L ${getX(i)} ${getY(targetHours[i])}`;
   }
-  svgContent += `<path d="${targetPath}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-dasharray="4,4"/>`;
+  svgContent += `<path d="${targetPath}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4"/>`;
   
   let actualPath = `M ${getX(0)} ${getY(cumValues[0])}`;
   let areaPath = `M ${getX(0)} ${getY(0)} L ${getX(0)} ${getY(cumValues[0])}`;
@@ -579,19 +579,19 @@ export function drawBurnupChart(dailyWorkSeconds: Record<string, number>): void 
   for (let i = 0; i < 7; i++) {
     const x = getX(i);
     const y = getY(cumValues[i]);
-    svgContent += `<circle cx="${x}" cy="${y}" r="4" fill="var(--accent-primary)" stroke="rgba(15,23,42,1)" stroke-width="1.5" style="cursor: pointer;">
+    svgContent += `<circle cx="${x}" cy="${y}" r="4" fill="var(--accent-primary)" stroke="#ffffff" stroke-width="1.5" style="cursor: pointer;">
       <title>${labels[i]}: 累計 ${cumValues[i].toFixed(2)}時間</title>
     </circle>`;
     
-    svgContent += `<circle cx="${x}" cy="${getY(targetHours[i])}" r="2" fill="rgba(255,255,255,0.4)"/>`;
-    svgContent += `<text x="${x}" y="${paddingTop + height + 18}" fill="rgba(255,255,255,0.5)" font-size="8" text-anchor="middle">${labels[i]}</text>`;
+    svgContent += `<circle cx="${x}" cy="${getY(targetHours[i])}" r="2" fill="#94a3b8"/>`;
+    svgContent += `<text x="${x}" y="${paddingTop + height + 18}" fill="#64748b" font-size="8" text-anchor="middle">${labels[i]}</text>`;
   }
   
   svgContent += `<g transform="translate(${paddingLeft + 10}, ${paddingTop + 10})">
     <line x1="0" y1="5" x2="15" y2="5" stroke="var(--accent-primary)" stroke-width="3"/>
-    <text x="20" y="9" fill="rgba(255,255,255,0.7)" font-size="8">実績実績時間</text>
-    <line x1="100" y1="5" x2="115" y2="5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="3,3"/>
-    <text x="120" y="9" fill="rgba(255,255,255,0.7)" font-size="8">目標 (2h/日)</text>
+    <text x="20" y="9" fill="#1e293b" font-size="8">実績時間</text>
+    <line x1="100" y1="5" x2="115" y2="5" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3,3"/>
+    <text x="120" y="9" fill="#1e293b" font-size="8">目標 (2h/日)</text>
   </g>`;
   
   svgContent += `<defs>
@@ -708,8 +708,8 @@ export function drawFatigueChart(fatiguePoints: FatiguePoint[]): void {
   for (let i = 0; i <= 3; i++) {
     const y = paddingTop + (height / 3) * i;
     const val = Math.round((maxLag / 3) * (3 - i));
-    svgContent += `<line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
-    svgContent += `<text x="${paddingLeft - 8}" y="${y + 3}" fill="rgba(255,255,255,0.4)" font-size="8" text-anchor="end">${val}秒</text>`;
+    svgContent += `<line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`;
+    svgContent += `<text x="${paddingLeft - 8}" y="${y + 3}" fill="#64748b" font-size="8" text-anchor="end">${val}秒</text>`;
   }
   
   fatiguePoints.forEach(p => {
@@ -744,7 +744,7 @@ export function drawFatigueChart(fatiguePoints: FatiguePoint[]): void {
   
   for (let i = 1; i <= maxSession; i++) {
     const x = getX(i);
-    svgContent += `<text x="${x}" y="${paddingTop + height + 15}" fill="rgba(255,255,255,0.5)" font-size="8" text-anchor="middle">#${i}</text>`;
+    svgContent += `<text x="${x}" y="${paddingTop + height + 15}" fill="#64748b" font-size="8" text-anchor="middle">#${i}</text>`;
   }
   
   svgContent += `</svg>`;
@@ -809,13 +809,15 @@ export function renderStatsDashboard(): void {
   const avgTimeDayEl = document.getElementById('stats-avg-time-day');
   const avgTimeWeekEl = document.getElementById('stats-avg-time-week');
   const totalTimeEl = document.getElementById('stats-total-time');
+  const scoreStddevEl = document.getElementById('stats-score-stddev');
+  const targetForecastEl = document.getElementById('stats-target-forecast');
   
   if (!chartWrapper || !summaryEl) return;
   
   if (filteredHistory.length === 0) {
     chartWrapper.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted); margin: 2rem 0;">データがありません。テストを受けるとグラフが表示されます。</p>`;
     summaryEl.textContent = 'データが不足しているため評価を表示できません。テストを受講してください。';
-    [fitTypeEl, trendEl, avgTimeQEl, avgTimeRunEl, avgTimeDayEl, avgTimeWeekEl, totalTimeEl].forEach(el => {
+    [fitTypeEl, trendEl, avgTimeQEl, avgTimeRunEl, avgTimeDayEl, avgTimeWeekEl, totalTimeEl, scoreStddevEl, targetForecastEl].forEach(el => {
       if (el) el.textContent = '-';
     });
     return;
@@ -871,6 +873,79 @@ export function renderStatsDashboard(): void {
     else if (fit.trend === '上限') trendEl.style.color = '#38bdf8';
     else if (fit.trend === '下限') trendEl.style.color = '#facc15';
     else trendEl.style.color = '#94a3b8';
+  }
+
+  // Calculate score standard deviation (volatility)
+  if (scoreStddevEl) {
+    if (points.length === 0) {
+      scoreStddevEl.textContent = '-';
+    } else {
+      const scores = points.map(pt => pt.y);
+      const avgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+      const sqDiffsScore = scores.map(s => Math.pow(s - avgScore, 2));
+      const varianceScore = sqDiffsScore.reduce((sum, v) => sum + v, 0) / scores.length;
+      const stdDevScore = Math.sqrt(varianceScore);
+      
+      let stabilityText = "";
+      if (stdDevScore < 5) stabilityText = "（極めて安定）";
+      else if (stdDevScore < 12) stabilityText = "（安定）";
+      else if (stdDevScore < 20) stabilityText = "（ややムラあり）";
+      else stabilityText = "（ブレが大きい・苦手単元のムラあり）";
+      
+      scoreStddevEl.textContent = `${stdDevScore.toFixed(1)}% ${stabilityText}`;
+    }
+  }
+
+  // Calculate target achievement forecast (80% / 100% targets)
+  if (targetForecastEl) {
+    if (fit.type === '--' || fit.type === '不明' || points.length < 2) {
+      targetForecastEl.textContent = 'データ不足のため予測不可';
+    } else {
+      let target80 = -1;
+      let target100 = -1;
+      
+      if (fit.type === '線形') {
+        const match = fit.formula.match(/y = (-?[\d\.]+)x \+ (-?[\d\.]+)/);
+        if (match) {
+          const a = parseFloat(match[1]);
+          const b = parseFloat(match[2]);
+          if (a > 0) {
+            target80 = (80 - b) / a;
+            target100 = (100 - b) / a;
+          }
+        }
+      } else if (fit.type === '対数') {
+        const match = fit.formula.match(/y = (-?[\d\.]+)ln\(x\) \+ (-?[\d\.]+)/);
+        if (match) {
+          const a = parseFloat(match[1]);
+          const b = parseFloat(match[2]);
+          if (a > 0) {
+            target80 = Math.exp((80 - b) / a);
+            target100 = Math.exp((100 - b) / a);
+          }
+        }
+      } else if (fit.type === '指数') {
+        const match = fit.formula.match(/y = (-?[\d\.]+)e\^(-?[\d\.]+)x/);
+        if (match) {
+          const a = parseFloat(match[1]);
+          const b = parseFloat(match[2]);
+          if (b > 0) {
+            target80 = Math.log(80 / a) / b;
+            target100 = Math.log(100 / a) / b;
+          }
+        }
+      }
+      
+      const formatForecast = (val: number) => {
+        if (val <= 0 || val > 150) return '長期の学習継続が必要';
+        const rounded = Math.ceil(val);
+        const currentCount = points.length;
+        if (rounded <= currentCount) return '到達済み';
+        return `第${rounded}回目（あと${rounded - currentCount}回）`;
+      };
+      
+      targetForecastEl.textContent = `80%突破: ${formatForecast(target80)} / 100%突破: ${formatForecast(target100)}`;
+    }
   }
   
   let summaryText = "";
@@ -967,7 +1042,7 @@ export function renderStatsDashboard(): void {
   const yPercentages = [0, 25, 50, 75, 100];
   yPercentages.forEach(pct => {
     const yCoord = paddingY + chartH - (pct / 100) * chartH;
-    svgContent += `<line x1="${paddingX}" y1="${yCoord}" x2="${svgWidth - paddingX}" y2="${yCoord}" stroke="rgba(255,255,255,0.06)" stroke-width="1" />`;
+    svgContent += `<line x1="${paddingX}" y1="${yCoord}" x2="${svgWidth - paddingX}" y2="${yCoord}" stroke="#e2e8f0" stroke-width="1" />`;
     svgContent += `<text x="${paddingX - 10}" y="${yCoord + 4}" fill="#64748b" font-size="9" text-anchor="end">${pct}%</text>`;
   });
   
@@ -1012,7 +1087,7 @@ export function renderStatsDashboard(): void {
     const startFitY = paddingY + chartH - (getFitY(1) / 100) * chartH;
     const endFitY = paddingY + chartH - (getFitY(points.length) / 100) * chartH;
     
-    svgContent += `<line x1="${startX}" y1="${startFitY}" x2="${endX}" y2="${endFitY}" stroke="rgba(245, 158, 11, 0.4)" stroke-width="1.5" stroke-dasharray="4,4" />`;
+    svgContent += `<line x1="${startX}" y1="${startFitY}" x2="${endX}" y2="${endFitY}" stroke="rgba(245, 158, 11, 0.6)" stroke-width="1.5" stroke-dasharray="4,4" />`;
   }
   
   if (coords.length > 1) {
@@ -1020,12 +1095,12 @@ export function renderStatsDashboard(): void {
     for (let i = 1; i < coords.length; i++) {
       pathD += ` L ${coords[i].x} ${coords[i].y}`;
     }
-    svgContent += `<path d="${pathD}" fill="none" stroke="#6366f1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
+    svgContent += `<path d="${pathD}" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
   }
   
   coords.forEach((coord, idx) => {
-    svgContent += `<circle cx="${coord.x}" cy="${coord.y}" r="5" fill="#818cf8" stroke="#ffffff" stroke-width="1.5" />`;
-    svgContent += `<text x="${coord.x}" y="${coord.y - 10}" fill="#ffffff" font-size="9" font-weight="bold" text-anchor="middle">${Math.round(coord.value)}%</text>`;
+    svgContent += `<circle cx="${coord.x}" cy="${coord.y}" r="5" fill="#3b82f6" stroke="#ffffff" stroke-width="1.5" />`;
+    svgContent += `<text x="${coord.x}" y="${coord.y - 10}" fill="#1e293b" font-size="9" font-weight="bold" text-anchor="middle">${Math.round(coord.value)}%</text>`;
     svgContent += `<text x="${coord.x}" y="${paddingY + chartH + 18}" fill="#64748b" font-size="8" text-anchor="middle">${coord.label}</text>`;
   });
   

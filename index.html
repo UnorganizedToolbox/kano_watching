@@ -206,38 +206,156 @@
          VIEW 3: STATS (Score graph, weakness analysis)
          ========================================================== -->
     <div id="stats-view" class="view">
-      <div class="card">
-        <h2>📊 学習の統計 ＆ 得意・苦手分析</h2>
-        
-        <!-- Score Progress Graph -->
-        <div class="chart-container" style="margin-top: 1rem;">
-          <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem;">得点の推移（過去6回）</h3>
-          <div id="stats-score-chart-area">
-            <!-- SVG Polyline chart generated in stats.ts -->
+      <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+        <button class="btn btn-secondary" id="back-stats-btn" style="width: auto; padding: 0.5rem 1rem; font-size: 0.85rem; height: 36px; margin: 0; display: flex; align-items: center; gap: 0.3rem;">
+          ◀ 戻る
+        </button>
+        <h2 style="margin: 0; font-family: var(--font-title); font-size: 1.4rem;">📊 学習統計 ＆ 分析</h2>
+      </div>
+
+      <!-- School Student Container (Junior High / High School) -->
+      <div id="school-stats-container">
+        <!-- Selectors Card -->
+        <div class="card" style="margin-bottom: 1rem;">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.8rem;">集計対象の選択</h3>
+          <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 140px;">
+              <label class="form-label" for="stats-subject-select" style="margin-bottom: 0.3rem;">対象教科</label>
+              <select class="form-input" id="stats-subject-select" style="width: 100%; border-radius: 8px;">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div style="flex: 1; min-width: 140px;">
+              <label class="form-label" for="stats-chapter-select" style="margin-bottom: 0.3rem;">対象単元</label>
+              <select class="form-input" id="stats-chapter-select" style="width: 100%; border-radius: 8px;">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
           </div>
         </div>
 
-        <!-- Subject Understanding Bars -->
-        <div style="margin-top: 1.5rem;">
-          <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.8rem;">分野別理解度（平均得点率）</h3>
-          <div id="stats-understanding-bars-area">
-            <!-- Understanding bars rendered in stats.ts -->
+        <!-- Performance Chart Card -->
+        <div class="card" style="margin-bottom: 1rem;">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.8rem;">📈 成績推移（獲得得点率）</h3>
+          <div id="stats-chart-wrapper" style="width: 100%; background: var(--bg-secondary); border-radius: 12px; padding: 1rem; border: 1px solid var(--border-light); text-align: center; min-height: 240px; display: flex; align-items: center; justify-content: center;">
+            <!-- SVG Chart will be injected here -->
           </div>
+          
+          <div style="margin-top: 1.2rem; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15); border-radius: 12px; padding: 1rem;">
+            <h4 style="font-size: 0.9rem; margin-bottom: 0.4rem; color: var(--accent-primary); font-weight: 600;">🧠 学習分析・トレンド評価</h4>
+            <p id="stats-analysis-summary" style="font-size: 0.85rem; line-height: 1.5; color: var(--text-primary); margin: 0;">
+              データが不足しているため評価を表示できません。テストを受講してください。
+            </p>
+          </div>
+
+          <!-- Details Accordion -->
+          <details id="stats-details-accordion" style="margin-top: 1rem; border-top: 1px solid var(--border-light); padding-top: 1rem;">
+            <summary style="cursor: pointer; font-weight: bold; color: var(--accent-primary); font-size: 0.85rem; outline: none; margin-bottom: 0.5rem; user-select: none;">
+              詳細データ分析・ブレ幅を表示する ▼
+            </summary>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.6rem; padding: 0.5rem 0.2rem;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                <span>📊 得点のブレ幅（標準偏差 σ）</span>
+                <span id="stats-score-stddev" style="font-weight: 600; color: var(--text-primary);">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                <span>🎯 目標達成予測 (80% / 100%合格到達予想)</span>
+                <span id="stats-target-forecast" style="font-weight: 600; color: var(--accent-success);">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                <span>📊 近似モデル</span>
+                <span id="stats-fit-type" style="font-weight: 600; color: var(--text-primary);">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                <span>📈 成長傾向</span>
+                <span id="stats-trend" style="font-weight: 600;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                <span>⏱️ 平均回答時間 / 問</span>
+                <span id="stats-avg-time-q" style="font-weight: 600; color: var(--text-primary);">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                <span>⏱️ 平均回答時間 / 回</span>
+                <span id="stats-avg-time-run" style="font-weight: 600; color: var(--text-primary);">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                <span>⏱️ 平均学習時間 / 日</span>
+                <span id="stats-avg-time-day" style="font-weight: 600; color: var(--text-primary);">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                <span>⏱️ 平均学習時間 / 週</span>
+                <span id="stats-avg-time-week" style="font-weight: 600; color: var(--text-primary);">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding-bottom: 0.3rem;">
+                <span>🔥 累計学習時間</span>
+                <span id="stats-total-time" style="font-weight: 600; color: var(--accent-primary);">-</span>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
-      <div class="card" style="background-color: #eff6ff; border-color: #bfdbfe;">
-        <h3 style="color: #1e40af;">👍 得意・弱点克服分析</h3>
-        <div id="stats-analysis-cards" style="margin-top: 0.8rem; font-size: 0.85rem; line-height: 1.5;">
-          <!-- Dynamically generated suggestions based on student records -->
+      <!-- University Student Container (Advanced Analytics) -->
+      <div id="university-stats-container" style="display: none; display: flex; flex-direction: column; gap: 1rem;">
+        <!-- Overview Metrics Card -->
+        <div class="card" id="uni-overview-card">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.8rem;">📊 自習セッション分析概要</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.8rem;">
+            <div style="background: var(--bg-secondary); padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-light); text-align: center;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem;">⏳ 累計作業時間</div>
+              <div style="font-size: 1.2rem; font-weight: bold; color: var(--accent-primary);" id="uni-total-work-time">0分</div>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-light); text-align: center;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem;">🎯 完了セッション数</div>
+              <div style="font-size: 1.2rem; font-weight: bold; color: var(--accent-success);" id="uni-pomo-count">0回</div>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-light); text-align: center;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem;">⚡ 実質作業効率</div>
+              <div style="font-size: 1.2rem; font-weight: bold; color: var(--accent-warning);" id="uni-efficiency-rate">0%</div>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border-light); text-align: center;">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.3rem;">⏱️ 平均セッション</div>
+              <div style="font-size: 1.2rem; font-weight: bold; color: #a78bfa;" id="uni-avg-session">0分</div>
+            </div>
+          </div>
         </div>
-      </div>
-      
-      <!-- Study duration bars -->
-      <div class="card">
-        <h2>⏱️ 自習時間（過去1週間）</h2>
-        <div id="stats-study-hours-chart" style="margin-top: 1rem;">
-          <!-- Rendered in stats.ts -->
+
+        <!-- Circadian Rhythm Heatmap Card -->
+        <div class="card">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.8rem;">🕒 概日活動リズム（時間帯別の自習密度）</h3>
+          <div id="uni-circadian-chart" style="width: 100%; height: 160px; background: var(--bg-secondary); border-radius: 12px; padding: 1rem; border: 1px solid var(--border-light);">
+            <!-- Hourly Density Chart SVG -->
+          </div>
+        </div>
+
+        <!-- Cumulative Burn-up Chart Card -->
+        <div class="card">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.8rem;">📈 直近7日間の学習進捗累積（バーンアップ）</h3>
+          <div id="uni-burnup-chart" style="width: 100%; height: 200px; background: var(--bg-secondary); border-radius: 12px; padding: 1rem; border: 1px solid var(--border-light);">
+            <!-- Burnup Chart SVG -->
+          </div>
+        </div>
+
+        <!-- Markov Chain State Transition Matrix Card -->
+        <div class="card">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem;">🔄 科目間状態遷移確率マトリクス（マルコフ連鎖モデル）</h3>
+          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            ある教科の自習を終えた後、次にどの教科（または休憩）へ移行するかの遷移確率を示した統計モデルです。習慣的な勉強パターンを分析します。
+          </p>
+          <div id="uni-markov-matrix-wrapper" style="overflow-x: auto; border: 1px solid var(--border-light); border-radius: 8px; background: var(--bg-secondary);">
+            <!-- Markov table will be injected here -->
+          </div>
+        </div>
+
+        <!-- fatigue decay scatter plot -->
+        <div class="card">
+          <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem;">📈 連続自習サイクルと反応遅延（疲労度減衰分析）</h3>
+          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            連続して作業・休憩サイクルを行った際、セッション終了アラームが鳴ってから反応するまでの遅延（ラグ）の変化を示します。
+          </p>
+          <div id="uni-fatigue-chart" style="width: 100%; height: 180px; background: var(--bg-secondary); border-radius: 12px; padding: 1rem; border: 1px solid var(--border-light);">
+            <!-- Fatigue correlation SVG -->
+          </div>
         </div>
       </div>
     </div>

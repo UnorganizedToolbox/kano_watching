@@ -225,6 +225,7 @@ function setupEventListeners(): void {
 
   // ─── Settings View ───
   document.getElementById('back-settings-btn')?.addEventListener('click', () => switchView('portal'));
+  document.getElementById('back-stats-btn')?.addEventListener('click', () => switchView('portal'));
   document.getElementById('save-settings-btn')?.addEventListener('click', saveApiKey);
   document.getElementById('test-connection-btn')?.addEventListener('click', testApiConnection);
   document.getElementById('test-program-btn')?.addEventListener('click', testProgramExecution);
