@@ -1,6 +1,6 @@
 import { state } from './state';
 import { APP_PASSCODE } from './constants';
-import { showToast, switchView, openModal, closeModal, applyCurriculumModeUI } from './ui';
+import { showToast, switchView, applyCurriculumModeUI } from './ui';
 import { preventMobileZoom } from './utils';
 import {
   loadApiKey,
@@ -8,12 +8,11 @@ import {
   testApiConnection,
   testProgramExecution,
   changePassword,
-  autoSyncTextbookMapping,
   setRenderSubjectSelector,
   setupAuthHandlers,
   logoutStudent
 } from './settings';
-import { renderDashboard, initStatsPage, clearHistory, exportBackup } from './stats';
+import { renderDashboard, initStatsPage, clearHistory } from './stats';
 import {
   startExam,
   prevQuestion,
@@ -25,8 +24,7 @@ import {
   runOcrPreRead,
   runFinalDiagnosis,
   startDirectInput,
-  restoreSession,
-  resetSession
+  restoreSession
 } from './exam';
 import { setupPomodoroHandlers, renderPomoSubjects, saveAndLogOnClose, initPomodoroUI, stopPomoOnLeave } from './pomo';
 import { setupQuestionHandlers, initQuestionUI } from './question';
@@ -152,31 +150,6 @@ window.submitPasscode = submitPasscode;
 // Event Listeners registration
 // -------------------------------------------------------------
 function setupEventListeners(): void {
-  const checkExamInProgressAndWarn = (): boolean => {
-    if (state.activeSession && !state.activeSession.isFinished) {
-      showToast('テスト実施中はタブ切り替えができません。一時停止または終了してください。', 'warning');
-      return true;
-    }
-    return false;
-  };
-
-  // Tab Navigation click handlers
-  document.getElementById('tab-exam-btn')?.addEventListener('click', () => {
-    if (checkExamInProgressAndWarn()) return;
-    stopPomoOnLeave();
-    switchView('setup');
-  });
-  document.getElementById('tab-pomodoro-btn')?.addEventListener('click', () => {
-    if (checkExamInProgressAndWarn()) return;
-    switchView('pomodoro');
-  });
-  document.getElementById('tab-question-btn')?.addEventListener('click', () => {
-    if (checkExamInProgressAndWarn()) return;
-    stopPomoOnLeave();
-    switchView('question');
-    initQuestionUI();
-  });
-
   // Passcode listeners
   document.getElementById('submit-passcode-btn')?.addEventListener('click', window.submitPasscode);
   document.getElementById('passcode-input')?.addEventListener('keypress', (e: KeyboardEvent) => {
@@ -185,7 +158,46 @@ function setupEventListeners(): void {
     }
   });
 
-  // Navigation button handlers
+  // ─── Portal Menu Card Navigation ───
+  document.getElementById('portal-goto-dashboard-btn')?.addEventListener('click', () => {
+    renderDashboard();
+    switchView('dashboard');
+  });
+  document.getElementById('portal-goto-exam-btn')?.addEventListener('click', () => {
+    stopPomoOnLeave();
+    switchView('setup');
+  });
+  document.getElementById('portal-goto-stats-btn')?.addEventListener('click', () => {
+    initStatsPage();
+    switchView('stats');
+  });
+  document.getElementById('portal-goto-pomodoro-btn')?.addEventListener('click', () => {
+    switchView('pomodoro');
+  });
+  document.getElementById('portal-goto-question-btn')?.addEventListener('click', () => {
+    stopPomoOnLeave();
+    switchView('question');
+    initQuestionUI();
+  });
+  document.getElementById('portal-goto-settings-btn')?.addEventListener('click', () => {
+    loadApiKey();
+    switchView('settings');
+  });
+  document.getElementById('portal-goto-debug-btn')?.addEventListener('click', () => {
+    switchView('debug');
+  });
+
+  // ─── Header ☰ Menu button → returns to portal ───
+  document.getElementById('menu-nav-btn')?.addEventListener('click', () => {
+    if (state.activeSession && !state.activeSession.isFinished) {
+      showToast('テスト実施中はメニューに戻れません。', 'warning');
+      return;
+    }
+    stopPomoOnLeave();
+    switchView('portal');
+  });
+
+  // ─── Exam Flow ───
   document.getElementById('start-exam-btn')?.addEventListener('click', startExam);
   document.getElementById('prev-question-btn')?.addEventListener('click', prevQuestion);
   document.getElementById('next-question-btn')?.addEventListener('click', nextQuestion);
@@ -193,82 +205,79 @@ function setupEventListeners(): void {
   document.getElementById('pause-exam-btn')?.addEventListener('click', pauseExam);
   document.getElementById('resume-exam-btn')?.addEventListener('click', resumeExam);
   
-  document.getElementById('start-ocr-btn')?.addEventListener('click', runOcrPreRead);
-  document.getElementById('back-to-upload-btn')?.addEventListener('click', () => switchView('upload'));
-  document.getElementById('submit-diagnostic-btn')?.addEventListener('click', runFinalDiagnosis);
-  document.getElementById('download-pdf-btn')?.addEventListener('click', () => window.print());
-  document.getElementById('restart-app-btn')?.addEventListener('click', resetSession);
-  document.getElementById('abort-exam-btn')?.addEventListener('click', resetSession);
-  
-  // Cancel Exam / Upload handlers to escape without AI evaluation
-  const cancelExamHandler = () => {
-    if (confirm('テストを中断し、解答データを破棄してホームに戻りますか？（保存されていないデータは失われます）')) {
+  document.getElementById('ocr-submit-btn')?.addEventListener('click', runOcrPreRead);
+  document.getElementById('correction-cancel-btn')?.addEventListener('click', () => switchView('upload'));
+  document.getElementById('correction-submit-btn')?.addEventListener('click', runFinalDiagnosis);
+  document.getElementById('report-close-btn')?.addEventListener('click', () => {
+    renderDashboard();
+    switchView('dashboard');
+  });
+  document.getElementById('abort-exam-btn')?.addEventListener('click', () => {
+    if (confirm('テストを中断し、解答データを破棄してホームに戻りますか？')) {
       stopTimer();
       localStorage.removeItem('math_test_session');
       state.activeSession = null;
-      switchView('setup');
+      switchView('portal');
       showToast('テストを中断しました。');
     }
-  };
-  document.getElementById('cancel-upload-btn')?.addEventListener('click', cancelExamHandler);
-  document.getElementById('cancel-exam-btn')?.addEventListener('click', cancelExamHandler);
-
-  // Pomodoro Hide remaining time handler
-  const hideCheckbox = document.getElementById('pomo-hide-time-checkbox') as HTMLInputElement;
-  if (hideCheckbox) {
-    hideCheckbox.addEventListener('change', (e: any) => {
-      const display = document.getElementById('pomo-display');
-      if (display) {
-        if (e.target.checked) {
-          display.classList.add('blurred');
-        } else {
-          display.classList.remove('blurred');
-        }
-      }
-    });
-  }
-  
-  // Settings View Navigation Handlers
-  document.getElementById('settings-btn')?.addEventListener('click', () => {
-    if (state.activeSession && !state.activeSession.isFinished) {
-      showToast('テスト実施中は設定画面を開けません。', 'warning');
-      return;
-    }
-    loadApiKey();
-    switchView('settings');
   });
-  document.getElementById('back-settings-btn')?.addEventListener('click', () => switchView('setup'));
+  document.getElementById('direct-input-btn')?.addEventListener('click', startDirectInput);
+
+  // ─── Settings View ───
+  document.getElementById('back-settings-btn')?.addEventListener('click', () => switchView('portal'));
   document.getElementById('save-settings-btn')?.addEventListener('click', saveApiKey);
   document.getElementById('test-connection-btn')?.addEventListener('click', testApiConnection);
   document.getElementById('test-program-btn')?.addEventListener('click', testProgramExecution);
-  document.getElementById('stats-nav-btn')?.addEventListener('click', () => {
-    if (state.activeSession && !state.activeSession.isFinished) {
-      showToast('テスト実施中は統計画面を開けません。', 'warning');
+  document.getElementById('change-password-btn')?.addEventListener('click', changePassword);
+  document.getElementById('settings-logout-btn')?.addEventListener('click', logoutStudent);
+
+  // ─── Dashboard History ───
+  document.getElementById('clear-history-btn')?.addEventListener('click', clearHistory);
+
+  // ─── Debug back button ───
+  document.getElementById('back-debug-btn')?.addEventListener('click', () => switchView('portal'));
+
+  // ─── Bug Report Floating Button ───
+  document.getElementById('bug-report-trigger')?.addEventListener('click', () => {
+    const modal = document.getElementById('bug-report-modal');
+    if (modal) modal.style.display = 'flex';
+  });
+  document.getElementById('bug-report-cancel-btn')?.addEventListener('click', () => {
+    const modal = document.getElementById('bug-report-modal');
+    if (modal) modal.style.display = 'none';
+  });
+  document.getElementById('bug-report-submit-btn')?.addEventListener('click', async () => {
+    const textarea = document.getElementById('bug-report-textarea') as HTMLTextAreaElement;
+    const content = textarea?.value.trim();
+    if (!content) {
+      showToast('報告内容を入力してください。', 'warning');
       return;
     }
-    switchView('stats');
-    initStatsPage();
+    const sheetsUrl = localStorage.getItem('math_google_sheets_url') || '';
+    const studentName = localStorage.getItem('math_student_name') || '匿名';
+    if (!sheetsUrl) {
+      showToast('連携URLが設定されていません。', 'warning');
+      return;
+    }
+    try {
+      await fetch(sheetsUrl, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'report_bug', studentName, description: content })
+      });
+      showToast('不具合報告を送信しました。', 'success');
+      if (textarea) textarea.value = '';
+      const modal = document.getElementById('bug-report-modal');
+      if (modal) modal.style.display = 'none';
+    } catch {
+      showToast('送信に失敗しました。', 'danger');
+    }
   });
-  document.getElementById('change-password-btn')?.addEventListener('click', changePassword);
-  document.getElementById('clear-history-btn')?.addEventListener('click', clearHistory);
-  
-  document.getElementById('report-issue-btn')?.addEventListener('click', () => {
-    const desc = document.getElementById('report-desc-input') as HTMLInputElement;
-    if (desc) desc.value = '';
-    stopTimer();
-    openModal('report-modal');
-  });
-  
-  document.getElementById('direct-input-btn')?.addEventListener('click', startDirectInput);
 
-  // LMS Handlers
+  // ─── Sub-systems ───
   setupPomodoroHandlers();
   setupQuestionHandlers();
   setupDebugHandlers();
-
-  // Auth Handlers
   setupAuthHandlers();
-  document.getElementById('settings-logout-btn')?.addEventListener('click', logoutStudent);
 }
 
 // -------------------------------------------------------------
@@ -295,7 +304,7 @@ async function initApp(): Promise<void> {
     // Force switch to Auth screen
     switchView('auth');
   } else {
-    // Update settings modal inputs with logged-in user details
+    // Update settings view inputs with logged-in user details
     const studentNameInput = document.getElementById('student-name-input') as HTMLInputElement;
     if (studentNameInput) {
       studentNameInput.value = studentName;
@@ -304,6 +313,12 @@ async function initApp(): Promise<void> {
     const idDisplay = document.getElementById('settings-student-id-display');
     if (idDisplay) {
       idDisplay.textContent = studentId;
+    }
+    
+    // Show Admin debug entry if Admin account
+    if (studentName === 'Admin') {
+      const adminEntry = document.getElementById('portal-admin-debug-entry');
+      if (adminEntry) adminEntry.style.display = 'block';
     }
   }
   
@@ -323,13 +338,6 @@ async function initApp(): Promise<void> {
     
     // Check if there is an active session in progress
     restoreSession();
-    
-    // Automatically sync textbook mapping if URL exists and it's not yet synced
-    const sheetsUrl = localStorage.getItem('math_google_sheets_url');
-    const syncedVersion = localStorage.getItem('textbook_synced_version');
-    if (sheetsUrl && syncedVersion !== '1.0') {
-      autoSyncTextbookMapping(sheetsUrl);
-    }
   } catch (error) {
     showToast('問題データの読み込みに失敗しました。ラズパイ上のファイルを確認してください。', 'danger');
     console.error(error);

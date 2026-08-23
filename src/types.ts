@@ -88,6 +88,6 @@ export interface FatiguePoint {
 
 export type PomoState = 'idle' | 'work' | 'work_paused' | 'break' | 'break_paused' | 'work_complete' | 'break_complete';
 
-export type ViewName = 'auth' | 'setup' | 'exam' | 'upload' | 'correction' | 'report' | 'stats' | 'pomodoro' | 'question' | 'settings' | 'debug';
+export type ViewName = 'auth' | 'portal' | 'dashboard' | 'setup' | 'exam' | 'upload' | 'correction' | 'report' | 'stats' | 'pomodoro' | 'question' | 'settings' | 'debug';
 
 export type ToastType = 'info' | 'success' | 'warning' | 'danger';

@@ -6,6 +6,8 @@ function getViews(): Record<ViewName, HTMLElement> {
   if (!viewsCached) {
     viewsCached = {
       auth: document.getElementById('auth-view')!,
+      portal: document.getElementById('portal-view')!,
+      dashboard: document.getElementById('dashboard-view')!,
       setup: document.getElementById('setup-view')!,
       exam: document.getElementById('exam-view')!,
       upload: document.getElementById('upload-view')!,
@@ -22,8 +24,9 @@ function getViews(): Record<ViewName, HTMLElement> {
 }
 
 export function switchView(viewName: ViewName): void {
-  const isDev = localStorage.getItem('math_student_name') === 'Admin';
-  const targetView = isDev ? 'debug' : viewName;
+  // If not logged in, force 'auth' view regardless of destination
+  const loggedIn = !!localStorage.getItem('math_student_id');
+  const targetView = loggedIn ? viewName : 'auth';
 
   const views = getViews();
   Object.keys(views).forEach(name => {
@@ -35,32 +38,36 @@ export function switchView(viewName: ViewName): void {
     }
   });
 
-  // Handle Main Tab bar visibility and active state
-  const tabContainer = document.getElementById('app-main-tabs');
-  if (tabContainer) {
-    if (isDev) {
-      tabContainer.style.display = 'none';
-    } else if (viewName === 'setup' || viewName === 'pomodoro' || viewName === 'question' || viewName === 'stats') {
-      tabContainer.style.display = 'flex';
-      
-      // Deactivate all tab buttons
-      document.getElementById('tab-exam-btn')?.classList.remove('active');
-      document.getElementById('tab-pomodoro-btn')?.classList.remove('active');
-      document.getElementById('tab-question-btn')?.classList.remove('active');
-      
-      // Activate corresponding tab button
-      if (viewName === 'setup' || viewName === 'stats') {
-        document.getElementById('tab-exam-btn')?.classList.add('active');
-      } else if (viewName === 'pomodoro') {
-        document.getElementById('tab-pomodoro-btn')?.classList.add('active');
-      } else if (viewName === 'question') {
-        document.getElementById('tab-question-btn')?.classList.add('active');
-      }
+  // Handle Header visibility
+  const appHeader = document.getElementById('app-header');
+  const menuBtn = document.getElementById('menu-nav-btn');
+  const statsBtn = document.getElementById('stats-nav-btn');
+  const settingsBtn = document.getElementById('settings-btn');
+  const accountDisplay = document.getElementById('header-account-display');
+
+  if (appHeader) {
+    if (targetView === 'auth') {
+      appHeader.style.display = 'none';
     } else {
-      tabContainer.style.display = 'none';
+      appHeader.style.display = 'flex';
+      
+      // Update header username
+      const studentName = localStorage.getItem('math_student_name') || '未設定';
+      const studentId = localStorage.getItem('math_student_id') || '';
+      if (accountDisplay) {
+        accountDisplay.textContent = `👤 ${studentName} (${studentId}) ▼`;
+      }
+      
+      // Strict Navigation Lock (Hide menu/settings/stats buttons during exam session)
+      const isExamActive = (targetView === 'exam' || targetView === 'upload' || targetView === 'correction');
+      
+      if (menuBtn) menuBtn.style.display = isExamActive ? 'none' : 'flex';
+      if (statsBtn) statsBtn.style.display = isExamActive ? 'none' : 'inline-block';
+      if (settingsBtn) settingsBtn.style.display = isExamActive ? 'none' : 'inline-block';
     }
   }
 
+  // Always scroll to top on transition
   window.scrollTo(0, 0);
 }
 
@@ -128,37 +135,7 @@ export function applyCurriculumModeUI(): void {
   const isDev = localStorage.getItem('math_student_name') === 'Admin';
   if (isDev) {
     switchView('debug');
-    return;
-  }
-
-  const mode = localStorage.getItem('math_curriculum_mode') || 'junior_high';
-  const tabExam = document.getElementById('tab-exam-btn');
-  const statsNavBtn = document.getElementById('stats-nav-btn');
-  
-  const schoolStats = document.getElementById('school-stats-container');
-  const uniStats = document.getElementById('university-stats-container');
-  
-  if (mode === 'university') {
-    // University Mode hides exam tab and shows university statistics dashboard
-    if (tabExam) tabExam.style.display = 'none';
-    if (schoolStats) schoolStats.style.display = 'none';
-    if (uniStats) uniStats.style.display = 'block';
-    
-    // Auto route to pomodoro if we are in setup/exam and in university mode
-    const activeView = document.querySelector('.view.active');
-    if (activeView && (
-      activeView.id === 'setup-view' || 
-      activeView.id === 'exam-view' || 
-      activeView.id === 'upload-view' || 
-      activeView.id === 'correction-view' || 
-      activeView.id === 'report-view'
-    )) {
-      switchView('pomodoro');
-    }
   } else {
-    // School mode (Junior / High school) shows exam tab
-    if (tabExam) tabExam.style.display = 'inline-block';
-    if (schoolStats) schoolStats.style.display = 'block';
-    if (uniStats) uniStats.style.display = 'none';
+    switchView('portal');
   }
 }

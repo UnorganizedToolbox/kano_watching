@@ -1,5 +1,5 @@
 import { DEFAULT_API_KEY } from './constants';
-import { showToast, showLoader, hideLoader, closeModal, applyCurriculumModeUI } from './ui';
+import { showToast, showLoader, hideLoader, applyCurriculumModeUI } from './ui';
 import { testGeminiApiKey, testGasConnection, testGasEmailProgram, syncTextbookMappingToGas } from './api';
 import { renderDashboard } from './stats';
 import { updatePomoUIState } from './pomo';
@@ -55,7 +55,7 @@ export function saveApiKey(): void {
   const oldMode = localStorage.getItem('math_curriculum_mode') || 'junior_high';
   localStorage.setItem('math_curriculum_mode', mode);
   
-  closeModal('settings-modal');
+  switchView('portal');
   showToast('設定を保存しました。');
   
   if (mode !== oldMode) {
@@ -157,7 +157,7 @@ export async function syncTextbookMapping(): Promise<void> {
     
     localStorage.setItem('textbook_synced_version', '1.0');
     showToast(`教材データ（${count}件）の同期が完了しました！`, 'success');
-    closeModal('settings-modal');
+    switchView('portal');
   } catch (err: any) {
     console.error(err);
     showToast(`エラー: ${err.message}`, 'danger');
@@ -281,18 +281,19 @@ export function setupAuthHandlers(): void {
         localStorage.setItem('math_student_name', result.studentName);
         localStorage.setItem('math_student_email', result.email);
         
-        // Lock student name input in settings modal
+        // Lock student name input in settings view
         const studentNameInput = document.getElementById('student-name-input') as HTMLInputElement;
         if (studentNameInput) {
           studentNameInput.value = result.studentName;
           studentNameInput.disabled = true;
         }
+        const idDisplay = document.getElementById('settings-student-id-display');
+        if (idDisplay) idDisplay.textContent = studentId;
         
         hideLoader();
         showToast(`ログインに成功しました。お帰りなさい、${result.studentName}さん！`, 'success');
         
-        // Switch to dashboard view
-        switchView('setup');
+        // Switch to portal menu view
         renderDashboard();
         applyCurriculumModeUI();
         updatePomoUIState();
