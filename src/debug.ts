@@ -10,31 +10,40 @@ export function setupDebugHandlers(): void {
 
   // 1. Timer tests
   document.getElementById('debug-timer-2s-btn')?.addEventListener('click', () => {
+    stopPomoOnLeave();
     unlockAudio();
     state.pomoSecondsLeft = 2;
     state.pomoState = 'work';
     state.pomoStateStartTime = Date.now();
     state.pomoTimerStartSecondsLeft = 2;
+    state.pomoAccumulatedSeconds = 0;
+    state.pomoZeroTimestamp = 0;
     startPomoTimerTick();
     showToast('デバッグ: 2秒タイマーを開始しました。');
   });
 
   document.getElementById('debug-timer-15m-btn')?.addEventListener('click', () => {
+    stopPomoOnLeave();
     unlockAudio();
     state.pomoSecondsLeft = 15 * 60;
     state.pomoState = 'work';
     state.pomoStateStartTime = Date.now();
     state.pomoTimerStartSecondsLeft = 15 * 60;
+    state.pomoAccumulatedSeconds = 0;
+    state.pomoZeroTimestamp = 0;
     startPomoTimerTick();
     showToast('デバッグ: 15分タイマーを開始しました。');
   });
 
   document.getElementById('debug-timer-25m-btn')?.addEventListener('click', () => {
+    stopPomoOnLeave();
     unlockAudio();
     state.pomoSecondsLeft = 25 * 60;
     state.pomoState = 'work';
     state.pomoStateStartTime = Date.now();
     state.pomoTimerStartSecondsLeft = 25 * 60;
+    state.pomoAccumulatedSeconds = 0;
+    state.pomoZeroTimestamp = 0;
     startPomoTimerTick();
     showToast('デバッグ: 25分タイマーを開始しました。');
   });

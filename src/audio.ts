@@ -1,6 +1,6 @@
 import { state } from './state';
 
-let globalBgmEl: HTMLAudioElement | null = null;
+let globalBgmEl: HTMLVideoElement | null = null; // Uses HTMLVideoElement to support video (mp4/mov) soundtrack playback on iOS
 let globalAlertEl: HTMLAudioElement | null = null;
 
 // 1-second silent MP3 base64 data URI
@@ -12,16 +12,32 @@ const BEEP_WAV_B64 = 'data:audio/wav;base64,UklGRhQLAABXQVZFZm10IBAAAAABAAEAQB8A
 export function initAudio(): void {
   try {
     if (!globalBgmEl) {
-      globalBgmEl = new Audio();
+      // Create a hidden video element to support video (.mp4/.mov) soundtrack playback on iOS
+      globalBgmEl = document.createElement('video');
+      globalBgmEl.id = 'hidden-bgm-video';
       globalBgmEl.loop = true;
       globalBgmEl.setAttribute('playsinline', 'true');
+      globalBgmEl.setAttribute('webkit-playsinline', 'true');
+      
+      // Hide completely but keep in DOM for iOS activation
+      globalBgmEl.style.position = 'fixed';
+      globalBgmEl.style.top = '0';
+      globalBgmEl.style.left = '0';
+      globalBgmEl.style.width = '1px';
+      globalBgmEl.style.height = '1px';
+      globalBgmEl.style.opacity = '0.001';
+      globalBgmEl.style.pointerEvents = 'none';
+      globalBgmEl.style.zIndex = '-9999';
+      
+      document.body.appendChild(globalBgmEl);
     }
+    
     if (!globalAlertEl) {
       globalAlertEl = new Audio();
       globalAlertEl.setAttribute('playsinline', 'true');
     }
   } catch (e) {
-    console.error("Failed to initialize HTML5 Audio components:", e);
+    console.error("Failed to initialize HTML5 Audio/Video components:", e);
   }
 }
 
@@ -51,14 +67,42 @@ export function unlockAudio(): void {
   }
 }
 
+// MediaSession metadata update helper to overwrite active media (like d anime store)
+function updateMediaSessionState(): void {
+  if ('mediaSession' in navigator) {
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: state.pomoState === 'work' ? '集中学習中 📝' : 'ポモドーロ休憩中 ☕',
+        artist: state.pomoBgmFileName || '無音 (バックグラウンド維持)',
+        album: 'kano_watching 数学学習管理',
+        artwork: [
+          { src: `${(import.meta as any).env?.BASE_URL || '/'}favicon.ico`, sizes: '64x64', type: 'image/x-icon' }
+        ]
+      });
+      
+      // Bind basic lockscreen handlers
+      navigator.mediaSession.setActionHandler('play', () => {
+        resumeBgmPlayback();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        pauseBgmPlayback();
+      });
+    } catch (e) {
+      console.warn("Failed to set MediaSession metadata:", e);
+    }
+  }
+}
+
 export function startBgmPlayback(): void {
   initAudio();
   if (!globalBgmEl) return;
   
   try {
-    // If a custom local BGM url exists, prioritize it. Otherwise use silent fallback.
     globalBgmEl.src = state.pomoBgmUrl || SILENT_MP3_B64;
     globalBgmEl.loop = true;
+    
+    updateMediaSessionState();
+    
     globalBgmEl.play().catch(e => {
       console.warn("BGM play failed or blocked. User interaction required:", e);
     });

@@ -15,9 +15,11 @@ export function initPomodoroUI(): void {
   state.pomoAccumulatedSeconds = 0;
   
   const pomoDisplay = document.getElementById('pomo-display');
+  const debugDisplay = document.getElementById('debug-pomo-display');
   const pomoMemoInput = document.getElementById('pomo-memo-input') as HTMLInputElement;
   
   if (pomoDisplay) pomoDisplay.textContent = "25:00";
+  if (debugDisplay) debugDisplay.textContent = "25:00";
   if (pomoMemoInput) pomoMemoInput.value = "";
   
   updatePomoUIState();
@@ -25,32 +27,37 @@ export function initPomodoroUI(): void {
 
 export function updatePomoUIState(): void {
   const statusEl = document.getElementById('pomo-status');
-  if (!statusEl) return;
+  const debugStatusEl = document.getElementById('debug-pomo-status');
   
-  statusEl.className = 'pomo-status-pill';
+  const updateStatus = (el: HTMLElement) => {
+    el.className = 'pomo-status-pill';
+    
+    if (state.pomoState === 'idle') {
+      el.textContent = '現在の状態: 未開始';
+      el.classList.add('pomo-status-idle');
+    } else if (state.pomoState === 'work') {
+      el.textContent = '現在の状態: 作業中 📝';
+      el.classList.add('pomo-status-work');
+    } else if (state.pomoState === 'work_paused') {
+      el.textContent = '現在の状態: 作業一時停止中 ⏸️';
+      el.classList.add('pomo-status-paused');
+    } else if (state.pomoState === 'break') {
+      el.textContent = '現在の状態: 休憩中 ☕';
+      el.classList.add('pomo-status-break');
+    } else if (state.pomoState === 'break_paused') {
+      el.textContent = '現在の状態: 休憩一時停止中 ⏸️';
+      el.classList.add('pomo-status-paused');
+    } else if (state.pomoState === 'work_complete') {
+      el.textContent = '作業終了！☕ 休憩を開始してください';
+      el.classList.add('pomo-status-paused');
+    } else if (state.pomoState === 'break_complete') {
+      el.textContent = '休憩終了！🚀 作業を開始してください';
+      el.classList.add('pomo-status-work');
+    }
+  };
   
-  if (state.pomoState === 'idle') {
-    statusEl.textContent = '現在の状態: 未開始';
-    statusEl.classList.add('pomo-status-idle');
-  } else if (state.pomoState === 'work') {
-    statusEl.textContent = '現在の状態: 作業中 📝';
-    statusEl.classList.add('pomo-status-work');
-  } else if (state.pomoState === 'work_paused') {
-    statusEl.textContent = '現在の状態: 作業一時停止中 ⏸️';
-    statusEl.classList.add('pomo-status-paused');
-  } else if (state.pomoState === 'break') {
-    statusEl.textContent = '現在の状態: 休憩中 ☕';
-    statusEl.classList.add('pomo-status-break');
-  } else if (state.pomoState === 'break_paused') {
-    statusEl.textContent = '現在の状態: 休憩一時停止中 ⏸️';
-    statusEl.classList.add('pomo-status-paused');
-  } else if (state.pomoState === 'work_complete') {
-    statusEl.textContent = '作業終了！☕ 休憩を開始してください';
-    statusEl.classList.add('pomo-status-paused');
-  } else if (state.pomoState === 'break_complete') {
-    statusEl.textContent = '休憩終了！🚀 作業を開始してください';
-    statusEl.classList.add('pomo-status-work');
-  }
+  if (statusEl) updateStatus(statusEl);
+  if (debugStatusEl) updateStatus(debugStatusEl);
 
   const startBtn = document.getElementById('pomo-start-btn');
   const pauseBtn = document.getElementById('pomo-pause-btn');
@@ -173,8 +180,12 @@ export function tickPomoTimer(): void {
     state.pomoAccumulatedSeconds = Math.max(prevAccumulated, state.pomoTimerStartSecondsLeft - state.pomoSecondsLeft);
     
     const displayEl = document.getElementById('pomo-display');
+    const debugDisplayEl = document.getElementById('debug-pomo-display');
+    const timeText = formatPomoTime(state.pomoSecondsLeft);
+    
     if (state.pomoSecondsLeft > 0) {
-      if (displayEl) displayEl.textContent = formatPomoTime(state.pomoSecondsLeft);
+      if (displayEl) displayEl.textContent = timeText;
+      if (debugDisplayEl) debugDisplayEl.textContent = timeText;
     } else {
       if (state.pomoTimerInterval) {
         clearInterval(state.pomoTimerInterval);
@@ -194,7 +205,9 @@ export function tickPomoTimer(): void {
         state.pomoSecondsLeft = 25 * 60;
       }
       
-      if (displayEl) displayEl.textContent = formatPomoTime(state.pomoSecondsLeft);
+      const newTimeText = formatPomoTime(state.pomoSecondsLeft);
+      if (displayEl) displayEl.textContent = newTimeText;
+      if (debugDisplayEl) debugDisplayEl.textContent = newTimeText;
       updatePomoUIState();
     }
   }
