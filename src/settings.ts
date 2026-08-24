@@ -302,42 +302,6 @@ export function setupAuthHandlers(): void {
     };
   }
 
-  // 5. Temporary Test Account Creator (Admin / Test accounts setup)
-  const btnCreateTemp = document.getElementById('auth-create-temp-btn');
-  if (btnCreateTemp) {
-    btnCreateTemp.onclick = async () => {
-      showLoader('アカウント作成中...', 'Test & Admin アカウントを登録中...');
-      
-      try {
-        const response = await fetch('/api/gas', {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'create_temp_test_admin_accounts'
-          })
-        });
-        if (!response.ok) {
-          throw new Error(`接続エラー: ${response.statusText}`);
-        }
-        const resJson = await response.json();
-        if (resJson.status !== 'success') {
-          throw new Error(resJson.message || '作成に失敗しました。');
-        }
-        
-        hideLoader();
-        alert(`一時テストアカウントを作成しました！\n\n【一般用】\n生徒名: Test\n生徒ID: ${resJson.testId}\n初期パスワード: ${resJson.password}\n\n【管理者用】\n生徒名: Admin\n生徒ID: ${resJson.adminId}\n初期パスワード: ${resJson.password}\n\nこれらを入力してログインしてください。`);
-        
-        // Fill inputs automatically with test account credentials
-        const inputId = document.getElementById('auth-student-id-input') as HTMLInputElement;
-        const inputPass = document.getElementById('auth-student-password-input') as HTMLInputElement;
-        if (inputId) inputId.value = resJson.testId;
-        if (inputPass) inputPass.value = resJson.password;
-        
-      } catch (err: any) {
-        hideLoader();
-        showToast(err.message || 'アカウント作成に失敗しました。', 'danger');
-      }
-    };
-  }
 }
 
 export function logoutStudent(): void {
