@@ -1,0 +1,296 @@
+[
+  {
+    "page": "14",
+    "unit": "式と証明",
+    "topic": "3次式の展開と因数分解",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "15",
+    "unit": "式と証明",
+    "topic": "二項定理の基本",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "18",
+    "unit": "式と証明",
+    "topic": "分数式",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "21",
+    "unit": "式と証明",
+    "topic": "条件が比例式の等式の証明",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "22",
+    "unit": "式と証明",
+    "topic": "不等式の証明",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "24",
+    "unit": "式と証明",
+    "topic": "相加平均と相乗平均",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "25",
+    "unit": "式と証明",
+    "topic": "定期テスト対策問題①",
+    "difficulty": 2,
+    "question_count": 5
+  },
+  {
+    "page": "28",
+    "unit": "複素数と方程式",
+    "topic": "複素数",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "31",
+    "unit": "複素数と方程式",
+    "topic": "2次方程式の解の判別②",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "34",
+    "unit": "複素数と方程式",
+    "topic": "2次方程式の実数解の符号",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "36",
+    "unit": "複素数と方程式",
+    "topic": "剰余の定理と因数定理",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "46",
+    "unit": "図形と方程式",
+    "topic": "直線の方程式",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "52",
+    "unit": "図形と方程式",
+    "topic": "三角形の面積",
+    "difficulty": 2,
+    "question_count": 1
+  },
+  {
+    "page": "55",
+    "unit": "図形と方程式",
+    "topic": "円の方程式②",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "59",
+    "unit": "図形と方程式",
+    "topic": "円の弦の長さ",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "60",
+    "unit": "図形と方程式",
+    "topic": "円と直線の交点を通る円",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "63",
+    "unit": "図形と方程式",
+    "topic": "軌跡と領域",
+    "difficulty": 1,
+    "question_count": null
+  },
+  {
+    "page": "66",
+    "unit": "図形と方程式",
+    "topic": "不等式の表す領域①",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "70",
+    "unit": "図形と方程式",
+    "topic": "不等式の表す領域",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "73",
+    "unit": "三角関数",
+    "topic": "弧度法と、三角関数の相互関係①",
+    "difficulty": 2,
+    "question_count": 4
+  },
+  {
+    "page": "75",
+    "unit": "三角関数",
+    "topic": "三角関数の相互関係②",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "78",
+    "unit": "三角関数",
+    "topic": "変換公式",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "79",
+    "unit": "三角関数",
+    "topic": "最大値・最小値①",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "82",
+    "unit": "三角関数",
+    "topic": "加法定理",
+    "difficulty": 1,
+    "question_count": null
+  },
+  {
+    "page": "85",
+    "unit": "三角関数",
+    "topic": "等式の証明",
+    "difficulty": 2,
+    "question_count": 5
+  },
+  {
+    "page": "88",
+    "unit": "三角関数",
+    "topic": "等式の証明、式の値",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "90",
+    "unit": "三角関数",
+    "topic": "最大値・最小値②",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "93",
+    "unit": "三角関数",
+    "topic": "定期テスト対策問題",
+    "difficulty": 2,
+    "question_count": 4
+  },
+  {
+    "page": "95",
+    "unit": "指数・対数関数",
+    "topic": "累乗根",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "96",
+    "unit": "指数・対数関数",
+    "topic": "指数の拡張",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "99",
+    "unit": "指数・対数関数",
+    "topic": "指数関数を含む方程式・不等式",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "100",
+    "unit": "指数・対数関数",
+    "topic": "定期テスト対策問題①",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "102",
+    "unit": "指数・対数関数",
+    "topic": "対数関数",
+    "difficulty": 1,
+    "question_count": null
+  },
+  {
+    "page": "103",
+    "unit": "指数・対数関数",
+    "topic": "対数の定義と性質①",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "105",
+    "unit": "指数・対数関数",
+    "topic": "底の変換公式",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "108-109",
+    "unit": "指数関数・対数関数",
+    "topic": "常用対数の応用（桁数・小数の問題）",
+    "difficulty": 2,
+    "question_count": 4
+  },
+  {
+    "page": "112-113",
+    "unit": "微分法と積分法",
+    "topic": "微分法の要点チェック（導関数・極大・極小・方程式への応用）",
+    "difficulty": 1,
+    "question_count": null
+  },
+  {
+    "page": "116",
+    "unit": "微分法と積分法",
+    "topic": "導関数の定義",
+    "difficulty": 2,
+    "question_count": 6
+  },
+  {
+    "page": "119",
+    "unit": "微分法と積分法",
+    "topic": "単調に増加する3次関数",
+    "difficulty": 2,
+    "question_count": 2
+  },
+  {
+    "page": "120",
+    "unit": "微分法と積分法",
+    "topic": "関数の決定と極大値・極小値",
+    "difficulty": 2,
+    "question_count": 5
+  },
+  {
+    "page": "123",
+    "unit": "微分法と積分法",
+    "topic": "3次方程式の異なる3つの実数解",
+    "difficulty": 2,
+    "question_count": 3
+  },
+  {
+    "page": "130",
+    "unit": "微分法と積分法",
+    "topic": "絶対値記号がついた定積分",
+    "difficulty": 2,
+    "question_count": 7
+  }
+]
