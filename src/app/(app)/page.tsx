@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -111,7 +112,7 @@ export default async function DashboardPage() {
             ) : (
               <div className="py-8 text-center">
                 <p className="text-xs text-slate-500 mb-3">診断テストをまだ受けていません</p>
-                <button className="px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-bold hover:bg-brand-700 transition-colors">
+                <Link href="/exam" className="px-4 py-2 inline-block bg-brand-600 text-white rounded-xl text-xs font-bold hover:bg-brand-700 transition-colors">
                   実力診断テストを開始
                 </button>
               </div>
