@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic';
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
@@ -15,7 +14,7 @@ export default async function DashboardPage() {
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
 
   if (profile?.role === 'admin') {
-    // redirect('/admin');
+    redirect('/admin');
   }
 
   const { data: pomodoros } = await supabase.from('pomodoro_logs').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false });
