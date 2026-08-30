@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import AdminQuestionList from "./components/AdminQuestionList";
+import RealtimeAdminQuestions from "./components/RealtimeAdminQuestions";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -106,6 +107,7 @@ export default async function AdminDashboard() {
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 dark:bg-slate-900/20">
+              <RealtimeAdminQuestions />
               <AdminQuestionList questions={openQuestions || []} />
             </div>
           </div>

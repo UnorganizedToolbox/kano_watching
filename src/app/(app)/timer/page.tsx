@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { askQuestion } from "./actions";
+import RealtimeQuestions from "./components/RealtimeQuestions";
 import PomodoroTimer from "./components/PomodoroTimer";
 
 export default async function TimerPage() {
@@ -24,6 +25,7 @@ export default async function TimerPage() {
         {/* Left Column (Timer & Current task) */}
         <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
           <PomodoroTimer />
+          <RealtimeQuestions studentId={user.id} />
         </div>
 
         {/* Right Column (Q&A) */}
