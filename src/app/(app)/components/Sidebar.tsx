@@ -2,9 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal } from "lucide-react";
+import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal, Gamepad2 } from "lucide-react";
 
-export default function Sidebar({ role }: { role: string }) {
+interface SidebarProps {
+  role: string;
+  level?: number;
+  exp?: number;
+}
+
+export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
   const pathname = usePathname();
 
   const getLinkClass = (href: string) => {
@@ -16,11 +22,33 @@ export default function Sidebar({ role }: { role: string }) {
     }`;
   };
 
+  // 簡易的な必要EXP計算（とりあえず二次関数的に）
+  const requiredExp = level * level * 100;
+  const progressPercent = Math.min(100, Math.max(0, (exp / requiredExp) * 100));
+
   return (
     <div className="flex-1 flex flex-col justify-between overflow-hidden">
       <nav className="flex-1 flex flex-col gap-1 p-4 overflow-y-auto">
         {role === 'student' ? (
           <>
+            <Link href="/game" className="mb-4 block">
+              <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
+                  <span className="text-[10px] mr-0.5">Lv.</span>{level}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <p className="text-xs font-bold text-brand-700 dark:text-brand-300 truncate pr-2">ゲームポータル <Gamepad2 className="inline w-3 h-3 ml-0.5 opacity-70" /></p>
+                    <span className="text-[9px] text-brand-600/70 dark:text-brand-400/70 font-mono">{exp}/{requiredExp}</span>
+                  </div>
+                  <div className="w-full bg-brand-200/60 dark:bg-brand-900/50 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-brand-500 h-full rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
             <Link href="/" className={getLinkClass('/')}>
               <LayoutDashboard className="w-5 h-5" />
               <span>Dashboard</span>

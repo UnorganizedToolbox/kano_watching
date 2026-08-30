@@ -26,6 +26,8 @@ export default async function AppLayout({
   const name = profile?.name || user.email?.split('@')[0] || 'Unknown';
   const role = profile?.role || 'student';
   const isAdmin = role === 'admin';
+  const level = profile?.level || 1;
+  const exp = profile?.exp || 0;
 
   return (
     <>
@@ -47,7 +49,7 @@ export default async function AppLayout({
 
       <div className="flex flex-1 overflow-hidden relative z-10">
         <aside className="w-64 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
-          <Sidebar role={role} />
+          <Sidebar role={role} level={level} exp={exp} />
         </aside>
 
         <main className="flex-1 overflow-y-auto px-20 py-4 h-[calc(100vh-4rem)] flex flex-col pb-16" id="main-content-scroll">
