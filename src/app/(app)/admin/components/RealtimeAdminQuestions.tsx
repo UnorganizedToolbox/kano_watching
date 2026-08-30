@@ -10,7 +10,7 @@ export default function RealtimeAdminQuestions() {
   useEffect(() => {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
     const channel = supabase.channel('realtime_admin_questions')

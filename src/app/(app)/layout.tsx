@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
-import Link from "next/link";
-import { CircleUserRound, LayoutDashboard, Clock, Users, MessageSquareWarning } from "lucide-react";
+import { CircleUserRound } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import Sidebar from "./components/Sidebar";
 
 export default async function AppLayout({
   children,
@@ -72,35 +72,7 @@ export default async function AppLayout({
             </div>
           )}
 
-          <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
-            {!isAdmin ? (
-              <>
-                <Link href="/" className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <LayoutDashboard className="w-5 h-5" />
-                  <span>Dashboard</span>
-                </Link>
-                <Link href="/timeline" className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <i className="fa-solid fa-timeline w-5 text-center"></i>
-                  <span>Timeline</span>
-                </Link>
-                <Link href="/progress" className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <i className="fa-solid fa-chart-line w-5 text-center"></i>
-                  <span>Progress</span>
-                </Link>
-                <Link href="/timer" className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <Clock className="w-5 h-5" />
-                  <span>Timer & Q&A</span>
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href="/admin" className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 hover:bg-slate-100 dark:hover:bg-slate-800">
-                  <Users className="w-5 h-5" />
-                  <span>生徒一覧・管理</span>
-                </Link>
-              </>
-            )}
-          </div>
+          <Sidebar role={role} />
         </aside>
 
         <main className="flex-1 overflow-y-auto px-20 py-4 h-[calc(100vh-4rem)] flex flex-col pb-16" id="main-content-scroll">
