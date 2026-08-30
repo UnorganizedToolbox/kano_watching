@@ -253,7 +253,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     id: 'EVENT_APRIL_FOOL',
     category: 'EVENT',
     name: '笑えない嘘😡',
-    description: '#Aprilfoolで嘘をついてみよう！（※4/1のみ、#Aprilfoolをつけて質問箱等に投稿すると完全ランダムな点数が返ってくる）',
+    description: '4月1日にタイマーを開始するが、1度も完了せずに途中でキャンセルする',
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD,
     maxProgress: 1,
     unit: '回',
