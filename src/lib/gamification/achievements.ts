@@ -88,23 +88,47 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     maxProgress: 1,
     unit: '回',
   },
-  FIRST_FRIEND: {
-    id: 'FIRST_FRIEND',
+
+  // === 隠し実績 (GENERAL) ===
+  HIDDEN_GO_TO_SLEEP: {
+    id: 'HIDDEN_GO_TO_SLEEP',
     category: 'GENERAL',
-    name: '孤独な戦いの終わり',
-    description: '初めてフレンドを作る',
-    expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD,
+    name: '寝ろ',
+    description: '不健康だぞ（深夜2:00〜3:00の間にポモドーロ完了）',
+    expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 2,
     maxProgress: 1,
-    unit: '人',
+    unit: '回',
+    isHidden: true,
   },
-  FRIENDS_20: {
-    id: 'FRIENDS_20',
+  HIDDEN_EARLY_BIRD: {
+    id: 'HIDDEN_EARLY_BIRD',
     category: 'GENERAL',
-    name: '学びのネットワーク',
-    description: 'フレンドが20人に到達する',
-    expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD,
-    maxProgress: 20,
-    unit: '人',
+    name: '超健康優良児',
+    description: '君がNo.1だ（朝4:00-5:00にログインし、かつログイン前7時間以上アクティブでない状態を維持してポモドーロ完了）',
+    expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 3,
+    maxProgress: 1,
+    unit: '回',
+    isHidden: true,
+  },
+  HIDDEN_LAZY_REST: {
+    id: 'HIDDEN_LAZY_REST',
+    category: 'GENERAL',
+    name: 'ある意味の怠惰',
+    description: '休憩も作業の一部です（設定された休憩時間の80%以下、5分なら4分以内で次の作業を開始する）',
+    expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 2,
+    maxProgress: 1,
+    unit: '回',
+    isHidden: true,
+  },
+  HIDDEN_GACHA_STUDY: {
+    id: 'HIDDEN_GACHA_STUDY',
+    category: 'GENERAL',
+    name: '当たるまで学べば絶対当たる',
+    description: '期待値は20時間！（作業時間中、1分ごとに0.134%の確率で達成）',
+    expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 5,
+    maxProgress: 1,
+    unit: '回',
+    isHidden: true,
   },
 
   // ==========================================
@@ -162,7 +186,6 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 10,
     maxProgress: 80,
     unit: '時間',
-    // UI側で期間内のみ表示するよう制御可能
   },
   EVENT_SANTA_WAITING: {
     id: 'EVENT_SANTA_WAITING',
@@ -172,7 +195,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 5,
     maxProgress: 1,
     unit: '回',
-    isHidden: true, // 1日限定なので隠しアチーブ
+    isHidden: true,
   },
   EVENT_NEW_YEAR_GHOST: {
     id: 'EVENT_NEW_YEAR_GHOST',
@@ -210,6 +233,28 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     name: 'スタディ・オア・スタディ・アンド・トリート',
     description: '10/31に1ポモドーロ回し、かつテストを1つクリアする（イタズラかお菓子かは結果次第...？）',
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 3,
+    maxProgress: 1,
+    unit: '回',
+    isHidden: true,
+  },
+
+  // === 隠し実績 (EVENT) ===
+  EVENT_LEAP_YEAR: {
+    id: 'EVENT_LEAP_YEAR',
+    category: 'EVENT',
+    name: 'うるう年の刻印',
+    description: '2月29日にポモドーロを完了させる',
+    expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 5,
+    maxProgress: 1,
+    unit: '回',
+    isHidden: true,
+  },
+  EVENT_APRIL_FOOL: {
+    id: 'EVENT_APRIL_FOOL',
+    category: 'EVENT',
+    name: '笑えない嘘😡',
+    description: '#Aprilfoolで嘘をついてみよう！（※4/1のみ、#Aprilfoolをつけて質問箱等に投稿すると完全ランダムな点数が返ってくる）',
+    expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD,
     maxProgress: 1,
     unit: '回',
     isHidden: true,
