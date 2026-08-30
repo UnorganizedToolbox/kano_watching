@@ -10,32 +10,28 @@ export async function signup(formData: FormData) {
   try {
     const supabase = await createClient()
 
-    const data = {
-      email: formData.get('email') as string,
-      password: formData.get('password') as string,
-    }
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const student_id = formData.get('student_id') as string;
+    const name = formData.get('name') as string;
 
-    const { data: authData, error } = await supabase.auth.signUp(data)
+    const { data: authData, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          student_id,
+          name
+        }
+      }
+    })
 
     if (error) {
       console.error('Signup error:', error)
       hasError = true;
       errorMsg = 'サインアップに失敗しました。' + error.message;
-    } else if (authData.user) {
-      // Insert profile
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: authData.user.id,
-        student_id: formData.get('student_id') as string,
-        name: formData.get('name') as string,
-        email: data.email,
-        role: 'student',
-        status: 'active'
-      })
-
-      if (profileError) {
-        console.error('Profile insert error:', profileError)
-      }
     }
+    // Profile is now automatically inserted by Supabase Postgres Trigger on auth.users!
   } catch (err) {
     console.error('Unexpected error in signup:', err)
     hasError = true;
