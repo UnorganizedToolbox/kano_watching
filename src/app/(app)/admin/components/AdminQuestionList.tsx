@@ -50,7 +50,7 @@ export default function AdminQuestionList({ questions }: { questions: Question[]
                 name="answer_body" 
                 rows={3} 
                 placeholder="回答を入力してください..." 
-                className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-slate-50 dark:bg-slate-900 resize-none"
+                className="w-full px-3 py-2 text-xs text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-slate-50 dark:bg-slate-900 resize-none"
                 autoFocus
               ></textarea>
               <div className="flex justify-end gap-2">

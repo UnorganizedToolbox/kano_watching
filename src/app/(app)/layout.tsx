@@ -79,6 +79,14 @@ export default async function AppLayout({
                   <LayoutDashboard className="w-5 h-5" />
                   <span>Dashboard</span>
                 </Link>
+                <Link href="/timeline" className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <i className="fa-solid fa-timeline w-5 text-center"></i>
+                  <span>Timeline</span>
+                </Link>
+                <Link href="/progress" className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <i className="fa-solid fa-chart-line w-5 text-center"></i>
+                  <span>Progress</span>
+                </Link>
                 <Link href="/timer" className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                   <Clock className="w-5 h-5" />
                   <span>Timer & Q&A</span>
