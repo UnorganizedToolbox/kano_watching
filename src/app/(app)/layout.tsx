@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
-import { CircleUserRound } from "lucide-react";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Sidebar from "./components/Sidebar";
+import HeaderDropdown from "./components/HeaderDropdown";
 
 export default async function AppLayout({
   children,
@@ -41,16 +41,7 @@ export default async function AppLayout({
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <CircleUserRound className="w-8 h-8 text-slate-400" />
-            <div className="hidden md:block text-sm">
-              <p className="font-bold leading-none text-slate-700 dark:text-slate-200">{name}</p>
-              <p className="text-[10px] text-slate-500 mt-1 capitalize">{role}</p>
-            </div>
-          </div>
-          <form action="/auth/signout" method="post">
-            <button className="text-xs text-rose-500 hover:underline">ログアウト</button>
-          </form>
+          <HeaderDropdown name={name} role={role} />
         </div>
       </header>
 
