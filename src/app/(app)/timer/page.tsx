@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { askQuestion } from "./actions";
 import RealtimeQuestions from "./components/RealtimeQuestions";
 import PomodoroTimer from "./components/PomodoroTimer";
+import Image from "next/image";
 
 export default async function TimerPage() {
   const supabase = await createClient();
@@ -51,6 +52,14 @@ export default async function TimerPage() {
                     <h5 className="font-bold text-sm mb-1 text-slate-700 dark:text-slate-200">{q.title}</h5>
                     <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-wrap">{q.body}</p>
                     
+                    {q.image_url && (
+                      <div className="mt-3 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                        {/* Using standard img for external arbitrary URLs to avoid Next.js domain config issues */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={q.image_url} alt="添付画像" className="max-w-full h-auto max-h-48 object-contain" />
+                      </div>
+                    )}
+                    
                     {q.status === 'answered' && q.answer_body && (
                       <div className="mt-3 pt-3 border-t border-brand-100 dark:border-brand-800/50">
                         <span className="text-xs font-bold text-brand-600 dark:text-brand-400 block mb-1">先生からの回答:</span>
@@ -70,6 +79,11 @@ export default async function TimerPage() {
               <form action={askQuestion} className="flex flex-col gap-2">
                 <input required type="text" name="title" placeholder="質問のタイトル (例: 青チャートP45について)" className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-900" />
                 <textarea required name="body" rows={3} placeholder="質問内容を詳しく書いてください..." className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-900 resize-none"></textarea>
+                
+                <div className="flex items-center gap-2 mb-1">
+                  <input type="file" name="image" accept="image/*" className="text-xs text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300 w-full" />
+                </div>
+                
                 <button type="submit" className="w-full py-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2">
                   <i className="fa-solid fa-paper-plane"></i> 質問を送信する
                 </button>

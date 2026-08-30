@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 export async function askQuestion(formData: FormData) {
   const title = formData.get('title') as string;
   const body = formData.get('body') as string;
+  const image = formData.get('image') as File | null;
 
   if (!title || !body) throw new Error('タイトルと内容は必須です');
 
@@ -14,10 +15,34 @@ export async function askQuestion(formData: FormData) {
 
   if (!user) throw new Error('ログインしていません');
 
+  let image_url = null;
+
+  if (image && image.size > 0) {
+    const fileExt = image.name.split('.').pop();
+    const fileName = `${user.id}-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+    const filePath = `questions/${fileName}`;
+
+    const { error: uploadError, data } = await supabase.storage
+      .from('qa_images')
+      .upload(filePath, image);
+
+    if (uploadError) {
+      console.error('Failed to upload image', uploadError);
+      throw new Error('画像のアップロードに失敗しました');
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('qa_images')
+      .getPublicUrl(filePath);
+      
+    image_url = publicUrlData.publicUrl;
+  }
+
   const { error } = await supabase.from('questions').insert({
     student_uuid: user.id,
     title,
     body,
+    image_url,
     status: 'open'
   });
 

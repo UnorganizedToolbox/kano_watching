@@ -7,6 +7,7 @@ type Question = {
   id: string;
   title: string;
   body: string;
+  image_url: string | null;
   created_at: string;
   profiles: {
     name: string;
@@ -41,6 +42,11 @@ export default function AdminQuestionList({ questions }: { questions: Question[]
           </div>
           <h5 className="font-bold text-sm mb-1 text-slate-800 dark:text-slate-100">{q.title}</h5>
           <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-wrap">{q.body}</p>
+          {q.image_url && (
+            <div className="mt-3 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+              <img src={q.image_url} alt="添付画像" className="max-w-full h-auto max-h-64 object-contain" />
+            </div>
+          )}
           
           {answeringId === q.id ? (
             <form action={answerQuestion} className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
