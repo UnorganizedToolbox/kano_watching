@@ -8,15 +8,28 @@ export interface AchievementDef {
   name: string;          // 特徴的な名前（フレーバーテキスト）
   description: string;   // 実際の達成条件
   expReward: number;     // 獲得EXP（一旦デフォルトは1）
-  maxProgress: number;   // 達成に必要な最大プログレス値
+  maxProgress: number;   // 達成に必要な最大プログレス値（無限の場合は1ステップあたりの値）
   unit: string;          // 単位（回、日、時間、人など）
   isHidden?: boolean;    // シークレット実績かどうか
+  isInfinite?: boolean;  // 無限に達成可能かどうか（10, 20, 30...など）
+  infiniteStep?: number; // 無限の場合のステップ幅
 }
 
 export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
   // ==========================================
   // GENERAL (通常実績)
   // ==========================================
+  LOGIN_STREAK_INFINITE: {
+    id: 'LOGIN_STREAK_INFINITE',
+    category: 'GENERAL',
+    name: '日々の積み重ね',
+    description: '累計ログイン日数が一定数に達するごとに達成',
+    expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD,
+    maxProgress: 10,
+    unit: '日',
+    isInfinite: true,
+    infiniteStep: 10,
+  },
   LOGIN_STREAK_7: {
     id: 'LOGIN_STREAK_7',
     category: 'GENERAL',
@@ -35,23 +48,27 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     maxProgress: 3,
     unit: '日',
   },
-  TOTAL_STUDY_100HR: {
-    id: 'TOTAL_STUDY_100HR',
+  TOTAL_STUDY_INFINITE: {
+    id: 'TOTAL_STUDY_INFINITE',
     category: 'GENERAL',
     name: '精神と時の部屋の住人',
-    description: '累計勉強時間が100時間を突破する',
+    description: '累計勉強時間が一定数に達するごとに達成',
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD,
-    maxProgress: 100,
+    maxProgress: 10,
     unit: '時間',
+    isInfinite: true,
+    infiniteStep: 10,
   },
-  TOTAL_TASKS_50: {
-    id: 'TOTAL_TASKS_50',
+  TOTAL_TASKS_INFINITE: {
+    id: 'TOTAL_TASKS_INFINITE',
     category: 'GENERAL',
     name: 'タスククラッシャー',
-    description: '累計タスク達成数が50に到達する',
+    description: '累計タスク達成数が一定数に達するごとに達成',
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD,
-    maxProgress: 50,
+    maxProgress: 10,
     unit: '個',
+    isInfinite: true,
+    infiniteStep: 10,
   },
   MAX_CONTINUOUS_STUDY_18: {
     id: 'MAX_CONTINUOUS_STUDY_18',
@@ -135,7 +152,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
   },
 
   // ==========================================
-  // EVENT (イベント)
+  // EVENT (イベント) - 期間内のみ表示されるものなど
   // ==========================================
   EVENT_SUMMER_80HR: {
     id: 'EVENT_SUMMER_80HR',
@@ -145,6 +162,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 10,
     maxProgress: 80,
     unit: '時間',
+    // UI側で期間内のみ表示するよう制御可能
   },
   EVENT_SANTA_WAITING: {
     id: 'EVENT_SANTA_WAITING',
@@ -154,6 +172,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 5,
     maxProgress: 1,
     unit: '回',
+    isHidden: true, // 1日限定なので隠しアチーブ
   },
   EVENT_NEW_YEAR_GHOST: {
     id: 'EVENT_NEW_YEAR_GHOST',
@@ -163,6 +182,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 5,
     maxProgress: 1,
     unit: '回',
+    isHidden: true,
   },
   EVENT_VALENTINE_EXAM: {
     id: 'EVENT_VALENTINE_EXAM',
@@ -172,6 +192,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 3,
     maxProgress: 1,
     unit: '回',
+    isHidden: true,
   },
   EVENT_WHITE_DAY_RETURN: {
     id: 'EVENT_WHITE_DAY_RETURN',
@@ -181,6 +202,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 5,
     maxProgress: 1,
     unit: '回',
+    isHidden: true,
   },
   EVENT_HALLOWEEN_STUDY: {
     id: 'EVENT_HALLOWEEN_STUDY',
@@ -190,5 +212,6 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 3,
     maxProgress: 1,
     unit: '回',
+    isHidden: true,
   }
 };

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ACHIEVEMENTS_DICT, AchievementCategory } from "@/lib/gamification/achievements";
 import { cn } from "@/lib/utils";
-import { Trophy, CalendarDays, CalendarClock, Sparkles, Star } from "lucide-react";
+import { Trophy, CalendarDays, CalendarClock, Sparkles, Star, Lock } from "lucide-react";
 
 type TabConfig = {
   id: AchievementCategory;
@@ -20,10 +20,10 @@ const TABS: TabConfig[] = [
 
 // モックデータ：後でDB（student_achievements等）から取得する
 const MOCK_PROGRESS: Record<string, number> = {
-  'LOGIN_STREAK_7': 3,
+  'LOGIN_STREAK_INFINITE': 24, // 24日（次の目標は30）
   'STUDY_1HR_STREAK_3': 1,
-  'TOTAL_STUDY_100HR': 42.5,
-  'TOTAL_TASKS_50': 12,
+  'TOTAL_STUDY_INFINITE': 142.5, // 142.5時間（次の目標は150）
+  'TOTAL_TASKS_INFINITE': 12, // 12個（次の目標は20）
   'MAX_CONTINUOUS_STUDY_18': 4.5,
   'FIRST_QUESTION': 1,
   'FIRST_FRIEND': 0,
@@ -33,6 +33,7 @@ const MOCK_PROGRESS: Record<string, number> = {
   'WEEKLY_7_POMO': 4,
   'WEEKLY_DAILY_5_DAYS': 2,
   'EVENT_SUMMER_80HR': 85,
+  'EVENT_SANTA_WAITING': 0, // 隠しアチーブメント未達成
 };
 
 export default function GamePortalPage() {
@@ -41,6 +42,41 @@ export default function GamePortalPage() {
   const filteredAchievements = Object.values(ACHIEVEMENTS_DICT).filter(
     (a) => a.category === activeTab
   );
+
+  // 計算とソートの準備
+  const achievementsWithStatus = filteredAchievements.map(achieve => {
+    let currentProgress = MOCK_PROGRESS[achieve.id] || 0;
+    let targetProgress = achieve.maxProgress;
+    let isCompleted = currentProgress >= targetProgress;
+
+    // 無限達成可能な実績の場合、現在の進捗に応じて目標値を再計算
+    if (achieve.isInfinite && achieve.infiniteStep) {
+      targetProgress = Math.ceil((currentProgress + 0.1) / achieve.infiniteStep) * achieve.infiniteStep;
+      // ちょうどステップの倍数の場合は「完了」とは見なさない（次の目標に向かっているため）
+      // しかし、もしキリ番に達した直後などの演出をしたい場合は別途考慮が必要。
+      // ここでは常に「次の目標へのプログレスバー」として表示するため、isCompletedはfalseになる。
+      isCompleted = false; 
+    } else {
+      currentProgress = Math.min(currentProgress, targetProgress);
+    }
+
+    const progressPercent = Math.min(100, (currentProgress / targetProgress) * 100);
+
+    return {
+      ...achieve,
+      currentProgress,
+      targetProgress,
+      isCompleted,
+      progressPercent
+    };
+  });
+
+  // ソート：未達成を上に、達成済みを下にする
+  const sortedAchievements = achievementsWithStatus.sort((a, b) => {
+    if (a.isCompleted && !b.isCompleted) return 1;
+    if (!a.isCompleted && b.isCompleted) return -1;
+    return 0;
+  });
 
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1000px] mx-auto w-full px-6 pt-4 pb-6 animate-in fade-in slide-in-from-bottom-4">
@@ -94,38 +130,47 @@ export default function GamePortalPage() {
                 {TABS.find(t => t.id === activeTab)?.icon}
                 {TABS.find(t => t.id === activeTab)?.label} ミッション
               </h3>
-              <span className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
-                全 {filteredAchievements.length} 件
-              </span>
             </div>
             
             <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
-              {filteredAchievements.map((achieve) => {
-                const currentProgress = MOCK_PROGRESS[achieve.id] || 0;
-                const isCompleted = currentProgress >= achieve.maxProgress;
-                const progressPercent = Math.min(100, (currentProgress / achieve.maxProgress) * 100);
+              {sortedAchievements.map((achieve) => {
+                // 隠しアチーブメント（未達成）の場合は、シークレット表示にするか完全に隠す。
+                // 今回は「???」として存在だけ匂わせるデザインにする。
+                if (achieve.isHidden && !achieve.isCompleted) {
+                  return (
+                    <div key={achieve.id} className="p-5 flex items-center gap-4 bg-slate-50/30 dark:bg-slate-900/20">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-slate-200 dark:bg-slate-800 text-slate-400">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-base text-slate-500 dark:text-slate-500 mb-1">??? (隠し実績)</h4>
+                        <p className="text-xs text-slate-400 dark:text-slate-600">特定の条件を満たすと解放されます</p>
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
                   <div key={achieve.id} className={cn(
                     "p-5 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30",
-                    isCompleted && "bg-brand-50/30 dark:bg-brand-900/5"
+                    achieve.isCompleted && "bg-brand-50/30 dark:bg-brand-900/5"
                   )}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1">
                         <div className={cn(
                           "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner border",
-                          isCompleted 
+                          achieve.isCompleted 
                             ? "bg-gradient-to-br from-amber-300 to-amber-500 border-amber-400/50 text-white" 
                             : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400"
                         )}>
-                          <Star className={cn("w-6 h-6", isCompleted ? "fill-white" : "")} />
+                          <Star className={cn("w-6 h-6", achieve.isCompleted ? "fill-white" : "")} />
                         </div>
                         <div className="flex-1">
                           <h4 className={cn(
                             "font-bold text-base mb-1",
-                            isCompleted ? "text-amber-600 dark:text-amber-500" : "text-slate-700 dark:text-slate-200"
+                            achieve.isCompleted ? "text-amber-600 dark:text-amber-500" : "text-slate-700 dark:text-slate-200"
                           )}>
-                            {achieve.name}
+                            {achieve.name} {achieve.isInfinite && <span className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md ml-1 align-middle">反復可</span>}
                           </h4>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                             {achieve.description}
@@ -136,13 +181,13 @@ export default function GamePortalPage() {
                               <div 
                                 className={cn(
                                   "h-full rounded-full transition-all duration-1000",
-                                  isCompleted ? "bg-amber-400" : "bg-brand-400"
+                                  achieve.isCompleted ? "bg-amber-400" : "bg-brand-400"
                                 )}
-                                style={{ width: `${progressPercent}%` }}
+                                style={{ width: `${achieve.progressPercent}%` }}
                               />
                             </div>
                             <span className="text-xs font-mono font-bold text-slate-500 min-w-[60px] text-right">
-                              {currentProgress} / {achieve.maxProgress} <span className="text-[10px] text-slate-400">{achieve.unit}</span>
+                              {achieve.currentProgress} / {achieve.targetProgress} <span className="text-[10px] text-slate-400">{achieve.unit}</span>
                             </span>
                           </div>
                         </div>
@@ -152,7 +197,7 @@ export default function GamePortalPage() {
                         <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/50 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
                           <span className="text-[10px] opacity-80">EXP</span> {achieve.expReward}
                         </div>
-                        {isCompleted && (
+                        {achieve.isCompleted && (
                           <span className="text-[10px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/50">
                             達成済み
                           </span>
@@ -162,6 +207,12 @@ export default function GamePortalPage() {
                   </div>
                 );
               })}
+              
+              {sortedAchievements.length === 0 && (
+                <div className="p-8 text-center text-slate-400 text-sm">
+                  このカテゴリにはまだ実績がありません。
+                </div>
+              )}
             </div>
           </div>
         </div>
