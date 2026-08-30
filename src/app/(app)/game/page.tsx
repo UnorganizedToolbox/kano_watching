@@ -20,10 +20,10 @@ const TABS: TabConfig[] = [
 
 // モックデータ：後でDB（student_achievements等）から取得する
 const MOCK_PROGRESS: Record<string, number> = {
-  'LOGIN_STREAK_INFINITE': 24, // 24日（次の目標は30）
+  'LOGIN_STREAK_INFINITE': 24, // 24日（次の目標は30。10,20は達成済み）
   'STUDY_1HR_STREAK_3': 1,
   'TOTAL_STUDY_INFINITE': 142.5, // 142.5時間（次の目標は150）
-  'TOTAL_TASKS_INFINITE': 12, // 12個（次の目標は20）
+  'TOTAL_TASKS_INFINITE': 25, // 25個（次の目標は30）
   'MAX_CONTINUOUS_STUDY_18': 4.5,
   'FIRST_QUESTION': 1,
   'FIRST_FRIEND': 0,
@@ -34,6 +34,7 @@ const MOCK_PROGRESS: Record<string, number> = {
   'WEEKLY_DAILY_5_DAYS': 2,
   'EVENT_SUMMER_80HR': 85,
   'EVENT_SANTA_WAITING': 0, // 隠しアチーブメント未達成
+  'HIDDEN_GO_TO_SLEEP': 1, // 隠し実績達成済みテスト
 };
 
 export default function GamePortalPage() {
@@ -44,31 +45,51 @@ export default function GamePortalPage() {
   );
 
   // 計算とソートの準備
-  const achievementsWithStatus = filteredAchievements.map(achieve => {
+  const achievementsWithStatus: any[] = [];
+  
+  filteredAchievements.forEach(achieve => {
     let currentProgress = MOCK_PROGRESS[achieve.id] || 0;
-    let targetProgress = achieve.maxProgress;
-    let isCompleted = currentProgress >= targetProgress;
 
-    // 無限達成可能な実績の場合、現在の進捗に応じて目標値を再計算
     if (achieve.isInfinite && achieve.infiniteStep) {
-      targetProgress = Math.ceil((currentProgress + 0.1) / achieve.infiniteStep) * achieve.infiniteStep;
-      // ちょうどステップの倍数の場合は「完了」とは見なさない（次の目標に向かっているため）
-      // しかし、もしキリ番に達した直後などの演出をしたい場合は別途考慮が必要。
-      // ここでは常に「次の目標へのプログレスバー」として表示するため、isCompletedはfalseになる。
-      isCompleted = false; 
+      // 完了済みの過去のティア（段階）を生成
+      const completedTiers = Math.floor(currentProgress / achieve.infiniteStep);
+      for (let i = 1; i <= completedTiers; i++) {
+        achievementsWithStatus.push({
+          ...achieve,
+          id: `${achieve.id}_tier_${i}`,
+          name: `${achieve.name} (${i * achieve.infiniteStep}${achieve.unit})`,
+          currentProgress: i * achieve.infiniteStep,
+          targetProgress: i * achieve.infiniteStep,
+          isCompleted: true,
+          progressPercent: 100,
+          isInfiniteTier: true // 過去の履歴であることを示すフラグ
+        });
+      }
+      
+      // 次の目標（未達成）を生成
+      const nextTarget = (completedTiers + 1) * achieve.infiniteStep;
+      achievementsWithStatus.push({
+        ...achieve,
+        id: `${achieve.id}_next`,
+        currentProgress: currentProgress,
+        targetProgress: nextTarget,
+        isCompleted: false,
+        progressPercent: (currentProgress / nextTarget) * 100
+      });
     } else {
+      let targetProgress = achieve.maxProgress;
+      let isCompleted = currentProgress >= targetProgress;
       currentProgress = Math.min(currentProgress, targetProgress);
+      const progressPercent = Math.min(100, (currentProgress / targetProgress) * 100);
+
+      achievementsWithStatus.push({
+        ...achieve,
+        currentProgress,
+        targetProgress,
+        isCompleted,
+        progressPercent
+      });
     }
-
-    const progressPercent = Math.min(100, (currentProgress / targetProgress) * 100);
-
-    return {
-      ...achieve,
-      currentProgress,
-      targetProgress,
-      isCompleted,
-      progressPercent
-    };
   });
 
   // ソート：未達成を上に、達成済みを下にする
@@ -135,7 +156,6 @@ export default function GamePortalPage() {
             <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
               {sortedAchievements.map((achieve) => {
                 // 隠しアチーブメント（未達成）の場合は、シークレット表示にするか完全に隠す。
-                // 今回は「???」として存在だけ匂わせるデザインにする。
                 if (achieve.isHidden && !achieve.isCompleted) {
                   return (
                     <div key={achieve.id} className="p-5 flex items-center gap-4 bg-slate-50/30 dark:bg-slate-900/20">
@@ -153,7 +173,8 @@ export default function GamePortalPage() {
                 return (
                   <div key={achieve.id} className={cn(
                     "p-5 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30",
-                    achieve.isCompleted && "bg-brand-50/30 dark:bg-brand-900/5"
+                    achieve.isCompleted && "bg-brand-50/30 dark:bg-brand-900/5",
+                    achieve.isInfiniteTier && "opacity-80" // 過去の無限実績は少し薄くする
                   )}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1">
@@ -170,7 +191,7 @@ export default function GamePortalPage() {
                             "font-bold text-base mb-1",
                             achieve.isCompleted ? "text-amber-600 dark:text-amber-500" : "text-slate-700 dark:text-slate-200"
                           )}>
-                            {achieve.name} {achieve.isInfinite && <span className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md ml-1 align-middle">反復可</span>}
+                            {achieve.name} {achieve.isInfinite && !achieve.isInfiniteTier && <span className="text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md ml-1 align-middle">反復可</span>}
                           </h4>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                             {achieve.description}
