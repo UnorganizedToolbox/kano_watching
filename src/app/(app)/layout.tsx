@@ -17,7 +17,7 @@ export default async function AppLayout({
   }
 
   // Fetch profile
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)

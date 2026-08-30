@@ -1,14 +1,19 @@
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  if (!user) {
+    redirect('/login');
+  }
+
   // Fetch real data
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user?.id).single();
-  const { data: pomodoros } = await supabase.from('pomodoro_logs').select('*').eq('student_uuid', user?.id).order('created_at', { ascending: false });
-  const { data: diagnostics } = await supabase.from('diagnostic_results').select('*').eq('student_uuid', user?.id).order('created_at', { ascending: false });
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  const { data: pomodoros } = await supabase.from('pomodoro_logs').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false });
+  const { data: diagnostics } = await supabase.from('diagnostic_results').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false });
 
   const latestDiagnostic = diagnostics && diagnostics.length > 0 ? diagnostics[0] : null;
   const totalPomodoros = pomodoros?.length || 0;
@@ -19,7 +24,7 @@ export default async function DashboardPage() {
       <div className="flex justify-end items-center gap-4 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">表示名:</span>
-          <span className="bg-white/50 dark:bg-darkbg-secondary/50 border border-slate-300 dark:border-slate-700 px-3 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200">{profile?.name}</span>
+          <span className="bg-white/50 dark:bg-darkbg-secondary/50 border border-slate-300 dark:border-slate-700 px-3 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200">{profile?.name || 'ゲスト'}</span>
         </div>
       </div>
 
@@ -115,7 +120,7 @@ export default async function DashboardPage() {
               <h4 className="font-bold font-title text-contrast text-sm">AI 学習ナビゲーター</h4>
             </div>
             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl text-xs text-slate-600 dark:text-slate-300 leading-relaxed flex-1 overflow-y-auto">
-              <p className="mb-2">{profile?.name}さん、お疲れ様です。</p>
+              <p className="mb-2">{profile?.name || 'ゲスト'}さん、お疲れ様です。</p>
               {latestDiagnostic?.recommendation ? (
                 <p>{latestDiagnostic.recommendation}</p>
               ) : (
