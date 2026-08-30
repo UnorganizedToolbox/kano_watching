@@ -2,9 +2,26 @@ export default function SettingsPage() {
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1400px] mx-auto w-full px-6 pt-4 pb-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-sm space-y-8 flex-1 overflow-y-auto h-[calc(100vh-10rem)] min-h-[500px] mb-4">
+        
         <div>
           <h4 className="font-bold font-title border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2 text-indigo-500">アプリケーションテーマ設定</h4>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* Design Skin Theme Selector */}
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 block mb-1.5">デザインスキンテーマ</label>
+              <select defaultValue="glass" className="w-full bg-white dark:bg-darkbg-secondary border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-xs focus:outline-none font-bold text-slate-700 dark:text-slate-200">
+                <option value="glass">Glassmorphism (透過ガラス・アチーブ連動壁紙)</option>
+                <option value="brutalist">Neo-Brutalism (ネオ・ブルータリズム)</option>
+                <option value="clay">Claymorphism (クレイモーフィズム)</option>
+                <option value="lofi">Cozy Lo-Fi (コージー・ローファイ / 勉強部屋)</option>
+                <option value="aurora">Aurora Night (オーロラ・ナイト / 北欧夜空)</option>
+                <option value="cafe">Café Macchiato (カフェ・マキアート / 珈琲トーン)</option>
+                <option value="matcha">Matcha Zen (和風アース抹茶色)</option>
+              </select>
+            </div>
+
+            {/* Light/Dark Mode Selector */}
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-2">テーマ (カラーモード)</label>
               <div className="flex gap-2 text-sm">
@@ -19,6 +36,7 @@ export default function SettingsPage() {
                 </button>
               </div>
             </div>
+
           </div>
         </div>
 
@@ -52,6 +70,18 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        <div>
+          <h2 className="text-2xl font-bold font-title text-slate-800 dark:text-slate-200">アチーブメント (実績バッジ)</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">実績解除に応じて、設定画面でアンロックされる背景画像が増えていきます。</p>
+          
+          <div className="bg-brand-500 text-white px-6 py-4 rounded-2xl shadow-lg shadow-brand-500/20 text-center w-full sm:w-auto mt-4">
+            <span className="text-xs block text-white/75">現在のレベル</span>
+            <span className="text-3xl font-black font-title">Lv. 1</span>
+            <span className="text-[9px] block text-white/90 mt-1">次のLv.2に必要な実績: あと 2個 (通算3個)</span>
+          </div>
+        </div>
+
       </div>
     </section>
   );

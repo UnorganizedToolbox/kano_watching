@@ -26,11 +26,8 @@ export default function HeaderDropdown({ name, role }: { name: string, role: str
         className="flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors focus:outline-none"
       >
         <CircleUserRound className="w-8 h-8 text-slate-400" />
-        <div className="hidden md:block text-left">
-          <p className="font-bold leading-none text-slate-700 dark:text-slate-200 text-sm">{name}</p>
-          <p className="text-[10px] text-slate-500 mt-1 capitalize">{role}</p>
-        </div>
-        <ChevronDown className="w-3 h-3 text-slate-400 ml-1" />
+        <span className="hidden sm:block text-sm font-medium text-slate-700 dark:text-slate-200">{name}</span>
+        <ChevronDown className="w-3 h-3 text-slate-400" />
       </button>
 
       {isOpen && (

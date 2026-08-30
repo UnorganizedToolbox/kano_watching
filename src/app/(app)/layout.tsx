@@ -47,22 +47,6 @@ export default async function AppLayout({
 
       <div className="flex flex-1 overflow-hidden relative z-10">
         <aside className="w-64 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
-          {!isAdmin && (
-            <div className="p-4">
-              <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-inner">
-                  Lv.1
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-brand-700 dark:text-brand-300">駆け出し学習者</p>
-                  <div className="w-full bg-brand-200 dark:bg-brand-900/50 rounded-full h-1.5 mt-2">
-                    <div className="bg-brand-500 h-1.5 rounded-full" style={{ width: '0%' }}></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           <Sidebar role={role} />
         </aside>
 
