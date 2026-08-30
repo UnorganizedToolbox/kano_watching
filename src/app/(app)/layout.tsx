@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { CircleUserRound, LayoutDashboard, Clock, Users, MessageSquareWarning } from "lucide-react";
@@ -17,7 +18,7 @@ export default async function AppLayout({
   }
 
   // Fetch profile
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
@@ -29,6 +30,9 @@ export default async function AppLayout({
 
   return (
     <>
+      <div className="bg-rose-500 text-white text-xs px-2 py-1 text-center font-mono">
+        DEBUG: user.id={user.id} | profile.role={profile?.role} | error={error?.message} | isAdmin={isAdmin ? 'true' : 'false'}
+      </div>
       <header className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 shrink-0 z-20">
         <div className="flex items-center gap-4">
           <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/30">
