@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Search } from "lucide-react";
+import AdminQuestionList from "./components/AdminQuestionList";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -105,33 +106,7 @@ export default async function AdminDashboard() {
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 dark:bg-slate-900/20">
-              {openQuestions && openQuestions.length > 0 ? (
-                openQuestions.map(q => (
-                  <div key={q.id} className="bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-700/50 rounded-xl p-4 transition-all shadow-sm cursor-pointer group">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 flex items-center justify-center text-[10px] font-bold">
-                          {q.profiles?.name?.charAt(0) || 'S'}
-                        </div>
-                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{q.profiles?.name}</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400">{new Date(q.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <h5 className="font-bold text-sm mb-1 text-slate-800 dark:text-slate-100 group-hover:text-brand-600 transition-colors">{q.title}</h5>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{q.body}</p>
-                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-                      <button className="text-[10px] font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1 rounded-md">
-                        回答する
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full py-12 text-slate-400">
-                  <i className="fa-solid fa-mug-hot text-3xl mb-3 text-slate-300 dark:text-slate-600"></i>
-                  <p className="text-sm font-medium">現在、未回答の質問はありません。</p>
-                </div>
-              )}
+              <AdminQuestionList questions={openQuestions || []} />
             </div>
           </div>
         </div>
