@@ -114,7 +114,7 @@ export default async function DashboardPage() {
                 <p className="text-xs text-slate-500 mb-3">診断テストをまだ受けていません</p>
                 <Link href="/exam" className="px-4 py-2 inline-block bg-brand-600 text-white rounded-xl text-xs font-bold hover:bg-brand-700 transition-colors">
                   実力診断テストを開始
-                </button>
+                </Link>
               </div>
             )}
           </div>
