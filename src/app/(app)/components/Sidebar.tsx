@@ -29,7 +29,7 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
   return (
     <div className="flex-1 flex flex-col justify-between overflow-hidden">
       <nav className="flex-1 flex flex-col gap-1 p-4 overflow-y-auto">
-        {role === 'student' || role === 'tester' ? (
+        {role === 'student' ? (
           <>
             <Link href="/game" className="mb-4 block">
               <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer group relative overflow-hidden">
