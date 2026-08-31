@@ -1,24 +1,25 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { logPomodoro } from '../actions';
 import { cn } from '@/lib/utils';
-import { PartyPopper } from 'lucide-react';
+import { PartyPopper, Lock, Volume2 } from 'lucide-react';
 
 type TimerMode = 'WORK' | 'BREAK';
+type SoundType = 'chime' | 'retro' | 'modern';
 
 const WORK_TIME = 25 * 60;
 const BREAK_TIME = 5 * 60;
 
-function playBeepSound() {
+function playBeepSound(type: SoundType) {
   try {
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     
-    const playNote = (frequency: number, startTime: number, duration: number) => {
+    const playNote = (frequency: number, startTime: number, duration: number, oscType: OscillatorType = 'sine') => {
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
       
-      oscillator.type = 'sine';
+      oscillator.type = oscType;
       oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime + startTime);
       
       gainNode.gain.setValueAtTime(0, audioCtx.currentTime + startTime);
@@ -32,11 +33,18 @@ function playBeepSound() {
       oscillator.stop(audioCtx.currentTime + startTime + duration);
     };
 
-    playNote(523.25, 0, 1.5);
-    playNote(659.25, 0.4, 1.5);
-    playNote(783.99, 0.8, 1.5);
-    playNote(1046.50, 1.2, 2.0);
-    
+    if (type === 'chime') {
+      playNote(523.25, 0, 1.5, 'sine');
+      playNote(659.25, 0.4, 1.5, 'sine');
+      playNote(783.99, 0.8, 1.5, 'sine');
+      playNote(1046.50, 1.2, 2.0, 'sine');
+    } else if (type === 'retro') {
+      playNote(440, 0, 0.2, 'square');
+      playNote(880, 0.2, 0.4, 'square');
+    } else if (type === 'modern') {
+      playNote(800, 0, 0.5, 'triangle');
+      playNote(1200, 0.5, 1.0, 'triangle');
+    }
   } catch (e) {
     console.error("Audio playback failed", e);
   }
@@ -63,9 +71,8 @@ export default function PomodoroTimer() {
   const [subject, setSubject] = useState('数学');
   const [levelUpData, setLevelUpData] = useState<{oldLevel: number, newLevel: number, rewardStones: number} | null>(null);
   const [pomoCount, setPomoCount] = useState(0);
-  
-  const [breakStartTime, setBreakStartTime] = useState<number | null>(null);
   const [showTime, setShowTime] = useState(false);
+  const [soundType, setSoundType] = useState<SoundType>('chime');
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -81,7 +88,7 @@ export default function PomodoroTimer() {
   }, [isRunning, timeLeft]);
 
   const handleTimerComplete = async () => {
-    playBeepSound();
+    playBeepSound(soundType);
 
     if (mode === 'WORK') {
       speakText("ポモドーロが終了しました。5分間の休憩に入ります。");
@@ -98,22 +105,18 @@ export default function PomodoroTimer() {
       setPomoCount(p => p + 1);
       setMode('BREAK');
       setTimeLeft(BREAK_TIME);
-      setBreakStartTime(Date.now());
-      
     } else {
       speakText("休憩が終わりました。次のポモドーロを開始しましょう。");
       setMode('WORK');
       setTimeLeft(WORK_TIME);
-      setBreakStartTime(null);
     }
   };
 
   const toggleTimer = () => setIsRunning(!isRunning);
 
-  const switchMode = (newMode: TimerMode) => {
-    setMode(newMode);
+  const handleStop = () => {
     setIsRunning(false);
-    setTimeLeft(newMode === 'WORK' ? WORK_TIME : BREAK_TIME);
+    setTimeLeft(mode === 'WORK' ? WORK_TIME : BREAK_TIME);
   };
 
   const minutes = Math.floor(timeLeft / 60);
@@ -129,29 +132,30 @@ export default function PomodoroTimer() {
           ? "bg-white dark:bg-darkbg-secondary border-slate-200 dark:border-slate-800" 
           : "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50"
       )}>
-        <div className="absolute top-6 left-6 flex gap-2 z-20">
-          <button 
-            onClick={() => switchMode('WORK')}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-              isWork ? "bg-brand-500 text-white shadow-md shadow-brand-500/30" : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200"
-            )}
-          >
-            ポモドーロ
-          </button>
-          <button 
-            onClick={() => switchMode('BREAK')}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-              !isWork ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/30" : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200"
-            )}
-          >
-            休憩
-          </button>
+        <div className="absolute top-6 left-6 flex items-center gap-2 z-20">
+          <span className={cn(
+            "px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all",
+            isWork ? "bg-brand-500 text-white" : "bg-emerald-500 text-white"
+          )}>
+            現在のモード: {isWork ? '集中 (25分)' : '休憩 (5分)'}
+          </span>
         </div>
         
-        <div className="absolute top-6 right-6 z-20">
-          <span className="text-xs font-bold text-slate-400">今日: {pomoCount} 回完了</span>
+        <div className="absolute top-6 right-6 z-20 flex gap-3">
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+            <Volume2 className="w-3 h-3 text-slate-500" />
+            <select 
+              value={soundType}
+              onChange={(e) => setSoundType(e.target.value as SoundType)}
+              className="text-xs bg-transparent border-none text-slate-500 font-bold outline-none cursor-pointer"
+              title="通知音の設定"
+            >
+              <option value="chime">チャイム音</option>
+              <option value="retro">レトロ音</option>
+              <option value="modern">モダン音</option>
+            </select>
+          </div>
+          <span className="text-xs font-bold text-slate-400 py-1">今日: {pomoCount} 回</span>
         </div>
 
         {isWork && (
@@ -177,12 +181,20 @@ export default function PomodoroTimer() {
             ? (isRunning ? "border-brand-400 dark:border-brand-500" : "border-slate-100 dark:border-slate-800")
             : (isRunning ? "border-emerald-400 dark:border-emerald-500" : "border-emerald-100 dark:border-emerald-900/50")
         )}>
-          <span className={cn(
-            "text-6xl font-black font-title tracking-tighter z-10",
-            isWork ? "text-slate-800 dark:text-white" : "text-emerald-700 dark:text-emerald-400"
-          )}>
-            {(!isWork || showTime) ? `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}` : '??:??'}
-          </span>
+          {isWork && isRunning && !showTime ? (
+            <div className="flex flex-col items-center justify-center text-slate-400 z-10">
+              <Lock className="w-12 h-12 mb-2 opacity-50" />
+              <span className="text-xl font-bold tracking-widest opacity-50">集中</span>
+            </div>
+          ) : (
+            <span className={cn(
+              "text-6xl font-black font-title tracking-tighter z-10",
+              isWork ? "text-slate-800 dark:text-white" : "text-emerald-700 dark:text-emerald-400"
+            )}>
+              {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+            </span>
+          )}
+          
           <span className={cn(
             "text-sm font-bold mt-2 z-10",
             isWork ? "text-slate-400" : "text-emerald-600/70 dark:text-emerald-400/70"
@@ -190,6 +202,7 @@ export default function PomodoroTimer() {
             {isWork ? '集中モード' : 'リラックス'}
           </span>
         </div>
+        
         {isWork && !showTime && isRunning && (
           <button 
             onClick={() => { setShowTime(true); setTimeout(() => setShowTime(false), 3000); }}
@@ -201,7 +214,9 @@ export default function PomodoroTimer() {
         {isWork && showTime && isRunning && (
            <div className="mb-8 h-8"></div>
         )}
-
+        {(!isWork || !isRunning) && (
+           <div className="mb-8 h-8"></div>
+        )}
 
         <div className="flex gap-4 w-full max-w-sm z-10">
           <button 
@@ -216,12 +231,27 @@ export default function PomodoroTimer() {
             {isRunning ? <><i className="fa-solid fa-pause mr-2"></i> 一時停止</> : <><i className="fa-solid fa-play mr-2"></i> 開始</>}
           </button>
           
-          {isRunning && <button 
-    onClick={() => { setIsRunning(false); setTimeLeft(mode === 'WORK' ? WORK_TIME : BREAK_TIME); }} 
-    className="flex-none px-6 py-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-bold shadow-md transition-all active:scale-95"
-  >
-    <i className="fa-solid fa-stop mr-2"></i> 中止
-  </button>}
+          {isRunning && (
+            <button 
+              onClick={handleStop}
+              className="flex-none px-6 py-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-bold shadow-md transition-all active:scale-95"
+            >
+              <i className="fa-solid fa-stop mr-2"></i> 中止
+            </button>
+          )}
+          {!isRunning && (
+            <button 
+              onClick={() => {
+                // For manual fast forward testing locally without breaking production
+                setTimeLeft(2);
+                setIsRunning(true);
+              }}
+              className="flex-none px-4 py-4 bg-transparent text-transparent hover:text-slate-300 dark:hover:text-slate-700 transition-all active:scale-95"
+              title="秘密のテストボタン"
+            >
+              <i className="fa-solid fa-forward"></i>
+            </button>
+          )}
         </div>
       </div>
 
