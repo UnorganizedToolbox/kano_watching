@@ -20,14 +20,14 @@ export async function debugSimulatePomodoro() {
   const newTotalMinutes = (profile.total_study_minutes || 0) + 25;
   const currentStreak = profile.current_streak_days || 0;
   const newStreak = currentStreak === 0 ? 1 : currentStreak;
-  const newExp = (profile.exp || 0) + 20;
+  
+  // デバッグ機能ではポモドーロ完了自体のEXPは入れず、時間と回数だけ進める
 
   const { error: profileError } = await supabase
     .from('profiles')
     .update({
       total_study_minutes: newTotalMinutes,
       current_streak_days: newStreak,
-      exp: newExp,
     })
     .eq('id', user.id);
 
@@ -88,14 +88,28 @@ export async function unlockAchievement(achievementId: string, tier?: number) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('exp')
+    .select('exp, level')
     .eq('id', user.id)
     .single();
 
   if (profile) {
+    let currentExp = (profile.exp || 0) + baseAchievement.expReward;
+    let currentLevel = profile.level || 1;
+    
+    // レベルアップ判定 (必要EXP = レベルの2乗 * 100)
+    let requiredExp = currentLevel * currentLevel * 100;
+    while (currentExp >= requiredExp) {
+      currentExp -= requiredExp;
+      currentLevel += 1;
+      requiredExp = currentLevel * currentLevel * 100;
+    }
+
     const { error: expError } = await supabase
       .from('profiles')
-      .update({ exp: (profile.exp || 0) + baseAchievement.expReward })
+      .update({ 
+        exp: currentExp,
+        level: currentLevel
+      })
       .eq('id', user.id);
       
     if (expError) {
@@ -120,6 +134,15 @@ export async function resetAchievements() {
   if (delError) {
      console.error("Reset del error:", delError);
      throw new Error(delError.message);
+  }
+
+  const { error: logDelError } = await supabase
+    .from('student_activity_logs')
+    .delete()
+    .eq('student_id', user.id);
+
+  if (logDelError) {
+     console.error("Reset logs error:", logDelError);
   }
 
   const { error: updateError } = await supabase

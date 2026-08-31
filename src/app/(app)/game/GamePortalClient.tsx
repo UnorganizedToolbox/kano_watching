@@ -19,7 +19,7 @@ const TABS: TabConfig[] = [
   { id: 'EVENT', label: '限定', icon: <Sparkles className="w-4 h-4" /> },
 ];
 
-export default function GamePortalClient({ profile, unlockedIds, role }: { profile: any, unlockedIds: string[], role?: string }) {
+export default function GamePortalClient({ profile, unlockedIds, role, activityStats }: { profile: any, unlockedIds: string[], role?: string, activityStats?: any }) {
   const [activeTab, setActiveTab] = useState<AchievementCategory>('DAILY');
   const [isPending, startTransition] = useTransition();
 
@@ -35,7 +35,11 @@ export default function GamePortalClient({ profile, unlockedIds, role }: { profi
       case 'LOGIN_STREAK_7':
         return profile?.current_streak_days || 0;
       case 'DAILY_1_POMO':
-        return ((profile?.total_study_minutes || 0) >= 25) ? 1 : 0;
+        return activityStats?.dailyPomoCount || 0;
+      case 'WEEKLY_7_POMO':
+        return activityStats?.weeklyPomoCount || 0;
+      case 'TOTAL_TASKS_INFINITE':
+        return activityStats?.dailyPomoCount || 0; // デモ用に連動
       default:
         if (id === 'HIDDEN_GO_TO_SLEEP') return 1; 
         return 0;
@@ -158,7 +162,7 @@ export default function GamePortalClient({ profile, unlockedIds, role }: { profi
         </div>
         <div className="flex items-center gap-4 text-sm font-bold bg-white dark:bg-darkbg-secondary px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center gap-2 text-brand-600 dark:text-brand-400">
-            <span className="text-xs text-slate-500">EXP</span>
+            <span className="text-xs text-slate-500">Lv.{profile?.level || 1} EXP</span>
             <span className="text-lg">{profile?.exp || 0}</span>
           </div>
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
