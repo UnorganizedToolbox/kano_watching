@@ -89,7 +89,7 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
       </nav>
 
       <div className="p-4 border-t border-slate-100 dark:border-slate-800 space-y-1 shrink-0">
-        <Link href="/settings" className={`w-full text-left flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
+        <Link href="/settings?tab=general" className={`w-full text-left flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
           pathname === '/settings' ? 'bg-slate-100 dark:bg-slate-800 text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
         }`}>
           <SlidersHorizontal className="w-4 h-4" />
