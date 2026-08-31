@@ -152,10 +152,9 @@ function SettingsContent() {
                         </div>
                         
                         <div>
-                          <p className="text-[10px] font-bold text-slate-500 mb-2">保存済みコレクション (1/5)</p>
+                          <p className="text-[10px] font-bold text-slate-500 mb-2">保存済みコレクション ({savedAvatars.length}/5)</p>
                           <div className="flex gap-2">
-                            <div className="w-10 h-10 rounded-full border-2 border-brand-500 cursor-pointer overflow-hidden">
-                              {savedAvatars.map((seed, i) => (
+                            {savedAvatars.map((seed, i) => (
                               <div key={i} onClick={() => setAvatarSeed(seed)} className="w-10 h-10 rounded-full border-2 border-brand-500 cursor-pointer overflow-hidden transition-transform hover:scale-110">
                                 <ProceduralAvatar seed={seed} />
                               </div>
@@ -165,8 +164,6 @@ function SettingsContent() {
                                 <i className="fa-solid fa-plus text-xs"></i>
                               </div>
                             ))}
-                            </div>
-                            
                           </div>
                           <p className="text-[9px] text-slate-400 mt-1">※5個を超えると、どれか1つを削除して入れ替える必要があります。</p>
                         </div>
