@@ -65,6 +65,7 @@ export default function PomodoroTimer() {
   const [pomoCount, setPomoCount] = useState(0);
   
   const [breakStartTime, setBreakStartTime] = useState<number | null>(null);
+  const [showTime, setShowTime] = useState(false);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -180,7 +181,7 @@ export default function PomodoroTimer() {
             "text-6xl font-black font-title tracking-tighter z-10",
             isWork ? "text-slate-800 dark:text-white" : "text-emerald-700 dark:text-emerald-400"
           )}>
-            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+            {(!isWork || showTime) ? `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}` : '??:??'}
           </span>
           <span className={cn(
             "text-sm font-bold mt-2 z-10",
@@ -189,6 +190,18 @@ export default function PomodoroTimer() {
             {isWork ? '集中モード' : 'リラックス'}
           </span>
         </div>
+        {isWork && !showTime && isRunning && (
+          <button 
+            onClick={() => { setShowTime(true); setTimeout(() => setShowTime(false), 3000); }}
+            className="mb-8 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-4 py-2 rounded-full hover:bg-slate-200 transition-colors"
+          >
+            残り時間を確認する
+          </button>
+        )}
+        {isWork && showTime && isRunning && (
+           <div className="mb-8 h-8"></div>
+        )}
+
 
         <div className="flex gap-4 w-full max-w-sm z-10">
           <button 
@@ -203,14 +216,12 @@ export default function PomodoroTimer() {
             {isRunning ? <><i className="fa-solid fa-pause mr-2"></i> 一時停止</> : <><i className="fa-solid fa-play mr-2"></i> 開始</>}
           </button>
           
-          {/* For testing purposes, adding a quick complete button */}
-          <button 
-            onClick={() => setTimeLeft(2)} 
-            className="flex-none px-6 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-bold text-sm shadow-md transition-all active:scale-95"
-            title="テスト用: 残り2秒にする"
-          >
-            <i className="fa-solid fa-forward"></i>
-          </button>
+          {isRunning && <button 
+    onClick={() => { setIsRunning(false); setTimeLeft(mode === 'WORK' ? WORK_TIME : BREAK_TIME); }} 
+    className="flex-none px-6 py-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-bold shadow-md transition-all active:scale-95"
+  >
+    <i className="fa-solid fa-stop mr-2"></i> 中止
+  </button>}
         </div>
       </div>
 

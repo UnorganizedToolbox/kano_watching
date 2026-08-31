@@ -73,10 +73,11 @@ export async function evaluateAchievements(userId: string) {
 
   // Insert new achievements
   for (const u of newlyUnlocked) {
-    await supabase.from('student_achievements').insert({
+    const { error: achErr } = await supabase.from('student_achievements').insert({
       student_id: userId,
       achievement_id: u.id
     });
+    if (achErr) console.error('achieve insert err:', achErr);
   }
 
   // Handle EXP and Level up
@@ -101,11 +102,12 @@ export async function evaluateAchievements(userId: string) {
     currentStones += rewardStones;
   }
   
-  await supabase.from('profiles').update({
+  const { error: profErr } = await supabase.from('profiles').update({
     exp: currentExp,
     level: currentLevel,
     free_stones: currentStones
   }).eq('id', userId);
+  if (profErr) console.error('engine profile err:', profErr);
 
   return {
     achievements: newlyUnlocked,

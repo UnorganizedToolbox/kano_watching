@@ -68,22 +68,25 @@ export async function logPomodoro(subject: string, minutes: number = 25) {
     student_uuid: user.id,
     subject,
     duration_seconds: minutes * 60,
-    event_type: 'completed'
+    event_type: 'complete'
   });
+  if (pomoError) throw new Error('pomodoro_logs insert error: ' + pomoError.message);
 
   // 2. student_activity_logs に記録（新機能用）
-  await supabase.from('student_activity_logs').insert({
+  const { error: actErr } = await supabase.from('student_activity_logs').insert({
     student_id: user.id,
     activity_type: 'POMODORO_COMPLETED',
     metadata: { minutes, subject }
   });
+  if (actErr) throw new Error('activity logs insert error: ' + actErr.message);
 
   // 3. profiles の total_study_minutes を更新
   const { data: profile } = await supabase.from('profiles').select('total_study_minutes').eq('id', user.id).single();
   if (profile) {
-    await supabase.from('profiles').update({
+    const { error: profErr } = await supabase.from('profiles').update({
       total_study_minutes: (profile.total_study_minutes || 0) + minutes
     }).eq('id', user.id);
+  if (profErr) throw new Error('profile update error: ' + profErr.message);
   }
 
   // 4. 実績とレベルアップの自動評価
