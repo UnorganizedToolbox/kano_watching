@@ -37,5 +37,5 @@ export default async function GamePortalPage() {
     weeklyPomoCount: dailyPomoCount || 0, // 今は同じ数を入れておく
   };
 
-  return <GamePortalClient profile={profile} unlockedIds={unlockedIds} role={profile?.role} activityStats={activityStats} />;
+  return <GamePortalClient profile={profile} unlockedIds={unlockedIds} activityStats={activityStats} />;
 }
