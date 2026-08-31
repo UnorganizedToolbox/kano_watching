@@ -4,7 +4,6 @@ import { useState, useTransition, useEffect } from "react";
 import { ACHIEVEMENTS_DICT, AchievementCategory } from "@/lib/gamification/achievements";
 import { cn } from "@/lib/utils";
 import { Trophy, CalendarDays, CalendarClock, Sparkles, Star, Lock, PartyPopper } from "lucide-react";
-import { unlockAchievement } from "./actions";
 
 type TabConfig = {
   id: AchievementCategory;
@@ -108,15 +107,6 @@ export default function GamePortalClient({ profile, unlockedIds, activityStats }
     if (!a.isCompleted && b.isCompleted) return -1;
     return 0;
   });
-
-  const handleClaim = (achieve: any) => {
-    startTransition(async () => {
-      const res = await unlockAchievement(achieve.baseId, achieve.tier);
-      if (res && res.success && res.levelUp) {
-        setLevelUpData(res.levelUp);
-      }
-    });
-  };
 
   return (
     <>
@@ -226,20 +216,10 @@ export default function GamePortalClient({ profile, unlockedIds, activityStats }
                             <span className="text-[10px] opacity-80">EXP</span> {achieve.expReward}
                           </div>
                           {achieve.isCompleted ? (
-                            achieve.isRewardClaimed ? (
-                              <span className="text-[10px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/50">
-                                受取済み
-                              </span>
-                            ) : (
-                              <button 
-                                onClick={() => handleClaim(achieve)}
-                                disabled={isPending}
-                                className="text-[10px] font-bold text-white bg-brand-500 hover:bg-brand-600 px-3 py-1 rounded-full shadow-sm shadow-brand-500/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                              >
-                                報酬受取！
-                              </button>
-                            )
-                          ) : null}
+                          <span className="text-[10px] font-bold text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/50">
+                            達成済み
+                          </span>
+                        ) : null}
                         </div>
                       </div>
                     </div>
