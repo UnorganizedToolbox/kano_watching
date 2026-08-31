@@ -2,6 +2,49 @@ export default function SettingsPage() {
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1400px] mx-auto w-full px-6 pt-4 pb-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-sm space-y-8 flex-1 overflow-y-auto h-[calc(100vh-10rem)] min-h-[500px] mb-4">
+
+        <div>
+          <h4 className="font-bold font-title border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2 text-brand-600 dark:text-brand-400">プロフィール設定</h4>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 mb-4">他のユーザーから見えるあなたのプロフィール情報を変更します。</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 block mb-1">ニックネーム</label>
+                <div className="flex gap-2">
+                  <input type="text" defaultValue="Student" className="flex-1 px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-brand-500 outline-none" />
+                  <button className="px-4 py-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-200 dark:hover:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-bold transition-colors">保存</button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-xs font-bold text-slate-500 block mb-1">プロフィール画像</label>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xl font-bold border-2 border-brand-200">
+                    S
+                  </div>
+                  <button className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold transition-colors border border-slate-200 dark:border-slate-700">
+                    画像を変更
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 block mb-1">称号 (実績から選択)</label>
+                <select className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-brand-500 outline-none">
+                  <option value="">(称号なし)</option>
+                  <option value="1">継続の達人 (獲得済み)</option>
+                  <option value="2">ポモドーロマスター (獲得済み)</option>
+                  <option value="3" disabled>完全無欠の解答者 (未獲得)</option>
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">アンロックした実績の中から好きなものを称号として設定できます。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         
         <div>
           <h4 className="font-bold font-title border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2 text-indigo-500">アプリケーションテーマ設定</h4>
