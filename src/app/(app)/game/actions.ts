@@ -37,15 +37,22 @@ export async function unlockAchievement(achievementId: string, tier?: number) {
     return { success: false, message: insertError.message };
   }
 
+  let leveledUp = false;
+  let oldLevel = 1;
+  let newLevel = 1;
+  let rewardStones = 0;
+
   const { data: profile } = await supabase
     .from('profiles')
-    .select('exp, level')
+    .select('exp, level, free_stones')
     .eq('id', user.id)
     .single();
 
   if (profile) {
     let currentExp = (profile.exp || 0) + baseAchievement.expReward;
     let currentLevel = profile.level || 1;
+    oldLevel = currentLevel;
+    let currentStones = profile.free_stones || 0;
     
     // レベルアップ判定 (必要EXP = レベルの2乗 * 100)
     let requiredExp = currentLevel * currentLevel * 100;
@@ -53,13 +60,23 @@ export async function unlockAchievement(achievementId: string, tier?: number) {
       currentExp -= requiredExp;
       currentLevel += 1;
       requiredExp = currentLevel * currentLevel * 100;
+      leveledUp = true;
+    }
+
+    newLevel = currentLevel;
+    
+    // レベルアップ報酬 (1レベルごとに50個の無償石とする)
+    if (leveledUp) {
+      rewardStones = (newLevel - oldLevel) * 50;
+      currentStones += rewardStones;
     }
 
     const { error: expError } = await supabase
       .from('profiles')
       .update({ 
         exp: currentExp,
-        level: currentLevel
+        level: currentLevel,
+        free_stones: currentStones
       })
       .eq('id', user.id);
       
@@ -69,5 +86,9 @@ export async function unlockAchievement(achievementId: string, tier?: number) {
   }
 
   revalidatePath('/game');
-  return { success: true, reward: baseAchievement.expReward };
+  return { 
+    success: true, 
+    reward: baseAchievement.expReward,
+    levelUp: leveledUp ? { oldLevel, newLevel, rewardStones } : null
+  };
 }
