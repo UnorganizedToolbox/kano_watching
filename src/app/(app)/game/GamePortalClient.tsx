@@ -19,7 +19,7 @@ const TABS: TabConfig[] = [
   { id: 'EVENT', label: '限定', icon: <Sparkles className="w-4 h-4" /> },
 ];
 
-export default function GamePortalClient({ profile, unlockedIds }: { profile: any, unlockedIds: string[] }) {
+export default function GamePortalClient({ profile, unlockedIds, role }: { profile: any, unlockedIds: string[], role?: string }) {
   const [activeTab, setActiveTab] = useState<AchievementCategory>('DAILY');
   const [isPending, startTransition] = useTransition();
 
@@ -27,7 +27,6 @@ export default function GamePortalClient({ profile, unlockedIds }: { profile: an
     (a) => a.category === activeTab
   );
 
-  // プロフィールデータから進捗を計算するロジック（本来はもっと複雑に判定する）
   const getProgress = (id: string) => {
     switch(id) {
       case 'TOTAL_STUDY_INFINITE':
@@ -36,21 +35,20 @@ export default function GamePortalClient({ profile, unlockedIds }: { profile: an
       case 'LOGIN_STREAK_7':
         return profile?.current_streak_days || 0;
       case 'DAILY_1_POMO':
-        // 本当は今日のactivity_logsを見るべきだが、一旦デモ用に適当な数値を
         return ((profile?.total_study_minutes || 0) >= 25) ? 1 : 0;
       default:
-        return 0; // まだ実装していないものは0
+        // HIDDEN_GO_TO_SLEEP 等のデバッグ用
+        if (id === 'HIDDEN_GO_TO_SLEEP') return 1; 
+        return 0;
     }
   };
 
-  // 計算とソートの準備
   const achievementsWithStatus: any[] = [];
   
   filteredAchievements.forEach(achieve => {
     let currentProgress = getProgress(achieve.id);
 
     if (achieve.isInfinite && achieve.infiniteStep) {
-      // 過去のティア
       const completedTiers = Math.floor(currentProgress / achieve.infiniteStep);
       for (let i = 1; i <= completedTiers; i++) {
         const tierId = `${achieve.id}_tier_${i}`;
@@ -71,7 +69,6 @@ export default function GamePortalClient({ profile, unlockedIds }: { profile: an
         });
       }
       
-      // 次の目標
       const nextTarget = (completedTiers + 1) * achieve.infiniteStep;
       achievementsWithStatus.push({
         ...achieve,
@@ -130,14 +127,17 @@ export default function GamePortalClient({ profile, unlockedIds }: { profile: an
           <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm font-medium">
             獲得した石やEXPを使って、報酬と交換しましょう。
           </p>
-          <button 
-            onClick={handleDebugPomo} 
-            disabled={isPending}
-            className="mt-3 text-xs bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 font-bold transition-colors"
-          >
-            <RefreshCw className={cn("w-3 h-3", isPending && "animate-spin")} />
-            デバッグ: 1ポモドーロ完了 (25分進める)
-          </button>
+          
+          {role === 'tester' && (
+            <button 
+              onClick={handleDebugPomo} 
+              disabled={isPending}
+              className="mt-3 text-xs bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 font-bold transition-colors"
+            >
+              <RefreshCw className={cn("w-3 h-3", isPending && "animate-spin")} />
+              デバッグ: 1ポモドーロ完了 (25分進める)
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-4 text-sm font-bold bg-white dark:bg-darkbg-secondary px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center gap-2 text-brand-600 dark:text-brand-400">
@@ -184,18 +184,9 @@ export default function GamePortalClient({ profile, unlockedIds }: { profile: an
             
             <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
               {sortedAchievements.map((achieve) => {
+                // 隠しアチーブメント（未達成）の場合は完全に隠す（あるかどうかも分からないようにする）
                 if (achieve.isHidden && !achieve.isCompleted) {
-                  return (
-                    <div key={achieve.id} className="p-5 flex items-center gap-4 bg-slate-50/30 dark:bg-slate-900/20">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-slate-200 dark:bg-slate-800 text-slate-400">
-                        <Lock className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-base text-slate-500 dark:text-slate-500 mb-1">??? (隠し実績)</h4>
-                        <p className="text-xs text-slate-400 dark:text-slate-600">特定の条件を満たすと解放されます</p>
-                      </div>
-                    </div>
-                  );
+                  return null;
                 }
 
                 return (
@@ -267,7 +258,7 @@ export default function GamePortalClient({ profile, unlockedIds }: { profile: an
                 );
               })}
               
-              {sortedAchievements.length === 0 && (
+              {sortedAchievements.filter(a => !(a.isHidden && !a.isCompleted)).length === 0 && (
                 <div className="p-8 text-center text-slate-400 text-sm">
                   このカテゴリにはまだ実績がありません。
                 </div>
