@@ -103,3 +103,29 @@ export async function unlockAchievement(achievementId: string, tier?: number) {
   revalidatePath('/game');
   return { success: true, reward: baseAchievement.expReward };
 }
+
+export async function resetAchievements() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  // アチーブメント履歴を削除
+  await supabase
+    .from('student_achievements')
+    .delete()
+    .eq('student_id', user.id);
+
+  // プロフィールのEXP等をリセット
+  await supabase
+    .from('profiles')
+    .update({
+      total_study_minutes: 0,
+      current_streak_days: 0,
+      exp: 0,
+      level: 1
+    })
+    .eq('id', user.id);
+
+  revalidatePath('/game');
+  revalidatePath('/timer');
+}

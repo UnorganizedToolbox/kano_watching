@@ -25,5 +25,5 @@ export default async function GamePortalPage() {
 
   const unlockedIds = achievements?.map(a => a.achievement_id) || [];
 
-  return <GamePortalClient profile={profile} unlockedIds={unlockedIds} />;
+  return <GamePortalClient profile={profile} unlockedIds={unlockedIds} role={profile?.role} />;
 }

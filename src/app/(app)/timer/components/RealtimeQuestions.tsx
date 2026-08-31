@@ -8,10 +8,16 @@ export default function RealtimeQuestions({ studentId }: { studentId: string }) 
   const router = useRouter();
 
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    // Supabase URL and Key fallback to prevent crashes if one is named differently
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Supabase configuration missing in browser client');
+      return;
+    }
+
+    const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
     const channel = supabase.channel('realtime_questions')
       .on('postgres_changes', {

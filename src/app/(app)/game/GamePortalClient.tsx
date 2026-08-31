@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { ACHIEVEMENTS_DICT, AchievementCategory } from "@/lib/gamification/achievements";
 import { cn } from "@/lib/utils";
-import { Trophy, CalendarDays, CalendarClock, Sparkles, Star, Lock, RefreshCw } from "lucide-react";
-import { debugSimulatePomodoro, unlockAchievement } from "./actions";
+import { Trophy, CalendarDays, CalendarClock, Sparkles, Star, Lock, RefreshCw, Trash2 } from "lucide-react";
+import { debugSimulatePomodoro, unlockAchievement, resetAchievements } from "./actions";
 
 type TabConfig = {
   id: AchievementCategory;
@@ -37,7 +37,6 @@ export default function GamePortalClient({ profile, unlockedIds, role }: { profi
       case 'DAILY_1_POMO':
         return ((profile?.total_study_minutes || 0) >= 25) ? 1 : 0;
       default:
-        // HIDDEN_GO_TO_SLEEP 等のデバッグ用
         if (id === 'HIDDEN_GO_TO_SLEEP') return 1; 
         return 0;
     }
@@ -117,6 +116,14 @@ export default function GamePortalClient({ profile, unlockedIds, role }: { profi
     });
   };
 
+  const handleReset = () => {
+    if (confirm("全ての実績とEXPをリセットしますか？この操作は取り消せません。")) {
+      startTransition(async () => {
+        await resetAchievements();
+      });
+    }
+  };
+
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1000px] mx-auto w-full px-6 pt-4 pb-6 animate-in fade-in slide-in-from-bottom-4">
       <div className="flex items-end justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
@@ -129,14 +136,24 @@ export default function GamePortalClient({ profile, unlockedIds, role }: { profi
           </p>
           
           {role === 'tester' && (
-            <button 
-              onClick={handleDebugPomo} 
-              disabled={isPending}
-              className="mt-3 text-xs bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 font-bold transition-colors"
-            >
-              <RefreshCw className={cn("w-3 h-3", isPending && "animate-spin")} />
-              デバッグ: 1ポモドーロ完了 (25分進める)
-            </button>
+            <div className="flex gap-2 mt-3">
+              <button 
+                onClick={handleDebugPomo} 
+                disabled={isPending}
+                className="text-xs bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 font-bold transition-colors"
+              >
+                <RefreshCw className={cn("w-3 h-3", isPending && "animate-spin")} />
+                1ポモドーロ進める
+              </button>
+              <button 
+                onClick={handleReset} 
+                disabled={isPending}
+                className="text-xs text-rose-600 bg-rose-100 hover:bg-rose-200 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 dark:text-rose-400 px-3 py-1.5 rounded-lg flex items-center gap-2 font-bold transition-colors"
+              >
+                <Trash2 className="w-3 h-3" />
+                アチーブリセット
+              </button>
+            </div>
           )}
         </div>
         <div className="flex items-center gap-4 text-sm font-bold bg-white dark:bg-darkbg-secondary px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -153,7 +170,6 @@ export default function GamePortalClient({ profile, unlockedIds, role }: { profi
       </div>
 
       <div className="flex gap-6 items-start">
-        {/* サイドナビゲーション */}
         <div className="w-48 shrink-0 flex flex-col gap-2">
           {TABS.map((tab) => (
             <button
@@ -172,7 +188,6 @@ export default function GamePortalClient({ profile, unlockedIds, role }: { profi
           ))}
         </div>
 
-        {/* アチーブメントリスト */}
         <div className="flex-1 flex flex-col gap-4">
           <div className="bg-white dark:bg-darkbg-secondary rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
@@ -184,7 +199,6 @@ export default function GamePortalClient({ profile, unlockedIds, role }: { profi
             
             <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
               {sortedAchievements.map((achieve) => {
-                // 隠しアチーブメント（未達成）の場合は完全に隠す（あるかどうかも分からないようにする）
                 if (achieve.isHidden && !achieve.isCompleted) {
                   return null;
                 }
