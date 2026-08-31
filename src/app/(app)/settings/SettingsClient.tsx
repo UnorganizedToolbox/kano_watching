@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import ProceduralAvatar from '../components/ProceduralAvatar';
 import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle } from 'lucide-react';
 
 type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai';
@@ -15,6 +16,8 @@ function SettingsContent() {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [showAdvancedAI, setShowAdvancedAI] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [avatarSeed, setAvatarSeed] = useState('LearnFlowUser123');
+  const [savedAvatars, setSavedAvatars] = useState<string[]>(['LearnFlowUser123']);
 
   useEffect(() => {
     const tab = searchParams.get('tab') as Tab;
@@ -124,7 +127,7 @@ function SettingsContent() {
                       <div className="flex flex-col items-center gap-3">
                         <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-3xl font-bold border-4 border-brand-200 shadow-sm overflow-hidden relative group">
                           {/* ダミーのDiceBearアバター画像 */}
-                          <img src="https://api.dicebear.com/7.x/bottts/svg?seed=LearnFlow123" alt="Avatar" className="w-full h-full object-cover" />
+                          <ProceduralAvatar seed={avatarSeed} />
                         </div>
                         <span className="text-[10px] font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded-full border border-brand-200">現在のアイコン</span>
                       </div>
@@ -132,7 +135,18 @@ function SettingsContent() {
                       <div className="flex-1 w-full space-y-4">
                         <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-xl">
                           <p className="text-xs font-bold text-amber-700 dark:text-amber-500 mb-2">🎲 アバター生成ガチャ</p>
-                          <button className="w-full py-2 bg-white dark:bg-slate-800 border-2 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-400 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center justify-center gap-2">
+                          <button onClick={() => {
+                              const newSeed = Math.random().toString(36).substring(7);
+                              setAvatarSeed(newSeed);
+                              if (savedAvatars.length < 5 && !savedAvatars.includes(newSeed)) {
+                                setSavedAvatars([...savedAvatars, newSeed]);
+                              } else if (!savedAvatars.includes(newSeed)) {
+                                // If full, just replace the last one for the mockup
+                                const newArr = [...savedAvatars];
+                                newArr[4] = newSeed;
+                                setSavedAvatars(newArr);
+                              }
+                            }} className="w-full py-2 bg-white dark:bg-slate-800 border-2 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-400 rounded-lg text-sm font-bold transition-colors shadow-sm flex items-center justify-center gap-2 active:scale-95">
                             <i className="fa-solid fa-gem text-amber-400"></i> 無償石 50個 で新しく生成
                           </button>
                         </div>
@@ -141,20 +155,18 @@ function SettingsContent() {
                           <p className="text-[10px] font-bold text-slate-500 mb-2">保存済みコレクション (1/5)</p>
                           <div className="flex gap-2">
                             <div className="w-10 h-10 rounded-full border-2 border-brand-500 cursor-pointer overflow-hidden">
-                              <img src="https://api.dicebear.com/7.x/bottts/svg?seed=LearnFlow123" alt="Saved 1" className="w-full h-full" />
+                              {savedAvatars.map((seed, i) => (
+                              <div key={i} onClick={() => setAvatarSeed(seed)} className="w-10 h-10 rounded-full border-2 border-brand-500 cursor-pointer overflow-hidden transition-transform hover:scale-110">
+                                <ProceduralAvatar seed={seed} />
+                              </div>
+                            ))}
+                            {Array.from({ length: 5 - savedAvatars.length }).map((_, i) => (
+                              <div key={'empty-'+i} className="w-10 h-10 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-300 cursor-not-allowed">
+                                <i className="fa-solid fa-plus text-xs"></i>
+                              </div>
+                            ))}
                             </div>
-                            <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-300 cursor-not-allowed">
-                              <i className="fa-solid fa-plus text-xs"></i>
-                            </div>
-                            <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-300 cursor-not-allowed">
-                              <i className="fa-solid fa-plus text-xs"></i>
-                            </div>
-                            <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-300 cursor-not-allowed">
-                              <i className="fa-solid fa-plus text-xs"></i>
-                            </div>
-                            <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-300 cursor-not-allowed">
-                              <i className="fa-solid fa-plus text-xs"></i>
-                            </div>
+                            
                           </div>
                           <p className="text-[9px] text-slate-400 mt-1">※5個を超えると、どれか1つを削除して入れ替える必要があります。</p>
                         </div>
