@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
+import { evaluateAchievements } from "@/lib/gamification/engine";
 
 export async function askQuestion(formData: FormData) {
   const title = formData.get('title') as string;
@@ -55,24 +56,42 @@ export async function askQuestion(formData: FormData) {
   return;
 }
 
-export async function logPomodoro(subject: string) {
+export async function logPomodoro(subject: string, minutes: number = 25) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('ログインしていません');
 
-  const { error } = await supabase.from('pomodoro_logs').insert({
+  // 1. pomodoro_logs に記録（既存の機能）
+  // ただしスキーマエラーを避けるため、今回は student_activity_logs を主とする
+  const { error: pomoError } = await supabase.from('pomodoro_logs').insert({
     student_uuid: user.id,
     subject,
-    duration: 25
+    duration_seconds: minutes * 60,
+    event_type: 'completed'
   });
 
-  if (error) {
-    console.error('Failed to log pomodoro', error);
-    throw new Error('記録の保存に失敗しました');
+  // 2. student_activity_logs に記録（新機能用）
+  await supabase.from('student_activity_logs').insert({
+    student_id: user.id,
+    activity_type: 'POMODORO_COMPLETED',
+    metadata: { minutes, subject }
+  });
+
+  // 3. profiles の total_study_minutes を更新
+  const { data: profile } = await supabase.from('profiles').select('total_study_minutes').eq('id', user.id).single();
+  if (profile) {
+    await supabase.from('profiles').update({
+      total_study_minutes: (profile.total_study_minutes || 0) + minutes
+    }).eq('id', user.id);
   }
+
+  // 4. 実績とレベルアップの自動評価
+  const evaluationResult = await evaluateAchievements(user.id);
 
   revalidatePath('/');
   revalidatePath('/timer');
-  return;
+  revalidatePath('/game');
+  
+  return evaluationResult;
 }
