@@ -140,10 +140,10 @@ function SettingsContent() {
                     </div>
 
                     {!pendingAvatar ? (
-                      <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-xl flex items-center justify-between gap-4 flex-wrap">
+                      <div className="p-5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between gap-4 flex-wrap shadow-sm">
                         <div>
-                          <p className="text-sm font-bold text-amber-700 dark:text-amber-500 mb-1">🎲 アバター生成ガチャ</p>
-                          <p className="text-[10px] text-amber-600/80 dark:text-amber-400/80">新しいデザインを生成してコレクションに追加します。</p>
+                          <p className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center gap-2"><Sparkles className="w-4 h-4 text-brand-500" /> デザインジェネレーター</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">数学的アルゴリズムを用いて、世界に一つだけのアートワークを生成します。</p>
                         </div>
                         <button 
                           onClick={() => {
