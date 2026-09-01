@@ -5,12 +5,12 @@ import ProceduralAvatar from "./ProceduralAvatar";
 import { CircleUserRound, ChevronDown, Users, Trophy, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-export default function HeaderDropdown({ name, role }: { name: string, role: string }) {
+export default function HeaderDropdown({ name, role, initialAvatarSeed }: { name: string, role: string, initialAvatarSeed?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  const [avatarSeed, setAvatarSeed] = useState<string | null>(null);
+  const [avatarSeed, setAvatarSeed] = useState<string | null>(initialAvatarSeed || null);
 
   useEffect(() => {
     // Load initial

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ProceduralAvatar from '../components/ProceduralAvatar';
+import { createClient } from '@/utils/supabase/client';
 import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle } from 'lucide-react';
 
 type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai';
@@ -16,31 +17,52 @@ function SettingsContent() {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [showAdvancedAI, setShowAdvancedAI] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
+    const supabase = createClient();
   const [avatarSeed, setAvatarSeed] = useState('LearnFlowUser123');
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
   const [savedAvatars, setSavedAvatars] = useState<string[]>(['LearnFlowUser123']);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Load from localStorage on mount
+  // Load from Supabase on mount
   useEffect(() => {
-    const savedSeed = localStorage.getItem('avatarSeed');
-    const savedCollection = localStorage.getItem('savedAvatars');
-    if (savedSeed) setAvatarSeed(savedSeed);
-    if (savedCollection) {
-      try {
-        setSavedAvatars(JSON.parse(savedCollection));
-      } catch (e) {}
+    async function loadProfile() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        const { data: profile } = await supabase.from('profiles').select('avatar_seed, saved_avatars').eq('id', user.id).single();
+        if (profile) {
+          if (profile.avatar_seed) setAvatarSeed(profile.avatar_seed);
+          if (profile.saved_avatars && profile.saved_avatars.length > 0) setSavedAvatars(profile.saved_avatars);
+        }
+      }
     }
-  }, []);
+    loadProfile();
+  }, [supabase]);
 
-  // Save to localStorage when changed
-  useEffect(() => {
-    localStorage.setItem('avatarSeed', avatarSeed);
-    window.dispatchEvent(new Event('avatarChanged')); // Notify header
-  }, [avatarSeed]);
+  // Save changes to Supabase
+  const updateAvatarInDB = async (seed: string, collection: string[]) => {
+    if (!userId) return;
+    await supabase.from('profiles').update({
+      avatar_seed: seed,
+      saved_avatars: collection
+    }).eq('id', userId);
+    
+    // Fallback local storage for instantaneous cross-tab updates without realtime
+    localStorage.setItem('avatarSeed', seed);
+    window.dispatchEvent(new Event('avatarChanged'));
+  };
 
-  useEffect(() => {
-    localStorage.setItem('savedAvatars', JSON.stringify(savedAvatars));
-  }, [savedAvatars]);
+  const handleSetAvatar = (seed: string) => {
+    setAvatarSeed(seed);
+    updateAvatarInDB(seed, savedAvatars);
+  };
+
+  const handleSaveCollection = (seed: string, newCollection: string[]) => {
+    setSavedAvatars(newCollection);
+    setAvatarSeed(seed);
+    updateAvatarInDB(seed, newCollection);
+  };
+
 
   useEffect(() => {
     const tab = searchParams.get('tab') as Tab;
@@ -196,8 +218,7 @@ function SettingsContent() {
                           {savedAvatars.length < 5 && (
                             <button 
                               onClick={() => {
-                                setSavedAvatars([...savedAvatars, pendingAvatar]);
-                                setAvatarSeed(pendingAvatar);
+                                handleSaveCollection(pendingAvatar, [...savedAvatars, pendingAvatar]);
                                 setPendingAvatar(null);
                               }}
                               className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition-colors"
@@ -231,11 +252,10 @@ function SettingsContent() {
                               if (pendingAvatar && savedAvatars.length >= 5) {
                                 const newArr = [...savedAvatars];
                                 newArr[i] = pendingAvatar;
-                                setSavedAvatars(newArr);
-                                setAvatarSeed(pendingAvatar);
+                                handleSaveCollection(pendingAvatar, newArr);
                                 setPendingAvatar(null);
                               } else {
-                                setAvatarSeed(seed);
+                                handleSetAvatar(seed);
                               }
                             }} 
                             className={`w-14 h-14 rounded-full border-2 overflow-hidden transition-transform hover:scale-110 cursor-pointer ${

@@ -28,6 +28,7 @@ export default async function AppLayout({
   const isAdmin = role === 'admin';
   const level = profile?.level || 1;
   const exp = profile?.exp || 0;
+  const avatarSeed = profile?.avatar_seed || 'LearnFlowUser123';
 
   return (
     <>
@@ -43,7 +44,7 @@ export default async function AppLayout({
         </div>
 
         <div className="flex items-center gap-4">
-          <HeaderDropdown name={name} role={role} />
+          <HeaderDropdown name={name} role={role} initialAvatarSeed={avatarSeed} />
         </div>
       </header>
 
