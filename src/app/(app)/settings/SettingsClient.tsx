@@ -20,6 +20,28 @@ function SettingsContent() {
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
   const [savedAvatars, setSavedAvatars] = useState<string[]>(['LearnFlowUser123']);
 
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedSeed = localStorage.getItem('avatarSeed');
+    const savedCollection = localStorage.getItem('savedAvatars');
+    if (savedSeed) setAvatarSeed(savedSeed);
+    if (savedCollection) {
+      try {
+        setSavedAvatars(JSON.parse(savedCollection));
+      } catch (e) {}
+    }
+  }, []);
+
+  // Save to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem('avatarSeed', avatarSeed);
+    window.dispatchEvent(new Event('avatarChanged')); // Notify header
+  }, [avatarSeed]);
+
+  useEffect(() => {
+    localStorage.setItem('savedAvatars', JSON.stringify(savedAvatars));
+  }, [savedAvatars]);
+
   useEffect(() => {
     const tab = searchParams.get('tab') as Tab;
     if (tab && ['general', 'profile', 'gamification', 'theme', 'billing', 'ai'].includes(tab)) {
@@ -55,7 +77,7 @@ function SettingsContent() {
               "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 text-left",
               activeTab === t.id
                 ? "bg-brand-500 text-white shadow-md shadow-brand-500/20 translate-x-1"
-                : "bg-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:translate-x-1"
+                : "bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-slate-200 hover:translate-x-1"
             )}
           >
             {t.icon}

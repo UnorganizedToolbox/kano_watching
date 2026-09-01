@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from "react";
+import ProceduralAvatar from "./ProceduralAvatar";
 import { CircleUserRound, ChevronDown, Users, Trophy, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -8,6 +9,21 @@ export default function HeaderDropdown({ name, role }: { name: string, role: str
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  const [avatarSeed, setAvatarSeed] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load initial
+    const loadSeed = () => {
+      const seed = localStorage.getItem('avatarSeed');
+      if (seed) setAvatarSeed(seed);
+    };
+    loadSeed();
+
+    // Listen for changes from Settings page
+    window.addEventListener('avatarChanged', loadSeed);
+    return () => window.removeEventListener('avatarChanged', loadSeed);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -25,7 +41,13 @@ export default function HeaderDropdown({ name, role }: { name: string, role: str
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-xl transition-colors focus:outline-none"
       >
-        <CircleUserRound className="w-8 h-8 text-slate-400" />
+        {avatarSeed ? (
+          <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0">
+            <ProceduralAvatar seed={avatarSeed} />
+          </div>
+        ) : (
+          <CircleUserRound className="w-8 h-8 text-slate-400" />
+        )}
         <span className="hidden sm:block text-sm font-medium text-slate-700 dark:text-slate-200">{name}</span>
         <ChevronDown className="w-3 h-3 text-slate-400" />
       </button>
