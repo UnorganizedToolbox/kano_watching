@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { calc_Lv_from_EXP } from '@/lib/gamification/level';
 import Sidebar from "./components/Sidebar";
 import HeaderDropdown from "./components/HeaderDropdown";
 
@@ -26,7 +27,7 @@ export default async function AppLayout({
   const name = profile?.name || user.email?.split('@')[0] || 'Unknown';
   const role = profile?.role || 'student';
   const isAdmin = role === 'admin';
-  const level = profile?.level || 1;
+  const level = calc_Lv_from_EXP(profile?.exp || 0).level;
   const exp = profile?.exp || 0;
   const avatarSeed = profile?.avatar_seed || 'LearnFlowUser123';
 

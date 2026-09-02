@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { ACHIEVEMENTS_DICT } from "@/lib/gamification/achievements";
+import { calc_Lv_from_EXP } from "@/lib/gamification/level";
 
 export async function unlockAchievement(achievementId: string, tier?: number) {
   const supabase = await createClient();
@@ -42,30 +43,24 @@ export async function unlockAchievement(achievementId: string, tier?: number) {
   let newLevel = 1;
   let rewardStones = 0;
 
+
   const { data: profile } = await supabase
     .from('profiles')
-    .select('exp, level, free_stones')
+    .select('exp, free_stones')
     .eq('id', user.id)
     .single();
 
   if (profile) {
-    let currentExp = (profile.exp || 0) + baseAchievement.expReward;
-    let currentLevel = profile.level || 1;
-    oldLevel = currentLevel;
+    const oldLevelData = calc_Lv_from_EXP(profile.exp || 0);
+    const newTotalExp = (profile.exp || 0) + baseAchievement.expReward;
+    const newLevelData = calc_Lv_from_EXP(newTotalExp);
+    
+    oldLevel = oldLevelData.level;
+    newLevel = newLevelData.level;
+    leveledUp = newLevel > oldLevel;
+
     let currentStones = profile.free_stones || 0;
     
-    // レベルアップ判定 (必要EXP = レベルの2乗 * 100)
-    let requiredExp = currentLevel * currentLevel * 100;
-    while (currentExp >= requiredExp) {
-      currentExp -= requiredExp;
-      currentLevel += 1;
-      requiredExp = currentLevel * currentLevel * 100;
-      leveledUp = true;
-    }
-
-    newLevel = currentLevel;
-    
-    // レベルアップ報酬 (1レベルごとに50個の無償石とする)
     if (leveledUp) {
       rewardStones = (newLevel - oldLevel) * 50;
       currentStones += rewardStones;
@@ -74,11 +69,11 @@ export async function unlockAchievement(achievementId: string, tier?: number) {
     const { error: expError } = await supabase
       .from('profiles')
       .update({ 
-        exp: currentExp,
-        level: currentLevel,
+        exp: newTotalExp,
         free_stones: currentStones
       })
       .eq('id', user.id);
+
       
     if (expError) {
        console.error("Failed to add EXP:", expError);

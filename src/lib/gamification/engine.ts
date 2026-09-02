@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { ACHIEVEMENTS_DICT } from "./achievements";
+import { calc_Lv_from_EXP } from "./level";
 
 export async function evaluateAchievements(userId: string) {
   const supabase = await createClient();
@@ -13,55 +14,56 @@ export async function evaluateAchievements(userId: string) {
     
   if (!profile) return null;
 
-  // Get Dates
+  // Time boundaries based on JST/Local concept
+  // DAILY: Resets at 00:00
+  // WEEKLY: Resets at Monday 00:00
   const todayStr = new Date().toISOString().split('T')[0];
   const now = new Date();
   const dayOfWeek = now.getDay();
-  const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Monday as start of week
+  const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
   const startOfWeekDate = new Date(now.setDate(diff));
   const startOfWeekStr = startOfWeekDate.toISOString().split('T')[0];
 
-  // Get daily/weekly stats
-  const { count: dailyPomoCount } = await supabase
+  // Fetch all activity logs
+  const { data: allLogs } = await supabase
     .from('student_activity_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('student_id', userId)
-    .eq('activity_type', 'POMODORO_COMPLETED')
-    .eq('activity_date', todayStr);
+    .select('activity_type, activity_date, metadata')
+    .eq('student_id', userId);
 
-  const { count: weeklyPomoCount } = await supabase
-    .from('student_activity_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('student_id', userId)
-    .eq('activity_type', 'POMODORO_COMPLETED')
-    .gte('activity_date', startOfWeekStr);
+  const logs = allLogs || [];
 
-  // Get Total Pomo Count
-  const { count: totalPomoCount } = await supabase
-    .from('student_activity_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('student_id', userId)
-    .eq('activity_type', 'POMODORO_COMPLETED');
-    
-  const getProgress = (id: string) => {
-    switch(id) {
-      case 'TOTAL_STUDY_INFINITE':
-        return (profile.total_study_minutes || 0) / 60;
-      case 'LOGIN_STREAK_INFINITE':
-      case 'LOGIN_STREAK_7':
-        return profile.current_streak_days || 0;
-      case 'TOTAL_TASKS_INFINITE':
-        return totalPomoCount || 0;
-      case 'DAILY_1_POMO':
-        return dailyPomoCount || 0;
-      case 'WEEKLY_7_POMO':
-        return weeklyPomoCount || 0;
-      case 'WEEKLY_DAILY_5_DAYS':
-        return 0; // Requires complex query, mock for now
-      default:
-        return 0;
+  // Grouped stats calculation
+  const stats = {
+    DAILY: { POMODORO_COUNT: 0 },
+    WEEKLY: { POMODORO_COUNT: 0 },
+    GENERAL: { 
+      POMODORO_COUNT: 0, 
+      LOGIN_STREAK: profile.current_streak_days || 0,
+      TOTAL_STUDY_HOURS: (profile.total_study_minutes || 0) / 60 
     }
   };
+
+  const rewardedToday: string[] = [];
+  const rewardedThisWeek: string[] = [];
+
+  for (const log of logs) {
+    const isToday = log.activity_date === todayStr;
+    const isThisWeek = log.activity_date >= startOfWeekStr;
+
+    if (log.activity_type === 'POMODORO_COMPLETED') {
+      stats.GENERAL.POMODORO_COUNT++;
+      if (isThisWeek) stats.WEEKLY.POMODORO_COUNT++;
+      if (isToday) stats.DAILY.POMODORO_COUNT++;
+    }
+
+    if (log.activity_type === 'MISSION_REWARDED') {
+      const mId = log.metadata?.mission_id;
+      if (mId) {
+        if (isThisWeek) rewardedThisWeek.push(mId);
+        if (isToday) rewardedToday.push(mId);
+      }
+    }
+  }
 
   // Get currently unlocked permanent achievements
   const { data: unlockedData } = await supabase
@@ -70,25 +72,29 @@ export async function evaluateAchievements(userId: string) {
     .eq('student_id', userId);
     
   const unlockedIds = unlockedData?.map(a => a.achievement_id) || [];
-
-  // Get rewarded missions for today/this week
-  const { data: rewardedData } = await supabase
-    .from('student_activity_logs')
-    .select('activity_type, metadata, activity_date')
-    .eq('student_id', userId)
-    .eq('activity_type', 'MISSION_REWARDED')
-    .gte('activity_date', startOfWeekStr);
-
-  const rewardedToday = rewardedData?.filter(r => r.activity_date === todayStr).map(r => r.metadata?.mission_id) || [];
-  const rewardedThisWeek = rewardedData?.map(r => r.metadata?.mission_id) || [];
   
   let totalExpGained = 0;
-  const newlyUnlocked = [];
-  const newlyRewardedMissions = [];
+  const newlyUnlocked: any[] = [];
+  const newlyRewardedMissions: string[] = [];
+
+  // Helper to resolve progress
+  const getProgress = (achieve: any) => {
+    switch (achieve.id) {
+      case 'TOTAL_STUDY_INFINITE': return stats.GENERAL.TOTAL_STUDY_HOURS;
+      case 'LOGIN_STREAK_INFINITE':
+      case 'LOGIN_STREAK_7': return stats.GENERAL.LOGIN_STREAK;
+      case 'TOTAL_TASKS_INFINITE': return stats.GENERAL.POMODORO_COUNT;
+      case 'DAILY_1_POMO': return stats.DAILY.POMODORO_COUNT;
+      case 'WEEKLY_7_POMO': return stats.WEEKLY.POMODORO_COUNT;
+      case 'WEEKLY_DAILY_5_DAYS': return 0; // Mocked for now
+      default: return 0;
+    }
+  };
 
   for (const achieve of Object.values(ACHIEVEMENTS_DICT)) {
-    const currentProgress = getProgress(achieve.id);
+    const currentProgress = getProgress(achieve);
     
+    // Process by Category
     if (achieve.category === 'DAILY') {
       if (currentProgress >= achieve.maxProgress && !rewardedToday.includes(achieve.id)) {
         newlyRewardedMissions.push(achieve.id);
@@ -100,7 +106,7 @@ export async function evaluateAchievements(userId: string) {
         totalExpGained += achieve.expReward;
       }
     } else {
-      // General or Event (Permanent)
+      // GENERAL or EVENT (Permanent)
       if (achieve.isInfinite && achieve.infiniteStep) {
         const completedTiers = Math.floor(currentProgress / achieve.infiniteStep);
         for (let i = 1; i <= completedTiers; i++) {
@@ -141,38 +147,33 @@ export async function evaluateAchievements(userId: string) {
     });
   }
 
-  // Handle EXP and Level up
-  let currentExp = (profile.exp || 0) + totalExpGained;
-  let currentLevel = profile.level || 1;
-  const oldLevel = currentLevel;
+  // Handle EXP using pure calc_Lv_from_EXP
+  const currentTotalExp = profile.exp || 0;
+  const oldLevelData = calc_Lv_from_EXP(currentTotalExp);
+  
+  const newTotalExp = currentTotalExp + totalExpGained;
+  const newLevelData = calc_Lv_from_EXP(newTotalExp);
+  
   let currentStones = profile.free_stones || 0;
-  
-  let requiredExp = currentLevel * currentLevel * 100;
-  let leveledUp = false;
-  
-  while (currentExp >= requiredExp) {
-    currentExp -= requiredExp;
-    currentLevel += 1;
-    requiredExp = currentLevel * currentLevel * 100;
-    leveledUp = true;
-  }
-  
   let rewardStones = 0;
-  if (leveledUp) {
-    rewardStones = (currentLevel - oldLevel) * 50;
+  
+  if (newLevelData.level > oldLevelData.level) {
+    rewardStones = (newLevelData.level - oldLevelData.level) * 50;
     currentStones += rewardStones;
   }
   
   const { error: profErr } = await supabase.from('profiles').update({
-    exp: currentExp,
-    level: currentLevel,
+    exp: newTotalExp,
     free_stones: currentStones
   }).eq('id', userId);
+  
   if (profErr) console.error('engine profile err:', profErr);
 
   return {
     achievements: newlyUnlocked,
     missions: newlyRewardedMissions,
-    levelUp: leveledUp ? { oldLevel, newLevel: currentLevel, rewardStones } : null
+    levelUp: (newLevelData.level > oldLevelData.level) 
+      ? { oldLevel: oldLevelData.level, newLevel: newLevelData.level, rewardStones } 
+      : null
   };
 }

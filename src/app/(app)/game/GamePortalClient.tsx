@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { ACHIEVEMENTS_DICT, AchievementCategory } from "@/lib/gamification/achievements";
 import { cn } from "@/lib/utils";
 import { Trophy, CalendarDays, CalendarClock, Sparkles, Star, Lock, PartyPopper } from "lucide-react";
+import { calc_Lv_from_EXP } from '@/lib/gamification/level';
 
 type TabConfig = {
   id: AchievementCategory;
@@ -122,8 +123,8 @@ export default function GamePortalClient({ profile, unlockedIds, activityStats }
           </div>
           <div className="flex items-center gap-4 text-sm font-bold bg-white dark:bg-darkbg-secondary px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
             <div className="flex items-center gap-2 text-brand-600 dark:text-brand-400">
-              <span className="text-xs text-slate-500">Lv.{profile?.level || 1} EXP</span>
-              <span className="text-lg">{profile?.exp || 0}</span>
+              <span className="text-xs text-slate-500">Lv.{calc_Lv_from_EXP(profile?.exp || 0).level} EXP</span>
+              <span className="text-lg">{calc_Lv_from_EXP(profile?.exp || 0).currentExp}</span>
             </div>
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700"></div>
             <div className="flex items-center gap-2 text-amber-500">
