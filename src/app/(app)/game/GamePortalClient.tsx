@@ -88,7 +88,7 @@ export default function GamePortalClient({ profile, unlockedIds, activityStats }
       let isCompleted = currentProgress >= targetProgress;
       currentProgress = Math.min(currentProgress, targetProgress);
       const progressPercent = Math.min(100, (currentProgress / targetProgress) * 100);
-      const isUnlockedInDb = unlockedIds.includes(achieve.id);
+      const isUnlockedInDb = achieve.category === 'DAILY' ? activityStats?.rewardedToday?.includes(achieve.id) : activityStats?.rewardedThisWeek?.includes(achieve.id);
 
       achievementsWithStatus.push({
         ...achieve,

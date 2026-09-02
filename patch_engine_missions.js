@@ -1,4 +1,9 @@
-import { createClient } from "@/utils/supabase/server";
+const fs = require('fs');
+
+let content = fs.readFileSync('src/lib/gamification/engine.ts', 'utf8');
+
+// We need to rewrite evaluateAchievements to handle Daily/Weekly resets properly.
+const newEngine = `import { createClient } from "@/utils/supabase/server";
 import { ACHIEVEMENTS_DICT } from "./achievements";
 
 export async function evaluateAchievements(userId: string) {
@@ -104,7 +109,7 @@ export async function evaluateAchievements(userId: string) {
       if (achieve.isInfinite && achieve.infiniteStep) {
         const completedTiers = Math.floor(currentProgress / achieve.infiniteStep);
         for (let i = 1; i <= completedTiers; i++) {
-          const tierId = `${achieve.id}_tier_${i}`;
+          const tierId = \`\${achieve.id}_tier_\${i}\`;
           if (!unlockedIds.includes(tierId)) {
             newlyUnlocked.push({ id: tierId, exp: achieve.expReward });
             totalExpGained += achieve.expReward;
@@ -176,3 +181,6 @@ export async function evaluateAchievements(userId: string) {
     levelUp: leveledUp ? { oldLevel, newLevel: currentLevel, rewardStones } : null
   };
 }
+`;
+
+fs.writeFileSync('src/lib/gamification/engine.ts', newEngine);
