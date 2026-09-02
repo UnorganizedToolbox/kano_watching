@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ProceduralAvatar from '../components/ProceduralAvatar';
 import { createClient } from '@/utils/supabase/client';
+import { ACHIEVEMENTS_DICT } from "@/lib/gamification/achievements";
 import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle } from 'lucide-react';
 
 type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai';
@@ -22,6 +23,7 @@ function SettingsContent() {
   const [pendingAvatar, setPendingAvatar] = useState<string | null>(null);
   const [savedAvatars, setSavedAvatars] = useState<string[]>(['LearnFlowUser123']);
   const [userId, setUserId] = useState<string | null>(null);
+  const [unlockedTitles, setUnlockedTitles] = useState<any[]>([]);
 
   // Load from Supabase on mount
   useEffect(() => {
@@ -33,6 +35,14 @@ function SettingsContent() {
         if (profile) {
           if (profile.avatar_seed) setAvatarSeed(profile.avatar_seed);
           if (profile.saved_avatars && profile.saved_avatars.length > 0) setSavedAvatars(profile.saved_avatars);
+        }
+        
+        // Fetch achievements for titles
+        const { data: achieves } = await supabase.from('student_achievements').select('achievement_id').eq('student_id', user.id);
+        if (achieves) {
+          const ids = achieves.map(a => a.achievement_id);
+          const titles = Object.values(ACHIEVEMENTS_DICT).filter(a => ids.includes(a.id) && (a.category === 'GENERAL' || a.category === 'EVENT'));
+          setUnlockedTitles(titles);
         }
       }
     }
@@ -290,9 +300,10 @@ function SettingsContent() {
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">称号 (実績から選択)</label>
                   <select className="w-full px-4 py-3 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-darkbg-secondary focus:ring-2 focus:ring-brand-500 outline-none font-bold text-brand-700 dark:text-brand-400">
                     <option value="">(称号なし)</option>
-                    <option value="1">継続の達人</option>
-                    <option value="2">ポモドーロマスター</option>
-                    <option value="3" disabled>完全無欠の解答者 (未獲得)</option>
+                    {unlockedTitles.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                    {unlockedTitles.length === 0 && <option value="empty" disabled>称号を獲得していません</option>}
                   </select>
                   <p className="text-[10px] text-slate-400 mt-2">アンロックした実績の中から好きなものを称号として設定し、自慢できます。</p>
                 </div>

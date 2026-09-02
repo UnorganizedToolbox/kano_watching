@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { askQuestion } from "./actions";
 import RealtimeQuestions from "./components/RealtimeQuestions";
 import PomodoroTimer from "./components/PomodoroTimer";
-import Image from "next/image";
 
 export default async function TimerPage() {
   const supabase = await createClient();

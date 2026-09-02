@@ -16,11 +16,6 @@ export async function askQuestion(formData: FormData) {
 
   if (!user) throw new Error('ログインしていません');
 
-  // April Fools Easter Egg
-  const today = new Date();
-  const isAprilFirst = today.getMonth() === 3 && today.getDate() === 1;
-  const isAprilFoolTag = title.includes('#Aprilfool') || body.includes('#Aprilfool');
-
   let image_url = null;
 
   if (image && image.size > 0) {
@@ -42,28 +37,6 @@ export async function askQuestion(formData: FormData) {
       .getPublicUrl(filePath);
       
     image_url = publicUrlData.publicUrl;
-  }
-
-  // Easter Egg Intercept
-  if (isAprilFirst && isAprilFoolTag) {
-    const randomScore = Math.floor(Math.random() * 101);
-    const { error } = await supabase.from('questions').insert({
-      student_uuid: user.id,
-      title,
-      body,
-      image_url,
-      status: 'answered',
-      answer_body: `🎉 エイプリルフール特別判定！
-あなたの嘘の点数は... 【 ${randomScore}点 】 です！`
-    });
-
-    if (error) {
-      console.error('Failed to post april fool question', error);
-      throw new Error('質問の送信に失敗しました');
-    }
-
-    revalidatePath('/timer');
-    return;
   }
 
   const { error } = await supabase.from('questions').insert({
@@ -94,26 +67,22 @@ export async function logPomodoro(subject: string, minutes: number = 25) {
   const { error: pomoError } = await supabase.from('pomodoro_logs').insert({
     student_uuid: user.id,
     subject,
-    duration_seconds: minutes * 60,
-    event_type: 'complete'
+    duration: minutes
   });
-  if (pomoError) throw new Error('pomodoro_logs insert error: ' + pomoError.message);
 
   // 2. student_activity_logs に記録（新機能用）
-  const { error: actErr } = await supabase.from('student_activity_logs').insert({
+  await supabase.from('student_activity_logs').insert({
     student_id: user.id,
     activity_type: 'POMODORO_COMPLETED',
     metadata: { minutes, subject }
   });
-  if (actErr) throw new Error('activity logs insert error: ' + actErr.message);
 
   // 3. profiles の total_study_minutes を更新
   const { data: profile } = await supabase.from('profiles').select('total_study_minutes').eq('id', user.id).single();
   if (profile) {
-    const { error: profErr } = await supabase.from('profiles').update({
+    await supabase.from('profiles').update({
       total_study_minutes: (profile.total_study_minutes || 0) + minutes
     }).eq('id', user.id);
-  if (profErr) throw new Error('profile update error: ' + profErr.message);
   }
 
   // 4. 実績とレベルアップの自動評価
