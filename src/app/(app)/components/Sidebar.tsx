@@ -102,7 +102,7 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
           <span>不具合を報告</span>
         </a>
         <div className="px-4 py-2 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.2.0</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.3.0</span>
         </div>
       </div>
     </div>
