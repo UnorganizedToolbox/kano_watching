@@ -97,10 +97,10 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
           <SlidersHorizontal className="w-4 h-4" />
           <span>設定 (Settings)</span>
         </Link>
-        <button onClick={() => alert('不具合報告モーダルは未実装です')} className="w-full text-left flex items-center gap-2 px-4 py-2 text-xs text-rose-400 dark:text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 font-medium transition-colors rounded-lg">
+        <a href="mailto:support@learnflow.example.com?subject=不具合報告&body=【発生した画面】%0D%0A【不具合の内容】%0D%0A" className="w-full text-left flex items-center gap-2 px-4 py-2 text-xs text-rose-400 dark:text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 font-medium transition-colors rounded-lg">
           <TriangleAlert className="w-4 h-4" />
           <span>不具合を報告</span>
-        </button>
+        </a>
         <div className="px-4 py-2 text-right">
           <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.2.0</span>
         </div>
