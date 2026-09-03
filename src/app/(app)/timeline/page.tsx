@@ -1,4 +1,4 @@
-import { CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle, Sparkles } from 'lucide-react';
 
 export default function TimelinePage() {
   const hours = Array.from({ length: 13 }, (_, i) => i + 10); // 10 to 22 (10 AM to 10 PM)
