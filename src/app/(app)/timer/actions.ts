@@ -83,7 +83,7 @@ export async function askQuestion(formData: FormData) {
   return;
 }
 
-export async function logPomodoro(subject: string, minutes: number = 25) {
+export async function logPomodoro(subject: string, minutes: number = 25, concentrationRating?: number) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -100,10 +100,13 @@ export async function logPomodoro(subject: string, minutes: number = 25) {
   if (pomoError) throw new Error('pomodoro_logs insert error: ' + pomoError.message);
 
   // 2. student_activity_logs に記録（新機能用）
+  const metadata: Record<string, string | number> = { minutes, subject };
+  if (concentrationRating) metadata.concentrationRating = concentrationRating;
+
   const { error: actErr } = await supabase.from('student_activity_logs').insert({
     student_id: user.id,
     activity_type: 'POMODORO_COMPLETED',
-    metadata: { minutes, subject }
+    metadata
   });
   if (actErr) throw new Error('activity logs insert error: ' + actErr.message);
 

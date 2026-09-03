@@ -26,13 +26,7 @@ export default async function DashboardPage() {
 
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1400px] mx-auto w-full px-6 pt-2 pb-6">
-      {/* Nickname sector */}
-      <div className="flex justify-end items-center gap-4 shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">表示名:</span>
-          <span className="bg-white/50 dark:bg-darkbg-secondary/50 border border-slate-300 dark:border-slate-700 px-3 py-1 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200">{profile?.name || 'ゲスト'}</span>
-        </div>
-      </div>
+      
 
       {/* Height responsive grid */}
       <div className="flex-1 grid grid-cols-12 gap-6 items-stretch h-[calc(100vh-12rem)] min-h-[620px] mb-4">
@@ -47,8 +41,19 @@ export default async function DashboardPage() {
               <p className="text-xs text-white/80">これまでのポモドーロ完了数: {totalPomodoros} 回</p>
             </div>
             <div className="text-right">
-              <span className="text-[10px] block text-white/80 font-bold">共通テストまで</span>
-              <span className="text-3xl font-black font-title">138 日</span>
+              {profile?.target_date ? (
+                <>
+                  <span className="text-[10px] block text-white/80 font-bold">{profile.target_title || '目標日まで'}</span>
+                  <span className="text-3xl font-black font-title">
+                    {Math.max(0, Math.ceil((new Date(profile.target_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} 日
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] block text-white/80 font-bold">目標未設定</span>
+                  <span className="text-xl font-bold mt-2 inline-block">-- 日</span>
+                </>
+              )}
             </div>
           </div>
 

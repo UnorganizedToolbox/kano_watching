@@ -79,10 +79,12 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
             <button onClick={() => alert('未実装です')} className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/20">
               <i className="fa-solid fa-plus-minus text-lg w-5 text-center"></i>
               <span>CBT問題作成・配信</span>
+              <span className="ml-auto text-[8px] bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded font-bold">未実装</span>
             </button>
             <button onClick={() => alert('未実装です')} className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20">
               <i className="fa-solid fa-terminal text-lg w-5 text-center"></i>
               <span>管理者デバッグパネル</span>
+              <span className="ml-auto text-[8px] bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded font-bold">未実装</span>
             </button>
           </>
         )}
@@ -99,6 +101,9 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
           <TriangleAlert className="w-4 h-4" />
           <span>不具合を報告</span>
         </button>
+        <div className="px-4 py-2 text-right">
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.2.0</span>
+        </div>
       </div>
     </div>
   );

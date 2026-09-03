@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { logPomodoro } from '../actions';
 import { cn } from '@/lib/utils';
 import { PartyPopper, Lock, Volume2 } from 'lucide-react';
@@ -135,6 +135,21 @@ export default function PomodoroTimer() {
   const [showTime, setShowTime] = useState(false);
   const [soundType, setSoundType] = useState<SoundType>('chime');
   const [bgmType, setBgmType] = useState<'none'|'white'|'pink'|'brown'>('none');
+  const [showRatingModal, setShowRatingModal] = useState(false);
+
+  const handleTimerComplete = useCallback(() => {
+    playBeepSound(soundType);
+    stopAmbientBgm();
+
+    if (mode === 'WORK') {
+      speakText("ポモドーロが終了しました。集中度を評価してください。");
+      setShowRatingModal(true);
+    } else {
+      speakText("休憩が終わりました。次のポモドーロを開始しましょう。");
+      setMode('WORK');
+      setTimeLeft(WORK_TIME);
+    }
+  }, [soundType, mode]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -143,36 +158,31 @@ export default function PomodoroTimer() {
         setTimeLeft((prev) => prev - 1);
       }, 1000);
     } else if (timeLeft === 0 && isRunning) {
-      setIsRunning(false);
-      handleTimerComplete();
+      const timeoutId = setTimeout(() => {
+        setIsRunning(false);
+        handleTimerComplete();
+      }, 0);
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timeoutId);
+      };
     }
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft]);
+  }, [isRunning, timeLeft, handleTimerComplete]);
 
-  const handleTimerComplete = async () => {
-    playBeepSound(soundType);
-
-    stopAmbientBgm();
-    if (mode === 'WORK') {
-      speakText("ポモドーロが終了しました。5分間の休憩に入ります。");
-      
-      try {
-        const res = await logPomodoro(subject, 25);
-        if (res?.levelUp) {
-          setLevelUpData(res.levelUp);
-        }
-      } catch (e) {
-        console.error("Failed to log pomodoro", e);
+  const handleRatingSubmit = async (rating: number) => {
+    setShowRatingModal(false);
+    try {
+      const res = await logPomodoro(subject, 25, rating);
+      if (res?.levelUp) {
+        setLevelUpData(res.levelUp);
       }
-
-      setPomoCount(p => p + 1);
-      setMode('BREAK');
-      setTimeLeft(BREAK_TIME);
-    } else {
-      speakText("休憩が終わりました。次のポモドーロを開始しましょう。");
-      setMode('WORK');
-      setTimeLeft(WORK_TIME);
+    } catch (e) {
+      console.error("Failed to log pomodoro", e);
     }
+    setPomoCount(p => p + 1);
+    setMode('BREAK');
+    setTimeLeft(BREAK_TIME);
   };
 
   const toggleTimer = () => {
@@ -368,6 +378,32 @@ export default function PomodoroTimer() {
               </div>
             </div>
             <button onClick={() => setLevelUpData(null)} className="w-full py-4 bg-slate-800 hover:bg-slate-900 dark:bg-slate-200 dark:hover:bg-white text-white dark:text-slate-900 rounded-2xl font-bold transition-all active:scale-95 z-10 shadow-lg">閉じる</button>
+          </div>
+        </div>
+      )}
+
+      {showRatingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-darkbg-primary rounded-3xl p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
+            <h3 className="text-2xl font-black font-title text-slate-800 dark:text-white mb-4">集中度の評価</h3>
+            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">今回のポモドーロセッションの集中度を1(低)〜5(高)で評価してください。</p>
+            <div className="flex gap-3 mb-6 w-full justify-center">
+              {[1, 2, 3, 4, 5].map(rating => (
+                <button
+                  key={rating}
+                  onClick={() => handleRatingSubmit(rating)}
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-slate-100 hover:bg-brand-100 dark:bg-slate-800 dark:hover:bg-brand-900/30 text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 text-xl font-bold transition-all active:scale-90 border-2 border-transparent hover:border-brand-500"
+                >
+                  {rating}
+                </button>
+              ))}
+            </div>
+            <button 
+              onClick={() => handleRatingSubmit(3)} 
+              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-4"
+            >
+              スキップ（普通とする）
+            </button>
           </div>
         </div>
       )}
