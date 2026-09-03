@@ -1,4 +1,8 @@
-import { CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+const fs = require('fs');
+let content = fs.readFileSync('src/app/(app)/timeline/page.tsx', 'utf8');
+
+// We will completely replace the content of TimelinePage with a vastly improved design.
+const newComponent = `import { CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 
 export default function TimelinePage() {
   const hours = Array.from({ length: 13 }, (_, i) => i + 10); // 10 to 22 (10 AM to 10 PM)
@@ -40,8 +44,8 @@ export default function TimelinePage() {
                 { date: 29, day: 'Sun', isToday: true }
               ].map((d, i) => (
                 <div key={i} className="flex flex-col items-center justify-center gap-1">
-                  <span className={`text-[10px] font-black uppercase tracking-wider ${d.day === 'Sat' ? 'text-blue-500' : d.day === 'Sun' ? 'text-rose-500' : 'text-slate-400'}`}>{d.day}</span>
-                  <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-all ${d.isToday ? 'bg-brand-500 text-white shadow-md shadow-brand-500/40 ring-4 ring-brand-500/20' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
+                  <span className={\`text-[10px] font-black uppercase tracking-wider \${d.day === 'Sat' ? 'text-blue-500' : d.day === 'Sun' ? 'text-rose-500' : 'text-slate-400'}\`}>{d.day}</span>
+                  <div className={\`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-all \${d.isToday ? 'bg-brand-500 text-white shadow-md shadow-brand-500/40 ring-4 ring-brand-500/20' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'}\`}>
                     {d.date}
                   </div>
                 </div>
@@ -66,8 +70,8 @@ export default function TimelinePage() {
             {/* Time Axis */}
             <div className="w-20 shrink-0 relative min-h-[780px]">
               {hours.map((hour, i) => (
-                <div key={hour} className="absolute w-full pr-3 text-right text-[10px] font-bold text-slate-400 dark:text-slate-500 -translate-y-1/2" style={{ top: `${i * 60 + 30}px` }}>
-                  {hour === 12 ? '正午' : hour < 12 ? `午前${hour}時` : `午後${hour - 12}時`}
+                <div key={hour} className="absolute w-full pr-3 text-right text-[10px] font-bold text-slate-400 dark:text-slate-500 -translate-y-1/2" style={{ top: \`\${i * 60 + 30}px\` }}>
+                  {hour === 12 ? '正午' : hour < 12 ? \`午前\${hour}時\` : \`午後\${hour - 12}時\`}
                 </div>
               ))}
             </div>
@@ -77,12 +81,12 @@ export default function TimelinePage() {
               
               {/* Horizontal Lines */}
               {hours.map((hour, i) => (
-                <div key={hour} className="absolute left-0 right-0 h-px bg-slate-200/50 dark:bg-slate-700/50" style={{ top: `${i * 60 + 30}px` }}></div>
+                <div key={hour} className="absolute left-0 right-0 h-px bg-slate-200/50 dark:bg-slate-700/50" style={{ top: \`\${i * 60 + 30}px\` }}></div>
               ))}
               
               {/* Vertical Lines */}
               {[1, 2, 3, 4, 5, 6].map((col) => (
-                <div key={col} className="absolute top-0 bottom-0 border-l border-dashed border-slate-200/50 dark:border-slate-700/50" style={{ left: `${col * 14.2857}%` }}></div>
+                <div key={col} className="absolute top-0 bottom-0 border-l border-dashed border-slate-200/50 dark:border-slate-700/50" style={{ left: \`\${col * 14.2857}%\` }}></div>
               ))}
 
               {/* Event Blocks (Mock Data mapped to exact pixel positions) */}
@@ -126,3 +130,6 @@ export default function TimelinePage() {
     </section>
   );
 }
+`
+
+fs.writeFileSync('src/app/(app)/timeline/page.tsx', newComponent);
