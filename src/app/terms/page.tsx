@@ -1,9 +1,10 @@
 export default function TermsPage() {
   return (
-    <div className="max-w-3xl mx-auto py-12 px-6 text-slate-800 dark:text-slate-200">
-      <h1 className="text-3xl font-black mb-8 text-slate-900 dark:text-white">利用規約</h1>
-      
-      <div className="space-y-8 leading-relaxed">
+    <div className="flex-1 overflow-y-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto card-glass bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-8 md:p-12 rounded-3xl shadow-xl text-slate-800 dark:text-slate-200">
+        <h1 className="text-3xl font-black mb-8 text-slate-900 dark:text-white border-b-2 border-brand-500 pb-4 inline-block">利用規約</h1>
+        
+        <div className="space-y-8 leading-relaxed">
         <p>この利用規約（以下「本規約」）は、UnorganizedToolbox（以下「当方」）が提供するサービス「LearnFlow」（以下「本サービス」）の利用条件を定めるものです。ユーザーの皆様は、本規約に従って本サービスをご利用いただきます。</p>
 
         <section>
@@ -49,6 +50,8 @@ export default function TermsPage() {
         </section>
 
         <p className="text-right text-sm text-slate-500 mt-12">制定日：2026年9月4日</p>
+      </div>
+    </div>
       </div>
     </div>
   )
