@@ -44,6 +44,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             Googleでログイン (カレンダー連携)
           </button>
         </form>
+
+        <div className="mt-8 text-center text-xs text-slate-500">
+          ログインすることで、<br />
+          <a href="/terms" className="underline hover:text-brand-500">利用規約</a> および <a href="/privacy" className="underline hover:text-brand-500">プライバシーポリシー</a> に同意したものとみなされます。
+        </div>
       </div>
     </div>
   )
