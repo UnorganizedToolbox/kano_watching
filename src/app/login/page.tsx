@@ -1,4 +1,4 @@
-import { login, signInWithGoogle } from './actions'
+import { login } from './actions'
 
 // Note: Next.js page components can accept searchParams as a prop
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -29,21 +29,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </button>
         </form>
 
-        <div className="mt-6 mb-6 flex items-center gap-4">
-          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
-          <span className="text-xs font-bold text-slate-400">OR</span>
-          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
-        </div>
-
-        <form>
-          <button 
-            formAction={signInWithGoogle} 
-            className="w-full flex items-center justify-center gap-3 py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold shadow-sm transition-all active:scale-95"
-          >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-            Googleでログイン (カレンダー連携)
-          </button>
-        </form>
+        
 
         <div className="mt-8 text-center text-xs text-slate-500">
           ログインすることで、<br />

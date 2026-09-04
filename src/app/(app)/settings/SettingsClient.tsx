@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import ProceduralAvatar from '../components/ProceduralAvatar';
 import { createClient } from '@/utils/supabase/client';
 import { ACHIEVEMENTS_DICT } from "@/lib/gamification/achievements";
-import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle } from 'lucide-react';
+import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle, Cloud } from 'lucide-react';
 
 type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai';
 
@@ -134,7 +134,7 @@ function SettingsContent() {
               "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 text-left",
               activeTab === t.id
                 ? "bg-brand-500 text-white shadow-md shadow-brand-500/20 translate-x-1"
-                : "bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-slate-200 hover:translate-x-1"
+                : "bg-slate-100 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white hover:translate-x-1"
             )}
           >
             {t.icon}
@@ -426,6 +426,31 @@ function SettingsContent() {
                       <span className="absolute inset-0 bg-black/20 flex items-center justify-center"><Lock className="w-4 h-4 mr-1"/> Lv.2</span>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          
+          {activeTab === 'sync' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+              <h3 className="text-xl font-bold border-b border-slate-100 dark:border-slate-800 pb-2">同期設定</h3>
+              
+              <div className="space-y-6 max-w-lg">
+                <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <h4 className="font-bold text-slate-800 dark:text-white mb-2">Googleカレンダー連携</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
+                    Googleカレンダーと連携することで、スケジュールの読み取りが可能になります。（※学習成果などのデータがカレンダーに自動で書き込まれることはありません）
+                  </p>
+                  <form action={linkGoogleAccount}>
+                    <button 
+                      type="submit"
+                      className="w-full flex items-center justify-center gap-3 py-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl font-bold shadow-sm transition-all active:scale-95"
+                    >
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                      Googleアカウントと同期する
+                    </button>
+                  </form>
                 </div>
               </div>
             </div>
