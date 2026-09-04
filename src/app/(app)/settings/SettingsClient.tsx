@@ -5,10 +5,11 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ProceduralAvatar from '../components/ProceduralAvatar';
 import { createClient } from '@/utils/supabase/client';
+import { linkGoogleAccount } from './actions';
 import { ACHIEVEMENTS_DICT } from "@/lib/gamification/achievements";
 import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle, Cloud } from 'lucide-react';
 
-type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai';
+type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai' | 'sync';
 
 function SettingsContent() {
   const searchParams = useSearchParams();
@@ -111,11 +112,12 @@ function SettingsContent() {
     router.push(`/settings?tab=${tab}`);
   };
 
-  const tabs = [
+    const tabs = [
     { id: 'general', label: '全般', icon: <Settings2 className="w-4 h-4" /> },
     { id: 'profile', label: 'プロフィール', icon: <User className="w-4 h-4" /> },
     { id: 'gamification', label: 'ゲーミフィケーション', icon: <Gamepad2 className="w-4 h-4" /> },
     { id: 'theme', label: 'テーマ', icon: <Palette className="w-4 h-4" /> },
+    { id: 'sync', label: '同期', icon: <Cloud className="w-4 h-4" /> },
     { id: 'ai', label: 'AI設定', icon: <Sparkles className="w-4 h-4" /> },
     { id: 'billing', label: '購入とサブスクリプション', icon: <CreditCard className="w-4 h-4" /> },
   ];
