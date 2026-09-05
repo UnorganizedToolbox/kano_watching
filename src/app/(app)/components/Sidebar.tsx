@@ -101,12 +101,9 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
           <TriangleAlert className="w-4 h-4" />
           <span>不具合を報告</span>
         </a>
-        <div className="flex justify-between px-4 mt-2 mb-1 text-[9px] text-slate-400 font-medium">
-          <a href="/terms" className="hover:text-brand-500">利用規約</a>
-          <a href="/privacy" className="hover:text-brand-500">プライバシーポリシー</a>
-        </div>
+        
         <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.4.0</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.4.1</span>
         </div>
       </div>
     </div>

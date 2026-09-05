@@ -56,6 +56,15 @@ export default async function AppLayout({
 
         <main className="flex-1 overflow-y-auto px-20 py-4 h-[calc(100vh-4rem)] flex flex-col pb-16" id="main-content-scroll">
           {children}
+
+          <footer className="mt-auto pt-16 pb-8 text-center text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex justify-center items-center gap-6 mb-3 font-medium">
+              <a href="/terms" className="hover:text-brand-500 transition-colors">利用規約</a>
+              <a href="/privacy" className="hover:text-brand-500 transition-colors">プライバシーポリシー</a>
+            </div>
+            <p className="mb-2">お問い合わせ: <a href="mailto:unorganizedtoolbox@gmail.com" className="hover:text-slate-700 dark:hover:text-slate-300">unorganizedtoolbox@gmail.com</a></p>
+            <p>&copy; 2026 UnorganizedToolbox. Released under the MIT License.</p>
+          </footer>
         </main>
       </div>
     </>

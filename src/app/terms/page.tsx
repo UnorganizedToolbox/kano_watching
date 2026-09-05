@@ -40,12 +40,17 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-xl font-bold mb-4 border-b pb-2">第5条（サービス内容の変更等）</h2>
+          <h2 className="text-xl font-bold mb-4 border-b pb-2">第5条（オープンソースライセンス）</h2>
+          <p>本サービスはオープンソースソフトウェアとして <strong>MITライセンス</strong> のもとで公開されています。ユーザーはGitHubページからいつでもソースコードを閲覧・利用することが可能です。詳細な利用条件はGitHubリポジトリ内のLICENSEファイルに従うものとします。</p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-bold mb-4 border-b pb-2">第6条（サービス内容の変更等）</h2>
           <p>当方は、ユーザーに通知することなく、本サービスの内容を変更しまたは本サービスの提供を中止することができるものとし、これによってユーザーに生じた損害について一切の責任を負いません。</p>
         </section>
 
         <section>
-          <h2 className="text-xl font-bold mb-4 border-b pb-2">第6条（準拠法・裁判管轄）</h2>
+          <h2 className="text-xl font-bold mb-4 border-b pb-2">第7条（準拠法・裁判管轄）</h2>
           <p>本規約の解釈にあたっては、日本法を準拠法とします。本サービスに関して紛争が生じた場合には、当方の所在地を管轄する裁判所を専属的合意管轄とします。</p>
         </section>
 
