@@ -162,7 +162,7 @@ function SettingsContent() {
               <div className="space-y-6">
                 <div>
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">言語設定</label>
-                  <select className="w-full max-w-sm px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none">
+                  <select className="w-full max-w-sm px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none">
                     <option value="ja">日本語</option>
                     <option value="en">English</option>
                   </select>
@@ -408,7 +408,7 @@ function SettingsContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">デザインスキン</label>
-                  <select defaultValue="glass" className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none">
+                  <select defaultValue="glass" className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none">
                     <option value="glass">Glassmorphism (透過ガラス)</option>
                     <option value="brutalist">Neo-Brutalism</option>
                     <option value="lofi">Cozy Lo-Fi</option>
