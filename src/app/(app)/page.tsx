@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/server";
+import { cookies } from 'next/headers';
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -18,7 +19,32 @@ export default async function DashboardPage() {
     redirect('/admin');
   }
 
+  
+  const cookieStore = await cookies();
+  const googleToken = cookieStore.get('google_calendar_token')?.value;
+  let calendarEvents = [];
+  
+  if (googleToken) {
+    try {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfDay.toISOString()}&timeMax=${endOfDay.toISOString()}&singleEvents=true&orderBy=startTime`, {
+        headers: { Authorization: `Bearer ${googleToken}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        calendarEvents = data.items || [];
+      }
+    } catch (e) {
+      console.error('Calendar error:', e);
+    }
+  }
+
   const { data: pomodoros } = await supabase.from('pomodoro_logs').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false });
+
   const { data: diagnostics } = await supabase.from('diagnostic_results').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false });
 
   const latestDiagnostic = diagnostics && diagnostics.length > 0 ? diagnostics[0] : null;
@@ -130,10 +156,32 @@ export default async function DashboardPage() {
               <i className="fa-solid fa-robot text-brand-500"></i>
               <h4 className="font-bold font-title text-contrast text-sm">AI 学習ナビゲーター</h4>
             </div>
+            
             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl text-xs text-slate-600 dark:text-slate-300 leading-relaxed flex-1 overflow-y-auto">
               <p className="mb-2">{profile?.name || 'ゲスト'}さん、お疲れ様です。</p>
+              
+              {googleToken ? (
+                <div className="mb-3 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-lg">
+                  <p className="font-bold text-brand-700 dark:text-brand-400 mb-1 flex items-center gap-1"><i className="fa-regular fa-calendar-check"></i> 今日の予定からAIが推測した空き時間</p>
+                  {calendarEvents.length > 0 ? (
+                    <>
+                      <p className="mb-1">本日は {calendarEvents.length} 件の予定があります（例: {calendarEvents[0].summary}）。</p>
+                      <p>AI推測: <strong>16:00〜18:00</strong> の間にまとまった学習時間が取れそうです。まずは25分のポモドーロを開始しましょう。</p>
+                    </>
+                  ) : (
+                    <p>本日はGoogleカレンダーに予定が入っていません。1日を通して自分のペースで学習を進める絶好のチャンスです！</p>
+                  )}
+                </div>
+              ) : (
+                <div className="mb-3 p-2 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 text-[10px] flex items-start gap-2">
+                  <i className="fa-brands fa-google mt-0.5 text-slate-400"></i>
+                  <p>設定からGoogleカレンダーを連携すると、あなたの予定を考慮したパーソナライズされた学習計画をAIが提案します。</p>
+                </div>
+              )}
+
               {latestDiagnostic?.recommendation ? (
                 <p>{latestDiagnostic.recommendation}</p>
+
               ) : (
                 <p>まずはポモドーロタイマーを使って学習を記録するか、実力診断テストを受けてみましょう。データが集まるほど、精度の高いアドバイスが可能になります。</p>
               )}

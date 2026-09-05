@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { logPomodoro } from '../actions';
 import { cn } from '@/lib/utils';
 import { PartyPopper, Lock, Volume2 } from 'lucide-react';
@@ -127,6 +127,8 @@ function speakText(text: string) {
 
 export default function PomodoroTimer() {
   const [timeLeft, setTimeLeft] = useState(WORK_TIME);
+  const [targetEndTime, setTargetEndTime] = useState<number | null>(null);
+  const workerRef = React.useRef<Worker | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState<TimerMode>('WORK');
   const [subject, setSubject] = useState('数学');
@@ -148,27 +150,85 @@ export default function PomodoroTimer() {
       speakText("休憩が終わりました。次のポモドーロを開始しましょう。");
       setMode('WORK');
       setTimeLeft(WORK_TIME);
+    setTargetEndTime(null);
     }
   }, [soundType, mode]);
 
+  
+  // Setup Web Worker for accurate background timing (bypasses iOS Safari throttling)
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isRunning && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0 && isRunning) {
-      const timeoutId = setTimeout(() => {
-        setIsRunning(false);
-        handleTimerComplete();
-      }, 0);
+    if (typeof window !== 'undefined') {
+      const workerCode = `
+        let timer = null;
+        self.onmessage = function(e) {
+          if (e.data === 'start') {
+            if (timer) clearInterval(timer);
+            timer = setInterval(() => self.postMessage('tick'), 500);
+          } else if (e.data === 'stop') {
+            if (timer) clearInterval(timer);
+            timer = null;
+          }
+        };
+      `;
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      const workerUrl = URL.createObjectURL(blob);
+      workerRef.current = new Worker(workerUrl);
+      
+      // Request Notification permission for background alerts
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
       return () => {
-        clearInterval(interval);
-        clearTimeout(timeoutId);
+        workerRef.current?.terminate();
+        URL.revokeObjectURL(workerUrl);
       };
     }
-    return () => clearInterval(interval);
-  }, [isRunning, timeLeft, handleTimerComplete]);
+  }, []);
+
+  // Timer Tick Logic (Driven by Web Worker OR fallback interval)
+  useEffect(() => {
+    const tick = () => {
+      if (isRunning && targetEndTime) {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.round((targetEndTime - now) / 1000));
+        setTimeLeft(remaining);
+        
+        if (remaining <= 0) {
+          setIsRunning(false);
+          setTargetEndTime(null);
+          workerRef.current?.postMessage('stop');
+          handleTimerComplete();
+          
+          // Trigger background notification for iOS/Desktop
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification("ポモドーロ完了！", {
+              body: mode === 'WORK' ? "集中セッションが完了しました。休憩しましょう！" : "休憩が終了しました。学習を再開しましょう！",
+              icon: '/icon.png'
+            });
+          }
+        }
+      }
+    };
+
+    let fallbackInterval: NodeJS.Timeout;
+    if (isRunning && targetEndTime) {
+      if (workerRef.current) {
+        workerRef.current.onmessage = tick;
+        workerRef.current.postMessage('start');
+      } else {
+        fallbackInterval = setInterval(tick, 500);
+      }
+    } else {
+      workerRef.current?.postMessage('stop');
+    }
+
+    return () => {
+      if (fallbackInterval) clearInterval(fallbackInterval);
+      if (workerRef.current) workerRef.current.onmessage = null;
+    };
+  }, [isRunning, targetEndTime, mode, handleTimerComplete]);
+
 
   const handleRatingSubmit = async (rating: number) => {
     setShowRatingModal(false);
@@ -183,14 +243,18 @@ export default function PomodoroTimer() {
     setPomoCount(p => p + 1);
     setMode('BREAK');
     setTimeLeft(BREAK_TIME);
+    setTargetEndTime(null);
   };
 
   const toggleTimer = () => {
     if (!isRunning) {
       setIsRunning(true);
+      setTargetEndTime(Date.now() + timeLeft * 1000);
       playAmbientBgm(bgmType);
     } else {
       setIsRunning(false);
+      setTargetEndTime(null);
+      workerRef.current?.postMessage('stop');
       stopAmbientBgm();
     }
   };
