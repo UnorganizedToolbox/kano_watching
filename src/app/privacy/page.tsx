@@ -52,7 +52,6 @@ export default function PrivacyPage() {
 
         <p className="text-right text-sm text-slate-500 mt-12">制定日：2026年9月4日</p>
       </div>
-    </div>
       </div>
     </div>
   )
