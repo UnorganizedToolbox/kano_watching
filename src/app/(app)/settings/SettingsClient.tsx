@@ -408,10 +408,21 @@ function SettingsContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">デザインスキン</label>
-                  <select defaultValue="glass" className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none">
-                    <option value="glass">Glassmorphism (透過ガラス)</option>
-                    <option value="brutalist">Neo-Brutalism</option>
-                    <option value="lofi">Cozy Lo-Fi</option>
+                  <select 
+                    value={currentTheme}
+                    onChange={(e) => {
+                      const newTheme = e.target.value;
+                      // Replace existing theme class
+                      document.body.className = document.body.className.replace(/(theme-\w+|glass|brutalist|lofi)/g, '').trim() + ' ' + newTheme;
+                      
+                      setTheme(newTheme);
+                      setCurrentTheme(newTheme);
+                    }}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
+                  >
+                    <option value="theme-glass">Glassmorphism (透過ガラス)</option>
+                    <option value="theme-brutalist">Neo-Brutalism</option>
+                    <option value="theme-lofi">Cozy Lo-Fi</option>
                   </select>
                 </div>
 
