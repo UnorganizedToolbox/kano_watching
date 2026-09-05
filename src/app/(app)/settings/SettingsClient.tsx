@@ -180,11 +180,11 @@ function SettingsContent() {
                       <input type="checkbox" defaultChecked className="rounded text-brand-500 focus:ring-brand-500 bg-slate-100 border-slate-300 w-4 h-4" />
                       <span className="text-sm text-slate-600 dark:text-slate-300">プッシュ通知を有効にする</span>
                     </label>
-                    <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-xl max-w-lg">
-                      <p className="text-xs text-amber-700 dark:text-amber-500 font-bold flex items-center gap-2 mb-1">
+                    <div className="p-4 bg-amber-50 dark:bg-slate-900/70 border border-amber-200 dark:border-amber-700/50 rounded-xl max-w-lg">
+                      <p className="text-xs text-amber-700 dark:text-amber-400 font-bold flex items-center gap-2 mb-1">
                         <AlertTriangle className="w-4 h-4" /> 視覚効果の低減 (光過敏性症候群への配慮)
                       </p>
-                      <p className="text-[10px] text-amber-600/80 dark:text-amber-400/80 mb-2">光過敏性発作のリスクを減らすため、激しい点滅やレベルアップ時の強いエフェクトをオフにします。軽度の方でも設定を推奨します。</p>
+                      <p className="text-[10px] text-amber-600/80 dark:text-slate-300 mb-2">光過敏性発作のリスクを減らすため、激しい点滅やレベルアップ時の強いエフェクトをオフにします。軽度の方でも設定を推奨します。</p>
                       <label className="flex items-center gap-2">
                         <input type="checkbox" className="rounded text-amber-500 focus:ring-amber-500 bg-slate-100 border-slate-300 w-4 h-4" />
                         <span className="text-xs font-bold text-slate-600 dark:text-slate-300">エフェクトを低減する</span>
