@@ -14,10 +14,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  let theme = cookieStore.get('theme')?.value || 'theme-glass';
-  if (theme === 'glass') theme = 'theme-glass';
-  if (theme === 'brutalist') theme = 'theme-brutalist';
-  if (theme === 'lofi') theme = 'theme-lofi';
+    let theme = cookieStore.get('theme')?.value || 'theme-glass';
+  if (!theme.startsWith('theme-')) {
+    theme = 'theme-' + theme;
+  }
 
   return (
     <html lang="ja">

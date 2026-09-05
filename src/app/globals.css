@@ -192,3 +192,42 @@ body.theme-brutalist header, body.theme-brutalist aside, body.theme-brutalist .c
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
   }
 }
+
+/* Claymorphism Theme */
+body.theme-clay {
+  background-color: #f1f3f5 !important;
+  color: #495057 !important;
+}
+body.theme-clay header, body.theme-clay aside, body.theme-clay main section, body.theme-clay .card-glass {
+  background-color: #f8f9fa !important;
+  border: none !important;
+  border-radius: 24px !important;
+  color: #495057 !important;
+  box-shadow: 
+    8px 8px 16px #e5e5e5,
+    -8px -8px 16px #ffffff,
+    inset 2px 2px 4px rgba(255, 255, 255, 0.5),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+@media (prefers-color-scheme: dark) {
+  body.theme-clay {
+    background-color: #2b2b2b !important;
+    color: #e9ecef !important;
+  }
+  body.theme-clay header, body.theme-clay aside, body.theme-clay main section, body.theme-clay .card-glass {
+    background-color: #333333 !important;
+    border: none !important;
+    color: #e9ecef !important;
+    box-shadow: 
+      8px 8px 16px #222222,
+      -8px -8px 16px #444444,
+      inset 2px 2px 4px rgba(255, 255, 255, 0.05),
+      inset -2px -2px 4px rgba(0, 0, 0, 0.2) !important;
+  }
+}
+
+/* Default Slate Theme */
+/* Fallback to standard Tailwind classes. Just clear background-image if it exists. */
+body.theme-default {
+  background-image: none !important;
+}
