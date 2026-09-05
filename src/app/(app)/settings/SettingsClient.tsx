@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import ProceduralAvatar from '../components/ProceduralAvatar';
 import { createClient } from '@/utils/supabase/client';
 import { linkGoogleAccount } from './actions';
+import { setTheme } from '../../actions/theme';
 import { ACHIEVEMENTS_DICT } from "@/lib/gamification/achievements";
 import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle, Cloud } from 'lucide-react';
 
@@ -17,6 +18,11 @@ function SettingsContent() {
   
   const initialTab = (searchParams.get('tab') as Tab) || 'general';
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+  const [currentTheme, setCurrentTheme] = useState("theme-glass");
+  useEffect(() => {
+    const match = document.body.className.match(/theme-\w+/);
+    if (match) setCurrentTheme(match[0]);
+  }, []);
   const [showAdvancedAI, setShowAdvancedAI] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
     const supabase = createClient();

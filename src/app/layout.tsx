@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { cookies } from "next/headers";
 
 export const metadata: Metadata = {
   title: "LearnFlow",
   description: "Math Diagnostic & Learning Tool",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const theme = cookieStore.get('theme')?.value || 'theme-glass';
+
   return (
     <html lang="ja">
       <head>
@@ -19,7 +23,8 @@ export default function RootLayout({
       </head>
       <body className={cn(
         "bg-slate-50 text-slate-800 dark:bg-darkbg-primary dark:text-slate-100",
-        "transition-colors duration-200 min-h-screen flex flex-col font-sans overflow-hidden theme-glass"
+        "transition-colors duration-200 min-h-screen flex flex-col font-sans overflow-hidden",
+        theme
       )}>
         {children}
       </body>
