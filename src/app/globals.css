@@ -34,13 +34,13 @@ body {
 
 /* 1. Glassmorphism Theme (Default High Readability Glass) */
 body.theme-glass {
-  background-image: url('https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&q=80&w=1200');
+  background-image: url('https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&q=80&w=1200');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
   transition: background-image 0.5s ease-in-out;
 }
-body.theme-glass header, body.theme-glass aside, body.theme-glass main section, body.theme-glass .card-glass {
+body.theme-glass header, body.theme-glass aside, body.theme-glass .card-glass {
   background-color: rgba(255, 255, 255, 0.25) !important;
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
@@ -49,9 +49,9 @@ body.theme-glass header, body.theme-glass aside, body.theme-glass main section, 
   box-shadow: 0 10px 40px 0 rgba(31, 38, 135, 0.06) !important;
 }
 @media (prefers-color-scheme: dark) {
-  body.theme-glass header, body.theme-glass aside, body.theme-glass main section, body.theme-glass .card-glass {
-  background-color: rgba(0, 0, 0, 0.35) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  body.theme-glass header, body.theme-glass aside, body.theme-glass .card-glass {
+  background-color: rgba(0, 0, 0, 0.20) !important;
+  border: 1px solid rgba(255, 255, 255, 0.20) !important;
   color: #f8fafc !important;
 }
 }
@@ -94,7 +94,7 @@ body.theme-lofi {
   background-color: #f7f4eb !important;
   color: #4a3e29 !important;
 }
-body.theme-lofi header, body.theme-lofi aside, body.theme-lofi main section, body.theme-lofi .card-glass {
+body.theme-lofi header, body.theme-lofi aside, body.theme-lofi .card-glass {
   background-color: #ffffff !important;
   border: 1px solid #e1dbcd !important;
   color: #4a3e29 !important;
@@ -159,7 +159,7 @@ body.theme-brutalist {
   background-image: radial-gradient(#444cf7 1px, transparent 1px) !important;
   background-size: 20px 20px !important;
 }
-body.theme-brutalist header, body.theme-brutalist aside, body.theme-brutalist main section, body.theme-brutalist .card-glass {
+body.theme-brutalist header, body.theme-brutalist aside, body.theme-brutalist .card-glass {
   background-color: #ffffff !important;
   border: 3px solid #000000 !important;
   border-radius: 4px !important;
@@ -171,7 +171,7 @@ body.theme-brutalist header, body.theme-brutalist aside, body.theme-brutalist ma
     background-color: #1a1a2e !important;
     background-image: radial-gradient(#e94560 1px, transparent 1px) !important;
   }
-  body.theme-brutalist header, body.theme-brutalist aside, body.theme-brutalist main section, body.theme-brutalist .card-glass {
+  body.theme-brutalist header, body.theme-brutalist aside, body.theme-brutalist .card-glass {
     background-color: #16213e !important;
     border: 3px solid #e94560 !important;
     color: #ffffff !important;
@@ -185,7 +185,7 @@ body.theme-brutalist header, body.theme-brutalist aside, body.theme-brutalist ma
     background-color: #2c241b !important;
     color: #e6d3ba !important;
   }
-  body.theme-lofi header, body.theme-lofi aside, body.theme-lofi main section, body.theme-lofi .card-glass {
+  body.theme-lofi header, body.theme-lofi aside, body.theme-lofi .card-glass {
     background-color: #3b3228 !important;
     border: 1px solid #5a4f43 !important;
     color: #e6d3ba !important;
