@@ -12,63 +12,60 @@ const WORK_TIME = 25 * 60;
 const BREAK_TIME = 5 * 60;
 
 
-// Global AudioContext to bypass browser interaction policies
-let globalAudioCtx: AudioContext | null = null;
+// AudioContext をアラーム音・BGM で共有（1インスタンスのみ）
+// ユーザー操作時に unlock し、以降すべての音声処理に使用する
+let sharedAudioCtx: AudioContext | null = null;
+let bgmNode: AudioBufferSourceNode | null = null;
 
-function initAudioContext() {
-  if (!globalAudioCtx) {
-    globalAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+async function getAudioContext(): Promise<AudioContext> {
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   }
-  if (globalAudioCtx.state === 'suspended') {
-    globalAudioCtx.resume();
+  // suspended は iOS Safari の autoplay policy による。必ず await で resume する
+  if (sharedAudioCtx.state === 'suspended') {
+    await sharedAudioCtx.resume();
   }
+  return sharedAudioCtx;
 }
 
-function playBeepSound(type: SoundType) {
+async function playBeepSound(type: SoundType) {
   try {
-    initAudioContext();
-    if (!globalAudioCtx) return;
-    const audioCtx = globalAudioCtx;
+    const audioCtx = await getAudioContext();
 
-    
     const playNote = (frequency: number, startTime: number, duration: number, oscType: OscillatorType = 'sine') => {
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
-      
+
       oscillator.type = oscType;
       oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime + startTime);
-      
+
       gainNode.gain.setValueAtTime(0, audioCtx.currentTime + startTime);
       gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + startTime + 0.1);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + startTime + duration);
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-      
+
       oscillator.start(audioCtx.currentTime + startTime);
       oscillator.stop(audioCtx.currentTime + startTime + duration);
     };
 
     if (type === 'chime') {
-      playNote(523.25, 0, 1.5, 'sine');
+      playNote(523.25, 0,   1.5, 'sine');
       playNote(659.25, 0.4, 1.5, 'sine');
       playNote(783.99, 0.8, 1.5, 'sine');
       playNote(1046.50, 1.2, 2.0, 'sine');
     } else if (type === 'retro') {
-      playNote(440, 0, 0.2, 'square');
+      playNote(440, 0,   0.2, 'square');
       playNote(880, 0.2, 0.4, 'square');
     } else if (type === 'modern') {
-      playNote(800, 0, 0.5, 'triangle');
+      playNote(800, 0,   0.5, 'triangle');
       playNote(1200, 0.5, 1.0, 'triangle');
     }
   } catch (e) {
     console.error("Audio playback failed", e);
   }
 }
-
-
-let bgmCtx: AudioContext | null = null;
-let bgmNode: AudioBufferSourceNode | null = null;
 
 function stopAmbientBgm() {
   if (bgmNode) {
@@ -78,30 +75,27 @@ function stopAmbientBgm() {
   }
 }
 
-function playAmbientBgm(type: 'none' | 'white' | 'pink' | 'brown') {
+async function playAmbientBgm(type: 'none' | 'white' | 'pink' | 'brown') {
   stopAmbientBgm();
   if (type === 'none') return;
-  
+
   try {
-    if (!bgmCtx) {
-      bgmCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    if (bgmCtx.state === 'suspended') bgmCtx.resume();
-    
-    const bufferSize = bgmCtx.sampleRate * 2; // 2 seconds buffer
-    const buffer = bgmCtx.createBuffer(1, bufferSize, bgmCtx.sampleRate);
+    // アラーム音と同じ AudioContext を共有することで unlock 済みを保証
+    const audioCtx = await getAudioContext();
+
+    const bufferSize = audioCtx.sampleRate * 2; // 2秒バッファ
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
     const output = buffer.getChannelData(0);
-    
-    let b0=0, b1=0, b2=0, b3=0, b4=0, b5=0, b6=0;
+
+    let b0=0, b1=0, b2=0, b3=0, b4=0, b5=0;
     let lastOut = 0;
-    
+
     for (let i = 0; i < bufferSize; i++) {
       const white = Math.random() * 2 - 1;
-      
+
       if (type === 'white') {
         output[i] = white * 0.1;
-      } 
-      else if (type === 'pink') {
+      } else if (type === 'pink') {
         b0 = 0.99886 * b0 + white * 0.0555179;
         b1 = 0.99332 * b1 + white * 0.0750759;
         b2 = 0.96900 * b2 + white * 0.1538520;
@@ -109,18 +103,17 @@ function playAmbientBgm(type: 'none' | 'white' | 'pink' | 'brown') {
         b4 = 0.55000 * b4 + white * 0.5329522;
         b5 = -0.7616 * b5 - white * 0.0168980;
         output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + white * 0.5362) * 0.02;
-      }
-      else if (type === 'brown') {
-        let out = (lastOut + (0.02 * white)) / 1.02;
+      } else if (type === 'brown') {
+        const out = (lastOut + (0.02 * white)) / 1.02;
         lastOut = out;
         output[i] = out * 0.3;
       }
     }
-    
-    bgmNode = bgmCtx.createBufferSource();
+
+    bgmNode = audioCtx.createBufferSource();
     bgmNode.buffer = buffer;
     bgmNode.loop = true;
-    bgmNode.connect(bgmCtx.destination);
+    bgmNode.connect(audioCtx.destination);
     bgmNode.start();
   } catch (e) {
     console.error("BGM playback failed", e);
@@ -266,7 +259,7 @@ export default function PomodoroTimer() {
     if (!isRunning) {
       setIsRunning(true);
       setTargetEndTime(Date.now() + timeLeft * 1000);
-      initAudioContext(); // Unlock audio on user interaction
+      void getAudioContext(); // ユーザー操作のタイミングで AudioContext を unlock する
       playAmbientBgm(bgmType);
     } else {
       setIsRunning(false);
@@ -387,7 +380,7 @@ export default function PomodoroTimer() {
         </div>
         
         {isWork && !showTime && isRunning && (
-          <button 
+          <button
             onClick={() => { setShowTime(true); setTimeout(() => setShowTime(false), 3000); }}
             className="mb-8 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-4 py-2 rounded-full hover:bg-slate-200 transition-colors"
           >
@@ -397,7 +390,14 @@ export default function PomodoroTimer() {
         {isWork && showTime && isRunning && (
            <div className="mb-8 h-8"></div>
         )}
-        {(!isWork || !isRunning) && (
+        {!isWork && !isRunning && (
+          <div className="mb-8 h-8 flex items-center justify-center">
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 animate-pulse">
+              ↓ 「開始」を押して休憩をスタートしてください
+            </span>
+          </div>
+        )}
+        {((isWork && !isRunning) || (!isWork && isRunning)) && (
            <div className="mb-8 h-8"></div>
         )}
 
