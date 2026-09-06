@@ -1,7 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react';
-import { answerQuestion } from '../actions';
+import { useMemo, useState, useTransition } from 'react';
+import { answerQuestion, addAdminReply } from '../actions';
+
+type Reply = {
+  role: 'student' | 'admin';
+  text: string;
+  created_at: string;
+};
 
 type Question = {
   id: string;
@@ -10,6 +16,7 @@ type Question = {
   image_url: string | null;
   status: 'open' | 'answered' | 'resolved';
   answer_body: string | null;
+  replies: Reply[] | null;
   created_at: string;
   profiles: {
     name: string;
@@ -36,6 +43,22 @@ export default function AdminQAManager({ questions }: { questions: Question[] })
   const [tab, setTab] = useState<FilterTab>('open');
   const [query, setQuery] = useState('');
   const [answeringId, setAnsweringId] = useState<string | null>(null);
+  const [replyingId, setReplyingId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [isPending, startTransition] = useTransition();
+
+  const handleSendReply = (questionId: string) => {
+    if (!replyText.trim()) return;
+    startTransition(async () => {
+      try {
+        await addAdminReply(questionId, replyText);
+        setReplyText('');
+        setReplyingId(null);
+      } catch (e) {
+        alert(e instanceof Error ? e.message : '返信の送信に失敗しました');
+      }
+    });
+  };
 
   const counts = useMemo(() => ({
     all: questions.length,
@@ -119,6 +142,52 @@ export default function AdminQAManager({ questions }: { questions: Question[] })
                   <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400 block mb-1">回答内容:</span>
                   <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{q.answer_body}</p>
                 </div>
+              )}
+
+              {q.replies && q.replies.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                  {q.replies.map((r, i) => (
+                    <div key={i} className={`p-2 rounded-lg border text-xs ${
+                      r.role === 'admin'
+                        ? 'bg-brand-50 dark:bg-brand-900/10 border-brand-100 dark:border-brand-900/50 mr-4'
+                        : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 ml-4'
+                    }`}>
+                      <span className={`text-[10px] font-bold block mb-1 ${r.role === 'admin' ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500'}`}>
+                        {r.role === 'admin' ? 'あなた' : q.profiles?.name || '生徒'} ({new Date(r.created_at).toLocaleString()}):
+                      </span>
+                      <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300">{r.text}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {q.status !== 'resolved' && q.status !== 'open' && (
+                replyingId === q.id ? (
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex gap-2">
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="返信する..."
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendReply(q.id)}
+                      className="flex-1 px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                    <button
+                      onClick={() => handleSendReply(q.id)}
+                      disabled={isPending}
+                      className="px-3 py-1.5 bg-brand-600 text-white text-xs font-bold rounded-md hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      送信
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                    <button onClick={() => { setReplyingId(q.id); setReplyText(''); }} className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                      返信する
+                    </button>
+                  </div>
+                )
               )}
 
               {q.status === 'open' && (

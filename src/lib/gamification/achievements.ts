@@ -2,6 +2,13 @@ import { EXP_CONFIG } from "./config";
 
 export type AchievementCategory = 'GENERAL' | 'DAILY' | 'WEEKLY' | 'EVENT';
 
+export interface AchievementActiveWindow {
+  startMonth: number; // 1-12
+  startDay: number;
+  endMonth: number;
+  endDay: number;
+}
+
 export interface AchievementDef {
   id: string;
   category: AchievementCategory;
@@ -13,6 +20,16 @@ export interface AchievementDef {
   isHidden?: boolean;    // シークレット実績かどうか
   isInfinite?: boolean;  // 無限に達成可能かどうか（10, 20, 30...など）
   infiniteStep?: number; // 無限の場合のステップ幅
+  activeWindow?: AchievementActiveWindow; // EVENT実績: この期間外は未達成なら一覧に表示しない(年をまたがない範囲のみ対応)
+}
+
+export function isWithinActiveWindow(win: AchievementActiveWindow, date: Date = new Date()): boolean {
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const value = month * 100 + day;
+  const start = win.startMonth * 100 + win.startDay;
+  const end = win.endMonth * 100 + win.endDay;
+  return value >= start && value <= end;
 }
 
 export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
@@ -186,6 +203,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     expReward: EXP_CONFIG.ACHIEVEMENTS.DEFAULT_REWARD * 10,
     maxProgress: 80,
     unit: '時間',
+    activeWindow: { startMonth: 7, startDay: 27, endMonth: 8, endDay: 23 },
   },
   EVENT_SANTA_WAITING: {
     id: 'EVENT_SANTA_WAITING',
@@ -196,6 +214,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     maxProgress: 1,
     unit: '回',
     isHidden: true,
+    activeWindow: { startMonth: 12, startDay: 24, endMonth: 12, endDay: 24 },
   },
   EVENT_NEW_YEAR_GHOST: {
     id: 'EVENT_NEW_YEAR_GHOST',
@@ -206,6 +225,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     maxProgress: 1,
     unit: '回',
     isHidden: true,
+    activeWindow: { startMonth: 1, startDay: 1, endMonth: 1, endDay: 1 },
   },
   EVENT_VALENTINE_EXAM: {
     id: 'EVENT_VALENTINE_EXAM',
@@ -216,6 +236,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     maxProgress: 1,
     unit: '回',
     isHidden: true,
+    activeWindow: { startMonth: 2, startDay: 14, endMonth: 2, endDay: 14 },
   },
   EVENT_WHITE_DAY_RETURN: {
     id: 'EVENT_WHITE_DAY_RETURN',
@@ -226,6 +247,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     maxProgress: 1,
     unit: '回',
     isHidden: true,
+    activeWindow: { startMonth: 3, startDay: 14, endMonth: 3, endDay: 14 },
   },
   EVENT_HALLOWEEN_STUDY: {
     id: 'EVENT_HALLOWEEN_STUDY',
@@ -236,6 +258,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     maxProgress: 1,
     unit: '回',
     isHidden: true,
+    activeWindow: { startMonth: 10, startDay: 31, endMonth: 10, endDay: 31 },
   },
 
   // === 隠し実績 (EVENT) ===
@@ -248,6 +271,7 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     maxProgress: 1,
     unit: '回',
     isHidden: true,
+    activeWindow: { startMonth: 2, startDay: 29, endMonth: 2, endDay: 29 },
   },
   EVENT_APRIL_FOOL: {
     id: 'EVENT_APRIL_FOOL',
@@ -258,5 +282,6 @@ export const ACHIEVEMENTS_DICT: Record<string, AchievementDef> = {
     maxProgress: 1,
     unit: '回',
     isHidden: true,
+    activeWindow: { startMonth: 4, startDay: 1, endMonth: 4, endDay: 1 },
   }
 };

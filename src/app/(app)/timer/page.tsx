@@ -74,9 +74,7 @@ export default async function TimerPage() {
                   <input type="file" name="image" accept="image/*" className="text-xs text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300 w-full" />
                 </div>
                 
-                <button type="submit" className="w-full py-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2">
-                  <i className="fa-solid fa-paper-plane"></i> 質問を送信する
-                </button>
+                <SubmitQuestionButton />
               </form>
               )}
             </div>

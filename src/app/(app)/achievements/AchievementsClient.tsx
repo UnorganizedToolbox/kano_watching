@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react';
-import { ACHIEVEMENTS_DICT } from '@/lib/gamification/achievements';
+import { ACHIEVEMENTS_DICT, isWithinActiveWindow } from '@/lib/gamification/achievements';
 import { Trophy, Star, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,12 @@ export default function AchievementsClient({ profile, unlockedIds }: Props) {
   // Filter and enrich achievements
   const sortedAchievements = Object.values(ACHIEVEMENTS_DICT)
     .filter(a => a.category === activeTab)
+    .filter(a => {
+      const isCompleted = unlockedIds.includes(a.id);
+      if (isCompleted || !a.activeWindow) return true;
+      // 未達成のイベント実績は、期間外は一覧から隠す
+      return isWithinActiveWindow(a.activeWindow);
+    })
     .map(achieve => {
       const isCompleted = unlockedIds.includes(achieve.id);
       

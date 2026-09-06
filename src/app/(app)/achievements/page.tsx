@@ -18,6 +18,10 @@ export default async function AchievementsPage() {
     .eq('id', user.id)
     .single();
 
+  if (profile?.role === 'admin' || profile?.role === 'teacher') {
+    redirect('/admin');
+  }
+
   const { data: achievements } = await supabase
     .from('student_achievements')
     .select('achievement_id')

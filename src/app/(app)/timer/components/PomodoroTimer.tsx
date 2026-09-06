@@ -288,50 +288,49 @@ export default function PomodoroTimer() {
           ? "bg-white dark:bg-darkbg-secondary border-slate-200 dark:border-slate-800" 
           : "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50"
       )}>
-        <div className="absolute top-6 left-6 flex items-center gap-2 z-20">
+        <div className="w-full flex flex-wrap items-center justify-between gap-3 mb-6 z-20">
           <span className={cn(
-            "px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all",
+            "px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all shrink-0",
             isWork ? "bg-brand-500 text-white" : "bg-emerald-500 text-white"
           )}>
             現在のモード: {isWork ? '集中 (25分)' : '休憩 (5分)'}
           </span>
-        </div>
-        
-        <div className="absolute top-6 right-6 z-20 flex gap-3">
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-            <Volume2 className="w-3 h-3 text-slate-500" />
-            <select 
-              value={soundType}
-              onChange={(e) => setSoundType(e.target.value as SoundType)}
-              className="text-xs bg-transparent border-none text-slate-500 font-bold outline-none cursor-pointer"
-              title="通知音の設定"
-            >
-              <option value="chime">チャイム音</option>
-              <option value="retro">レトロ音</option>
-              <option value="modern">モダン音</option>
-            </select>
+
+          <div className="flex flex-wrap justify-end items-center gap-2">
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+              <Volume2 className="w-3 h-3 text-slate-500" />
+              <select
+                value={soundType}
+                onChange={(e) => setSoundType(e.target.value as SoundType)}
+                className="text-xs bg-transparent border-none text-slate-500 font-bold outline-none cursor-pointer"
+                title="通知音の設定"
+              >
+                <option value="chime">チャイム音</option>
+                <option value="retro">レトロ音</option>
+                <option value="modern">モダン音</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+              <i className="fa-solid fa-headphones text-slate-500 w-3 h-3 text-xs"></i>
+              <select
+                value={bgmType}
+                onChange={(e) => {
+                  const val = e.target.value as 'none'|'white'|'pink'|'brown';
+                  setBgmType(val);
+                  if (isRunning) playAmbientBgm(val);
+                }}
+                className="text-xs bg-transparent border-none text-slate-500 font-bold outline-none cursor-pointer"
+                title="環境音の設定"
+              >
+                <option value="none">BGMなし</option>
+                <option value="pink">ピンクノイズ（雨音風）</option>
+                <option value="brown">ブラウンノイズ（低音）</option>
+                <option value="white">ホワイトノイズ</option>
+              </select>
+            </div>
+            <span className="text-xs font-bold text-slate-400 py-1 shrink-0">今日: {pomoCount} 回</span>
           </div>
-          
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-            <i className="fa-solid fa-headphones text-slate-500 w-3 h-3 text-xs"></i>
-            <select 
-              value={bgmType}
-              onChange={(e) => {
-                const val = e.target.value as 'none'|'white'|'pink'|'brown';
-                setBgmType(val);
-                if (isRunning) playAmbientBgm(val);
-              }}
-              className="text-xs bg-transparent border-none text-slate-500 font-bold outline-none cursor-pointer"
-              title="環境音の設定"
-            >
-              <option value="none">BGMなし</option>
-              <option value="pink">ピンクノイズ（雨音風）</option>
-              <option value="brown">ブラウンノイズ（低音）</option>
-              <option value="white">ホワイトノイズ</option>
-            </select>
-          </div>
-          <span className="text-xs font-bold text-slate-400 py-1">今日: {pomoCount} 回</span>
-  
         </div>
 
         {isWork && (
@@ -373,7 +372,7 @@ export default function PomodoroTimer() {
           
           <span className={cn(
             "text-sm font-bold mt-2 z-10",
-            isWork ? "text-slate-400" : "text-emerald-600/70 dark:text-emerald-400/70"
+            isWork ? "text-slate-600 dark:text-slate-300" : "text-emerald-700 dark:text-emerald-300"
           )}>
             {isWork ? '集中モード' : 'リラックス'}
           </span>

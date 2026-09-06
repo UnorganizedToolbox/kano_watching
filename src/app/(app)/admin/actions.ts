@@ -45,6 +45,43 @@ export async function setStudentNickname(studentId: string, name: string, locked
   revalidatePath(`/admin/student/${studentId}`);
 }
 
+export async function addAdminReply(questionId: string, text: string) {
+  const supabase = await verifyAdmin();
+
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('返信内容を入力してください');
+
+  const { data: question, error: fetchError } = await supabase
+    .from('questions')
+    .select('replies')
+    .eq('id', questionId)
+    .single();
+
+  if (fetchError || !question) {
+    console.error('Failed to fetch question for reply', fetchError);
+    throw new Error('質問が見つかりませんでした');
+  }
+
+  const updatedReplies = [...(question.replies || []), {
+    role: 'admin',
+    text: trimmed,
+    created_at: new Date().toISOString(),
+  }];
+
+  const { error } = await supabase.from('questions').update({
+    replies: updatedReplies,
+    status: 'answered',
+  }).eq('id', questionId);
+
+  if (error) {
+    console.error('Failed to add admin reply', error);
+    throw new Error('返信の送信に失敗しました');
+  }
+
+  revalidatePath('/admin');
+  revalidatePath('/timer');
+}
+
 export async function answerQuestion(formData: FormData) {
   const question_id = formData.get('question_id') as string;
   const answer_body = formData.get('answer_body') as string;
