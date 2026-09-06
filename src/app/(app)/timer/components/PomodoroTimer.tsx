@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { logPomodoro, logPomodoroEvent } from '../actions';
 import { cn } from '@/lib/utils';
-import { PartyPopper, Lock, Volume2 } from 'lucide-react';
+import { PartyPopper, Lock } from 'lucide-react';
+import { getSoundPref, getBgmPref, renderAlarmBlobUrl, renderNoiseBlobUrl, type SoundType, type BgmType, type NoiseType } from '@/lib/pomodoroAudio';
 
 type TimerMode = 'WORK' | 'BREAK' | 'LONG_BREAK';
-type SoundType = 'chime' | 'retro' | 'modern';
 
 const WORK_TIME = 25 * 60;
 const BREAK_TIME = 5 * 60;
@@ -55,155 +55,6 @@ function clearPersistedState() {
 }
 
 
-// --- 音声生成: <audio> 要素 + 事前レンダリングした WAV で再生する ---
-//
-// これまでは AudioContext のオシレーターをライブ再生していたが、タブが非アクティブに
-// なると AudioContext ごとブラウザに止められてしまい、バックグラウンドでは一切鳴らない
-// (ロイロノート等の他アプリ作業中にアラームに気づけない、という報告の原因)。
-//
-// 実体のある <audio> 要素はブラウザから「再生中メディア」として扱われ、Web Audio API の
-// ライブ再生よりもバックグラウンドで継続されやすい。そこで、既存の音色合成ロジックは
-// そのまま活かしつつ OfflineAudioContext で事前に WAV としてレンダリングし、
-// <audio> 要素で再生する方式に変更する。
-//
-// 過去に一度この方式を試みて頓挫した際の既知の失敗パターンを踏まえた対策:
-// 1. BGMが「なし」だと背景維持の仕組みが無く鳴らなかった
-//    → BGMなしの場合もごく微小な音量のノイズループを裏で鳴らし続け、
-//      「メディア再生中」の状態を常に維持する。
-// 2. ノイズ→アラームへの切り替え時に再生権限を再取得できず音だけ止まった
-//    → タイマー開始時(ユーザー操作の直後)に、BGM要素だけでなくアラーム要素も
-//      一度 play() → 即座に pause() して「解錠」しておく。これにより、後で
-//      バックグラウンドから改めて play() を呼んでも新規の許可が要らない。
-
-function encodeWavBlob(buffer: AudioBuffer): Blob {
-  const numChannels = buffer.numberOfChannels;
-  const sampleRate = buffer.sampleRate;
-  const numFrames = buffer.length;
-  const blockAlign = numChannels * 2;
-  const dataSize = numFrames * blockAlign;
-  const arrayBuffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(arrayBuffer);
-
-  const writeString = (offset: number, s: string) => {
-    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
-  };
-
-  writeString(0, 'RIFF');
-  view.setUint32(4, 36 + dataSize, true);
-  writeString(8, 'WAVE');
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * blockAlign, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, 16, true);
-  writeString(36, 'data');
-  view.setUint32(40, dataSize, true);
-
-  const channelData: Float32Array[] = [];
-  for (let ch = 0; ch < numChannels; ch++) channelData.push(buffer.getChannelData(ch));
-
-  let offset = 44;
-  for (let i = 0; i < numFrames; i++) {
-    for (let ch = 0; ch < numChannels; ch++) {
-      const clamped = Math.max(-1, Math.min(1, channelData[ch][i]));
-      view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
-      offset += 2;
-    }
-  }
-
-  return new Blob([arrayBuffer], { type: 'audio/wav' });
-}
-
-function getOfflineAudioContextClass(): typeof OfflineAudioContext {
-  return window.OfflineAudioContext || (window as any).webkitOfflineAudioContext;
-}
-
-async function renderAlarmBlobUrl(type: SoundType): Promise<string> {
-  const sampleRate = 44100;
-  const duration = 3.5; // 全音色のうち最長(chime)を余裕を持ってカバー
-  const OfflineCtx = getOfflineAudioContextClass();
-  const offlineCtx = new OfflineCtx(1, Math.ceil(sampleRate * duration), sampleRate);
-
-  const playNote = (frequency: number, startTime: number, dur: number, oscType: OscillatorType = 'sine') => {
-    const oscillator = offlineCtx.createOscillator();
-    const gainNode = offlineCtx.createGain();
-    oscillator.type = oscType;
-    oscillator.frequency.setValueAtTime(frequency, startTime);
-    gainNode.gain.setValueAtTime(0, startTime);
-    gainNode.gain.linearRampToValueAtTime(0.5, startTime + 0.1);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + dur);
-    oscillator.connect(gainNode);
-    gainNode.connect(offlineCtx.destination);
-    oscillator.start(startTime);
-    oscillator.stop(startTime + dur);
-  };
-
-  if (type === 'chime') {
-    playNote(523.25, 0,   1.5, 'sine');
-    playNote(659.25, 0.4, 1.5, 'sine');
-    playNote(783.99, 0.8, 1.5, 'sine');
-    playNote(1046.50, 1.2, 2.0, 'sine');
-  } else if (type === 'retro') {
-    playNote(440, 0,   0.2, 'square');
-    playNote(880, 0.2, 0.4, 'square');
-  } else if (type === 'modern') {
-    playNote(800, 0,   0.5, 'triangle');
-    playNote(1200, 0.5, 1.0, 'triangle');
-  }
-
-  const rendered = await offlineCtx.startRendering();
-  return URL.createObjectURL(encodeWavBlob(rendered));
-}
-
-type NoiseType = 'white' | 'pink' | 'brown' | 'silent';
-
-async function renderNoiseBlobUrl(type: NoiseType): Promise<string> {
-  const sampleRate = 44100;
-  const duration = 2;
-  const OfflineCtx = getOfflineAudioContextClass();
-  const offlineCtx = new OfflineCtx(1, sampleRate * duration, sampleRate);
-  const buffer = offlineCtx.createBuffer(1, sampleRate * duration, sampleRate);
-  const output = buffer.getChannelData(0);
-
-  if (type === 'silent') {
-    // BGM「なし」でもバックグラウンド再生資格を維持するための、ほぼ聞こえない音量のループ
-    for (let i = 0; i < output.length; i++) {
-      output[i] = (Math.random() * 2 - 1) * 0.0008;
-    }
-  } else {
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
-    let lastOut = 0;
-    for (let i = 0; i < output.length; i++) {
-      const white = Math.random() * 2 - 1;
-      if (type === 'white') {
-        output[i] = white * 0.1;
-      } else if (type === 'pink') {
-        b0 = 0.99886 * b0 + white * 0.0555179;
-        b1 = 0.99332 * b1 + white * 0.0750759;
-        b2 = 0.96900 * b2 + white * 0.1538520;
-        b3 = 0.86650 * b3 + white * 0.3104856;
-        b4 = 0.55000 * b4 + white * 0.5329522;
-        b5 = -0.7616 * b5 - white * 0.0168980;
-        output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + white * 0.5362) * 0.02;
-      } else if (type === 'brown') {
-        const out = (lastOut + (0.02 * white)) / 1.02;
-        lastOut = out;
-        output[i] = out * 0.3;
-      }
-    }
-  }
-
-  const src = offlineCtx.createBufferSource();
-  src.buffer = buffer;
-  src.connect(offlineCtx.destination);
-  src.start();
-  const rendered = await offlineCtx.startRendering();
-  return URL.createObjectURL(encodeWavBlob(rendered));
-}
-
 function speakText(text: string) {
   try {
     if ('speechSynthesis' in window) {
@@ -228,8 +79,10 @@ export default function PomodoroTimer() {
   const [levelUpData, setLevelUpData] = useState<{oldLevel: number, newLevel: number, rewardStones: number} | null>(null);
   const [pomoCount, setPomoCount] = useState(0);
   const [showTime, setShowTime] = useState(false);
-  const [soundType, setSoundType] = useState<SoundType>('chime');
-  const [bgmType, setBgmType] = useState<'none'|'white'|'pink'|'brown'>('none');
+  // アラーム音・BGMの種類は設定画面で選ぶ。タイマー実行中に切り替えると
+  // バックグラウンド再生の「解錠」がやり直しになり不安定になるため、ここでは変更不可。
+  const [soundType] = useState<SoundType>(() => getSoundPref());
+  const [bgmType] = useState<BgmType>(() => getBgmPref());
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [awaitingDecision, setAwaitingDecision] = useState(false);
@@ -536,64 +389,7 @@ export default function PomodoroTimer() {
             現在のモード: {modeLabel}
           </span>
 
-          <div className="flex flex-wrap justify-end items-center gap-2">
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-              <Volume2 className="w-3 h-3 text-slate-500" />
-              <select
-                value={soundType}
-                onChange={(e) => {
-                  const val = e.target.value as SoundType;
-                  setSoundType(val);
-                  if (isRunning) {
-                    // 実行中に音色を変更した場合、新しい音色でも同じユーザー操作内で
-                    // 再解錠しておく(バックグラウンド再生を維持するため)
-                    getAlarmUrl(val).then((url) => {
-                      const alarmEl = alarmAudioElRef.current;
-                      if (!alarmEl) return;
-                      alarmEl.src = url;
-                      alarmEl.play().then(() => { alarmEl.pause(); alarmEl.currentTime = 0; }).catch(() => {});
-                    });
-                  }
-                }}
-                className="text-xs bg-transparent border-none text-slate-500 font-bold outline-none cursor-pointer"
-                title="通知音の設定"
-              >
-                <option value="chime">チャイム音</option>
-                <option value="retro">レトロ音</option>
-                <option value="modern">モダン音</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-              <i className="fa-solid fa-headphones text-slate-500 w-3 h-3 text-xs"></i>
-              <select
-                value={bgmType}
-                onChange={(e) => {
-                  const val = e.target.value as 'none'|'white'|'pink'|'brown';
-                  setBgmType(val);
-                  if (isRunning) {
-                    const noiseType: NoiseType = val === 'none' ? 'silent' : val;
-                    getNoiseUrl(noiseType).then((url) => {
-                      const bgmEl = bgmAudioElRef.current;
-                      if (!bgmEl) return;
-                      bgmEl.src = url;
-                      bgmEl.loop = true;
-                      bgmEl.volume = val === 'none' ? 0.02 : 0.5;
-                      void bgmEl.play();
-                    });
-                  }
-                }}
-                className="text-xs bg-transparent border-none text-slate-500 font-bold outline-none cursor-pointer"
-                title="環境音の設定"
-              >
-                <option value="none">BGMなし</option>
-                <option value="pink">ピンクノイズ（雨音風）</option>
-                <option value="brown">ブラウンノイズ（低音）</option>
-                <option value="white">ホワイトノイズ</option>
-              </select>
-            </div>
-            <span className="text-xs font-bold text-slate-400 py-1 shrink-0">今日: {pomoCount} 回</span>
-          </div>
+          <span className="text-xs font-bold text-slate-400 py-1 shrink-0">今日: {pomoCount} 回</span>
         </div>
 
         {isWork && (

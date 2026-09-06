@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client';
 import { linkGoogleAccount } from './actions';
 import { setTheme } from '../../actions/theme';
 import { ACHIEVEMENTS_DICT } from "@/lib/gamification/achievements";
+import PomodoroSoundSettings from './PomodoroSoundSettings';
 import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle, Cloud } from 'lucide-react';
 
 type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai' | 'sync';
@@ -175,6 +176,11 @@ function SettingsContent() {
                   <input type="range" min="0" max="100" defaultValue="50" className="w-full max-w-sm accent-brand-500" />
                 </div>
                 
+                <div>
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">ポモドーロの音</label>
+                  <PomodoroSoundSettings />
+                </div>
+
                 <div>
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">通知設定</label>
                   <div className="space-y-3">
