@@ -55,90 +55,129 @@ function clearPersistedState() {
 }
 
 
-// AudioContext をアラーム音・BGM で共有（1インスタンスのみ）
-// ユーザー操作時に unlock し、以降すべての音声処理に使用する
-let sharedAudioCtx: AudioContext | null = null;
-let bgmNode: AudioBufferSourceNode | null = null;
+// --- 音声生成: <audio> 要素 + 事前レンダリングした WAV で再生する ---
+//
+// これまでは AudioContext のオシレーターをライブ再生していたが、タブが非アクティブに
+// なると AudioContext ごとブラウザに止められてしまい、バックグラウンドでは一切鳴らない
+// (ロイロノート等の他アプリ作業中にアラームに気づけない、という報告の原因)。
+//
+// 実体のある <audio> 要素はブラウザから「再生中メディア」として扱われ、Web Audio API の
+// ライブ再生よりもバックグラウンドで継続されやすい。そこで、既存の音色合成ロジックは
+// そのまま活かしつつ OfflineAudioContext で事前に WAV としてレンダリングし、
+// <audio> 要素で再生する方式に変更する。
+//
+// 過去に一度この方式を試みて頓挫した際の既知の失敗パターンを踏まえた対策:
+// 1. BGMが「なし」だと背景維持の仕組みが無く鳴らなかった
+//    → BGMなしの場合もごく微小な音量のノイズループを裏で鳴らし続け、
+//      「メディア再生中」の状態を常に維持する。
+// 2. ノイズ→アラームへの切り替え時に再生権限を再取得できず音だけ止まった
+//    → タイマー開始時(ユーザー操作の直後)に、BGM要素だけでなくアラーム要素も
+//      一度 play() → 即座に pause() して「解錠」しておく。これにより、後で
+//      バックグラウンドから改めて play() を呼んでも新規の許可が要らない。
 
-async function getAudioContext(): Promise<AudioContext> {
-  // タブが非アクティブ/バックグラウンドになると 'suspended' ではなく 'closed' に
-  // 遷移することがある。closed になった AudioContext は二度と resume できないため、
-  // 新しく作り直す必要がある(これを見落とすと復帰後ずっと音が鳴らなくなる)。
-  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-    sharedAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  }
-  // suspended は iOS Safari の autoplay policy による。必ず await で resume する
-  if (sharedAudioCtx.state === 'suspended') {
-    await sharedAudioCtx.resume();
-  }
-  return sharedAudioCtx;
-}
+function encodeWavBlob(buffer: AudioBuffer): Blob {
+  const numChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const numFrames = buffer.length;
+  const blockAlign = numChannels * 2;
+  const dataSize = numFrames * blockAlign;
+  const arrayBuffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(arrayBuffer);
 
-async function playBeepSound(type: SoundType) {
-  try {
-    const audioCtx = await getAudioContext();
+  const writeString = (offset: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+  };
 
-    const playNote = (frequency: number, startTime: number, duration: number, oscType: OscillatorType = 'sine') => {
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
 
-      oscillator.type = oscType;
-      oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime + startTime);
+  const channelData: Float32Array[] = [];
+  for (let ch = 0; ch < numChannels; ch++) channelData.push(buffer.getChannelData(ch));
 
-      gainNode.gain.setValueAtTime(0, audioCtx.currentTime + startTime);
-      gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + startTime + 0.1);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + startTime + duration);
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-
-      oscillator.start(audioCtx.currentTime + startTime);
-      oscillator.stop(audioCtx.currentTime + startTime + duration);
-    };
-
-    if (type === 'chime') {
-      playNote(523.25, 0,   1.5, 'sine');
-      playNote(659.25, 0.4, 1.5, 'sine');
-      playNote(783.99, 0.8, 1.5, 'sine');
-      playNote(1046.50, 1.2, 2.0, 'sine');
-    } else if (type === 'retro') {
-      playNote(440, 0,   0.2, 'square');
-      playNote(880, 0.2, 0.4, 'square');
-    } else if (type === 'modern') {
-      playNote(800, 0,   0.5, 'triangle');
-      playNote(1200, 0.5, 1.0, 'triangle');
+  let offset = 44;
+  for (let i = 0; i < numFrames; i++) {
+    for (let ch = 0; ch < numChannels; ch++) {
+      const clamped = Math.max(-1, Math.min(1, channelData[ch][i]));
+      view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+      offset += 2;
     }
-  } catch (e) {
-    console.error("Audio playback failed", e);
   }
+
+  return new Blob([arrayBuffer], { type: 'audio/wav' });
 }
 
-function stopAmbientBgm() {
-  if (bgmNode) {
-    try { bgmNode.stop(); } catch (e) { /* ignore */ }
-    try { bgmNode.disconnect(); } catch (e) { /* AudioContext が既に closed の場合がある */ }
-    bgmNode = null;
-  }
+function getOfflineAudioContextClass(): typeof OfflineAudioContext {
+  return window.OfflineAudioContext || (window as any).webkitOfflineAudioContext;
 }
 
-async function playAmbientBgm(type: 'none' | 'white' | 'pink' | 'brown') {
-  stopAmbientBgm();
-  if (type === 'none') return;
+async function renderAlarmBlobUrl(type: SoundType): Promise<string> {
+  const sampleRate = 44100;
+  const duration = 3.5; // 全音色のうち最長(chime)を余裕を持ってカバー
+  const OfflineCtx = getOfflineAudioContextClass();
+  const offlineCtx = new OfflineCtx(1, Math.ceil(sampleRate * duration), sampleRate);
 
-  try {
-    // アラーム音と同じ AudioContext を共有することで unlock 済みを保証
-    const audioCtx = await getAudioContext();
+  const playNote = (frequency: number, startTime: number, dur: number, oscType: OscillatorType = 'sine') => {
+    const oscillator = offlineCtx.createOscillator();
+    const gainNode = offlineCtx.createGain();
+    oscillator.type = oscType;
+    oscillator.frequency.setValueAtTime(frequency, startTime);
+    gainNode.gain.setValueAtTime(0, startTime);
+    gainNode.gain.linearRampToValueAtTime(0.5, startTime + 0.1);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + dur);
+    oscillator.connect(gainNode);
+    gainNode.connect(offlineCtx.destination);
+    oscillator.start(startTime);
+    oscillator.stop(startTime + dur);
+  };
 
-    const bufferSize = audioCtx.sampleRate * 2; // 2秒バッファ
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const output = buffer.getChannelData(0);
+  if (type === 'chime') {
+    playNote(523.25, 0,   1.5, 'sine');
+    playNote(659.25, 0.4, 1.5, 'sine');
+    playNote(783.99, 0.8, 1.5, 'sine');
+    playNote(1046.50, 1.2, 2.0, 'sine');
+  } else if (type === 'retro') {
+    playNote(440, 0,   0.2, 'square');
+    playNote(880, 0.2, 0.4, 'square');
+  } else if (type === 'modern') {
+    playNote(800, 0,   0.5, 'triangle');
+    playNote(1200, 0.5, 1.0, 'triangle');
+  }
 
-    let b0=0, b1=0, b2=0, b3=0, b4=0, b5=0;
+  const rendered = await offlineCtx.startRendering();
+  return URL.createObjectURL(encodeWavBlob(rendered));
+}
+
+type NoiseType = 'white' | 'pink' | 'brown' | 'silent';
+
+async function renderNoiseBlobUrl(type: NoiseType): Promise<string> {
+  const sampleRate = 44100;
+  const duration = 2;
+  const OfflineCtx = getOfflineAudioContextClass();
+  const offlineCtx = new OfflineCtx(1, sampleRate * duration, sampleRate);
+  const buffer = offlineCtx.createBuffer(1, sampleRate * duration, sampleRate);
+  const output = buffer.getChannelData(0);
+
+  if (type === 'silent') {
+    // BGM「なし」でもバックグラウンド再生資格を維持するための、ほぼ聞こえない音量のループ
+    for (let i = 0; i < output.length; i++) {
+      output[i] = (Math.random() * 2 - 1) * 0.0008;
+    }
+  } else {
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
     let lastOut = 0;
-
-    for (let i = 0; i < bufferSize; i++) {
+    for (let i = 0; i < output.length; i++) {
       const white = Math.random() * 2 - 1;
-
       if (type === 'white') {
         output[i] = white * 0.1;
       } else if (type === 'pink') {
@@ -155,15 +194,14 @@ async function playAmbientBgm(type: 'none' | 'white' | 'pink' | 'brown') {
         output[i] = out * 0.3;
       }
     }
-
-    bgmNode = audioCtx.createBufferSource();
-    bgmNode.buffer = buffer;
-    bgmNode.loop = true;
-    bgmNode.connect(audioCtx.destination);
-    bgmNode.start();
-  } catch (e) {
-    console.error("BGM playback failed", e);
   }
+
+  const src = offlineCtx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(offlineCtx.destination);
+  src.start();
+  const rendered = await offlineCtx.startRendering();
+  return URL.createObjectURL(encodeWavBlob(rendered));
 }
 
 function speakText(text: string) {
@@ -197,9 +235,91 @@ export default function PomodoroTimer() {
   const [awaitingDecision, setAwaitingDecision] = useState(false);
   const hasHydratedRef = useRef(false);
 
+  const bgmAudioElRef = useRef<HTMLAudioElement | null>(null);
+  const alarmAudioElRef = useRef<HTMLAudioElement | null>(null);
+  const alarmUrlCacheRef = useRef<Partial<Record<SoundType, string>>>({});
+  const noiseUrlCacheRef = useRef<Partial<Record<NoiseType, string>>>({});
+
+  const getAlarmUrl = useCallback(async (type: SoundType) => {
+    if (!alarmUrlCacheRef.current[type]) {
+      alarmUrlCacheRef.current[type] = await renderAlarmBlobUrl(type);
+    }
+    return alarmUrlCacheRef.current[type]!;
+  }, []);
+
+  const getNoiseUrl = useCallback(async (type: NoiseType) => {
+    if (!noiseUrlCacheRef.current[type]) {
+      noiseUrlCacheRef.current[type] = await renderNoiseBlobUrl(type);
+    }
+    return noiseUrlCacheRef.current[type]!;
+  }, []);
+
+  // 選択中の音色・BGMをあらかじめ裏でレンダリング/キャッシュしておく。
+  // これにより「開始」を押した瞬間には既に生成済みで、ユーザー操作から
+  // 間を置かずに play() を呼べる(ブラウザの自動再生ポリシー対策)。
+  useEffect(() => { void getAlarmUrl(soundType); }, [soundType, getAlarmUrl]);
+  useEffect(() => { void getNoiseUrl(bgmType === 'none' ? 'silent' : bgmType); }, [bgmType, getNoiseUrl]);
+
+  useEffect(() => {
+    const alarmCache = alarmUrlCacheRef.current;
+    const noiseCache = noiseUrlCacheRef.current;
+    return () => {
+      Object.values(alarmCache).forEach(url => url && URL.revokeObjectURL(url));
+      Object.values(noiseCache).forEach(url => url && URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  // タイマー開始(ユーザー操作)のタイミングで、BGM要素とアラーム要素の両方を
+  // 一度再生→アラームは即座に一時停止して「解錠」しておく。BGMが「なし」でも
+  // ごく微小な音量のループを鳴らし続け、バックグラウンドでの再生資格を維持する。
+  const startAudioForSession = useCallback(async () => {
+    const noiseType: NoiseType = bgmType === 'none' ? 'silent' : bgmType;
+    const [noiseUrl, alarmUrl] = await Promise.all([getNoiseUrl(noiseType), getAlarmUrl(soundType)]);
+
+    const bgmEl = bgmAudioElRef.current;
+    if (bgmEl) {
+      bgmEl.src = noiseUrl;
+      bgmEl.loop = true;
+      bgmEl.volume = bgmType === 'none' ? 0.02 : 0.5;
+      try { await bgmEl.play(); } catch (e) { console.error('BGM playback failed', e); }
+    }
+
+    const alarmEl = alarmAudioElRef.current;
+    if (alarmEl) {
+      alarmEl.src = alarmUrl;
+      alarmEl.volume = 1.0;
+      try {
+        await alarmEl.play();
+        alarmEl.pause();
+        alarmEl.currentTime = 0;
+      } catch (e) {
+        console.error('Alarm priming failed', e);
+      }
+    }
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: 'LearnFlow ポモドーロタイマー',
+        artist: mode === 'WORK' ? '集中中...' : '休憩中...',
+      });
+    }
+  }, [bgmType, soundType, getNoiseUrl, getAlarmUrl, mode]);
+
+  const stopSessionAudio = useCallback(() => {
+    bgmAudioElRef.current?.pause();
+  }, []);
+
+  const playAlarm = useCallback(() => {
+    stopSessionAudio();
+    const alarmEl = alarmAudioElRef.current;
+    if (alarmEl) {
+      alarmEl.currentTime = 0;
+      void alarmEl.play().catch((e) => console.error('Alarm playback failed', e));
+    }
+  }, [stopSessionAudio]);
+
   const handleTimerComplete = useCallback(() => {
-    playBeepSound(soundType);
-    stopAmbientBgm();
+    playAlarm();
     if (sessionId) void logPomodoroEvent(sessionId, mode, 'COMPLETE');
 
     if (mode === 'WORK') {
@@ -212,7 +332,7 @@ export default function PomodoroTimer() {
       setTargetEndTime(null);
       setAwaitingDecision(true);
     }
-  }, [soundType, mode, sessionId]);
+  }, [playAlarm, mode, sessionId]);
 
   // 初回マウント時: リロード等で失われたタイマー状態を localStorage から復元する。
   // Start したまま ABANDON_THRESHOLD_MS 以上経過している場合は「タブを閉じた」とみなし、
@@ -360,20 +480,19 @@ export default function PomodoroTimer() {
       setAwaitingDecision(false);
       setIsRunning(true);
       setTargetEndTime(Date.now() + timeLeft * 1000);
-      void getAudioContext(); // ユーザー操作のタイミングで AudioContext を unlock する
-      playAmbientBgm(bgmType);
+      void startAudioForSession(); // ユーザー操作のタイミングで BGM・アラームを解錠する
       void logPomodoroEvent(sid, mode, 'START');
     } else {
       setIsRunning(false);
       setTargetEndTime(null);
       workerRef.current?.postMessage('stop');
-      stopAmbientBgm();
+      stopSessionAudio();
       if (sessionId) void logPomodoroEvent(sessionId, mode, 'PAUSE');
     }
   };
 
   const handleStop = () => {
-    stopAmbientBgm();
+    stopSessionAudio();
     if (sessionId) void logPomodoroEvent(sessionId, mode, 'STOP');
     setIsRunning(false);
     setTargetEndTime(null);
@@ -401,6 +520,8 @@ export default function PomodoroTimer() {
 
   return (
     <>
+      <audio ref={bgmAudioElRef} playsInline className="hidden" />
+      <audio ref={alarmAudioElRef} playsInline className="hidden" />
       <div className={cn(
         "card-glass border rounded-3xl p-10 flex flex-col items-center justify-center shadow-lg relative overflow-hidden flex-1 min-h-[400px] transition-colors duration-1000",
         isWork
@@ -420,7 +541,20 @@ export default function PomodoroTimer() {
               <Volume2 className="w-3 h-3 text-slate-500" />
               <select
                 value={soundType}
-                onChange={(e) => setSoundType(e.target.value as SoundType)}
+                onChange={(e) => {
+                  const val = e.target.value as SoundType;
+                  setSoundType(val);
+                  if (isRunning) {
+                    // 実行中に音色を変更した場合、新しい音色でも同じユーザー操作内で
+                    // 再解錠しておく(バックグラウンド再生を維持するため)
+                    getAlarmUrl(val).then((url) => {
+                      const alarmEl = alarmAudioElRef.current;
+                      if (!alarmEl) return;
+                      alarmEl.src = url;
+                      alarmEl.play().then(() => { alarmEl.pause(); alarmEl.currentTime = 0; }).catch(() => {});
+                    });
+                  }
+                }}
                 className="text-xs bg-transparent border-none text-slate-500 font-bold outline-none cursor-pointer"
                 title="通知音の設定"
               >
@@ -437,7 +571,17 @@ export default function PomodoroTimer() {
                 onChange={(e) => {
                   const val = e.target.value as 'none'|'white'|'pink'|'brown';
                   setBgmType(val);
-                  if (isRunning) playAmbientBgm(val);
+                  if (isRunning) {
+                    const noiseType: NoiseType = val === 'none' ? 'silent' : val;
+                    getNoiseUrl(noiseType).then((url) => {
+                      const bgmEl = bgmAudioElRef.current;
+                      if (!bgmEl) return;
+                      bgmEl.src = url;
+                      bgmEl.loop = true;
+                      bgmEl.volume = val === 'none' ? 0.02 : 0.5;
+                      void bgmEl.play();
+                    });
+                  }
                 }}
                 className="text-xs bg-transparent border-none text-slate-500 font-bold outline-none cursor-pointer"
                 title="環境音の設定"
@@ -562,6 +706,7 @@ export default function PomodoroTimer() {
                   setTimeLeft(2);
                   setTargetEndTime(Date.now() + 2000);
                   setIsRunning(true);
+                  void startAudioForSession();
                   void logPomodoroEvent(sid, mode, 'START', { test: true });
                 }}
                 className="flex-none px-4 py-4 bg-transparent text-transparent hover:text-slate-300 dark:hover:text-slate-700 transition-all active:scale-95"
