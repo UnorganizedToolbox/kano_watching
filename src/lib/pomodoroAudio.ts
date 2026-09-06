@@ -11,11 +11,11 @@ export const SOUND_OPTIONS: { value: SoundType; label: string }[] = [
   { value: 'modern', label: 'モダン音' },
 ];
 
-export const BGM_OPTIONS: { value: BgmType; label: string }[] = [
+export const BGM_OPTIONS: { value: BgmType; label: string; description?: string }[] = [
   { value: 'none', label: 'BGMなし' },
-  { value: 'pink', label: 'ピンクノイズ（雨音風）' },
-  { value: 'brown', label: 'ブラウンノイズ（低音）' },
-  { value: 'white', label: 'ホワイトノイズ' },
+  { value: 'white', label: 'ホワイトノイズ', description: '短時間の集中に向いています' },
+  { value: 'pink', label: 'ピンクノイズ（雨音風）', description: 'リラックスと集中のバランスを取りたいときに向いています' },
+  { value: 'brown', label: 'ブラウンノイズ（低音）', description: '長時間没頭して作業したいときに向いています' },
 ];
 
 const SOUND_PREF_KEY = 'learnflow_sound_type';

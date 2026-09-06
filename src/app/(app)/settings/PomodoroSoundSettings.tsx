@@ -99,30 +99,42 @@ export default function PomodoroSoundSettings() {
 
       <div>
         <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">学習中の環境音（BGM）</label>
-        <div className="flex flex-wrap gap-2 max-w-lg">
+        <div className="space-y-2 max-w-lg">
           {BGM_OPTIONS.map(opt => (
-            <div
+            <label
               key={opt.value}
-              className={`flex items-center gap-2 pl-3 pr-2 py-2 rounded-lg border text-sm transition-colors ${
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 bgmType === opt.value
-                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
+                  : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
               }`}
             >
-              <button type="button" onClick={() => { setBgmTypeState(opt.value); setBgmPref(opt.value); }} className="font-bold">
-                {opt.label}
-              </button>
-              {opt.value !== 'none' && (
-                <button
-                  type="button"
-                  onClick={() => (playingKey === `bgm-${opt.value}` ? stopPreview() : previewNoise(opt.value))}
-                  className="text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 p-1"
-                  title="試聴する"
-                >
-                  {playingKey === `bgm-${opt.value}` ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                </button>
-              )}
-            </div>
+              <input
+                type="radio"
+                name="bgm-type"
+                checked={bgmType === opt.value}
+                onChange={() => { setBgmTypeState(opt.value); setBgmPref(opt.value); }}
+                className="mt-1 accent-brand-500 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{opt.label}</span>
+                  {opt.value !== 'none' && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); playingKey === `bgm-${opt.value}` ? stopPreview() : previewNoise(opt.value); }}
+                      className="text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 p-1 shrink-0"
+                      title="試聴する"
+                    >
+                      {playingKey === `bgm-${opt.value}` ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
+                {opt.description && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{opt.description}</p>
+                )}
+              </div>
+            </label>
           ))}
         </div>
         <p className="text-[10px] text-slate-400 mt-2">タイマー画面ではこの設定がそのまま使われ、実行中に切り替えることはできません。</p>
