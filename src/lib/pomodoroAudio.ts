@@ -144,8 +144,12 @@ function applyLoopFadeEdges(output: Float32Array, fadeSamples: number) {
 
 export async function renderNoiseBlobUrl(type: NoiseType): Promise<string> {
   const sampleRate = 44100;
-  const duration = 10; // ループが単調に聞こえすぎない長さ
-  const fadeSamples = Math.floor(0.08 * sampleRate); // 80ms
+  // ブラウザネイティブの <audio loop> はサンプル精度の完全なギャップレスループを
+  // 保証しない(Web Audio の AudioBufferSourceNode.loop と違い、わずかな再同期が
+  // 入ることがある)。波形側のフェードだけでは消せないため、ループ頻度そのものを
+  // 下げて体感上の気になりを減らす。60秒でもファイルサイズは ~5MB程度で軽い。
+  const duration = 60;
+  const fadeSamples = Math.floor(0.15 * sampleRate); // 150ms
   const OfflineCtx = getOfflineAudioContextClass();
   const offlineCtx = new OfflineCtx(1, sampleRate * duration, sampleRate);
   const buffer = offlineCtx.createBuffer(1, sampleRate * duration, sampleRate);
