@@ -5,13 +5,31 @@ import { revalidatePath } from "next/cache";
 import { evaluateAchievements } from "@/lib/gamification/engine";
 
 export async function askQuestion(formData: FormData) {
+  const supabase = await createClient();
+
+  // Check if questions are disabled by admin
+  const { data: configLogs } = await supabase
+    .from('student_activity_logs')
+    .select('metadata')
+    .eq('activity_type', 'SYSTEM_CONFIG')
+    .order('created_at', { ascending: false })
+    .limit(1);
+    
+  if (configLogs && configLogs.length > 0 && configLogs[0].metadata) {
+    const meta = configLogs[0].metadata as any;
+    if (meta.questions_enabled === false) {
+      throw new Error('現在、管理者によって質問の受付が一時的に停止されています。');
+    }
+  }
+
+  // --- End Check ---
+
   const title = formData.get('title') as string;
   const body = formData.get('body') as string;
   const image = formData.get('image') as File | null;
 
   if (!title || !body) throw new Error('タイトルと内容は必須です');
 
-  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('ログインしていません');
@@ -83,7 +101,7 @@ export async function askQuestion(formData: FormData) {
   return;
 }
 
-export async function logPomodoro(subject: string, minutes: number = 25, concentrationRating?: number) {
+export async function logPomodoro(subject: string, minutes: number = 25, concentrationRating?: number, memo?: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -102,6 +120,7 @@ export async function logPomodoro(subject: string, minutes: number = 25, concent
   // 2. student_activity_logs に記録（新機能用）
   const metadata: Record<string, string | number> = { minutes, subject };
   if (concentrationRating) metadata.concentrationRating = concentrationRating;
+  if (memo) metadata.memo = memo;
 
   const { error: actErr } = await supabase.from('student_activity_logs').insert({
     student_id: user.id,

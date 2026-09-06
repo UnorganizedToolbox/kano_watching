@@ -8,10 +8,12 @@ export default function RealtimeAdminQuestions() {
   const router = useRouter();
 
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
+    
+    if (!supabaseUrl || !supabaseKey) return;
+
+    const supabase = createBrowserClient(supabaseUrl, supabaseKey);
 
     const channel = supabase.channel('realtime_admin_questions')
       .on('postgres_changes', {

@@ -11,9 +11,25 @@ type SoundType = 'chime' | 'retro' | 'modern';
 const WORK_TIME = 25 * 60;
 const BREAK_TIME = 5 * 60;
 
+
+// Global AudioContext to bypass browser interaction policies
+let globalAudioCtx: AudioContext | null = null;
+
+function initAudioContext() {
+  if (!globalAudioCtx) {
+    globalAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  if (globalAudioCtx.state === 'suspended') {
+    globalAudioCtx.resume();
+  }
+}
+
 function playBeepSound(type: SoundType) {
   try {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    initAudioContext();
+    if (!globalAudioCtx) return;
+    const audioCtx = globalAudioCtx;
+
     
     const playNote = (frequency: number, startTime: number, duration: number, oscType: OscillatorType = 'sine') => {
       const oscillator = audioCtx.createOscillator();
@@ -250,6 +266,7 @@ export default function PomodoroTimer() {
     if (!isRunning) {
       setIsRunning(true);
       setTargetEndTime(Date.now() + timeLeft * 1000);
+      initAudioContext(); // Unlock audio on user interaction
       playAmbientBgm(bgmType);
     } else {
       setIsRunning(false);

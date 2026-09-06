@@ -1,3 +1,4 @@
+import { SubmitButton } from "./SubmitButton"
 import { login } from './actions'
 
 // Note: Next.js page components can accept searchParams as a prop
@@ -15,7 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </div>
         )}
 
-        <form className="flex flex-col gap-4">
+        <form action={login} className="flex flex-col gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1" htmlFor="email">Email</label>
             <input className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white/60 dark:bg-slate-800/60 text-slate-900 dark:text-white" id="email" name="email" type="email" required />

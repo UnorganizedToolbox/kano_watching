@@ -1,3 +1,4 @@
+import { SubmitQuestionButton } from "./components/SubmitQuestionButton"
 export const dynamic = "force-dynamic";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
@@ -8,6 +9,17 @@ import QAThreadList from "./components/QAThreadList";
 
 export default async function TimerPage() {
   const supabase = await createClient();
+
+  // Fetch system config
+  const { data: configLogs } = await supabase
+    .from('student_activity_logs')
+    .select('metadata')
+    .eq('activity_type', 'SYSTEM_CONFIG')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  
+  const questionsEnabled = !(configLogs && configLogs.length > 0 && configLogs[0].metadata && (configLogs[0].metadata as any).questions_enabled === false);
+
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
@@ -42,8 +54,19 @@ export default async function TimerPage() {
             
             <QAThreadList initialQuestions={questions || []} />
             
+            
             <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-darkbg-secondary">
-              <form action={askQuestion} className="flex flex-col gap-2">
+              {!questionsEnabled ? (
+                <div className="p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl text-center">
+                  <p className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                    <i className="fa-solid fa-circle-exclamation mr-1"></i>
+                    現在、質問の受付を一時停止しています。
+                  </p>
+                  <p className="text-xs text-rose-500/80 dark:text-rose-400/80 mt-1">教師の回答をお待ちいただくか、後ほどお試しください。</p>
+                </div>
+              ) : (
+                <form action={askQuestion} className="flex flex-col gap-2">
+
                 <input required type="text" name="title" placeholder="質問のタイトル (例: 青チャートP45について)" className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-900" />
                 <textarea required name="body" rows={3} placeholder="質問内容を詳しく書いてください..." className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-900 resize-none"></textarea>
                 
@@ -55,6 +78,7 @@ export default async function TimerPage() {
                   <i className="fa-solid fa-paper-plane"></i> 質問を送信する
                 </button>
               </form>
+              )}
             </div>
           </div>
         </div>

@@ -5,13 +5,14 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import AdminQuestionList from "./components/AdminQuestionList";
 import RealtimeAdminQuestions from "./components/RealtimeAdminQuestions";
+import SystemConfigToggle from "./components/SystemConfigToggle";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user?.id).single();
-  if (profile?.role !== 'admin') {
+  if (profile?.role !== 'admin' && profile?.role !== 'teacher') {
     redirect('/');
   }
 
@@ -35,6 +36,9 @@ export default async function AdminDashboard() {
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1400px] mx-auto w-full px-6 pt-2 pb-6">
       <div className="flex justify-between items-end mb-4">
+        <div>
+          <SystemConfigToggle />
+        </div>
         <div>
           <h2 className="text-2xl font-black font-title text-slate-800 dark:text-white mb-2">管理者ダッシュボード</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">生徒の学習状況と質問を管理します</p>

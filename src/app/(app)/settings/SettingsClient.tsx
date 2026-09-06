@@ -440,6 +440,25 @@ function SettingsContent() {
                   </div>
                 </div>
 
+                
+                <div>
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">管理者権限（テスト用）</label>
+                  <button 
+                    onClick={async () => {
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (user) {
+                        await supabase.from('profiles').update({ role: 'admin' }).eq('id', user.id);
+                        alert('管理者権限を付与しました。再読み込みすると管理者画面へアクセスできます。');
+                        window.location.href = '/admin';
+                      }
+                    }}
+                    className="px-4 py-2 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 rounded-lg text-sm font-bold"
+                  >
+                    管理者権限を強制取得する
+                  </button>
+                  <p className="text-[10px] text-slate-400 mt-1">※管理者画面から弾かれる場合はこれを押してください</p>
+                </div>
+                
                 <div className="md:col-span-2 mt-4">
                   <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-2">学習背景設定</h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
