@@ -1,11 +1,10 @@
 export const dynamic = "force-dynamic";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { Search } from "lucide-react";
 import AdminQuestionList from "./components/AdminQuestionList";
 import RealtimeAdminQuestions from "./components/RealtimeAdminQuestions";
 import SystemConfigToggle from "./components/SystemConfigToggle";
+import StudentListClient from "./components/StudentListClient";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -49,52 +48,7 @@ export default async function AdminDashboard() {
         {/* Left Column: Students List */}
         <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
           <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col min-h-[500px]">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-lg text-slate-800 dark:text-white">生徒一覧</h3>
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" placeholder="名前やIDで検索..." className="pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
-                    <th className="pb-3 font-semibold">表示ID</th>
-                    <th className="pb-3 font-semibold">氏名</th>
-                    <th className="pb-3 font-semibold">ステータス</th>
-                    <th className="pb-3 font-semibold text-right">アクション</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {students && students.length > 0 ? (
-                    students.map(student => (
-                      <tr key={student.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="py-4 text-slate-600 dark:text-slate-300 font-mono text-xs">{student.student_id}</td>
-                        <td className="py-4 font-bold text-slate-800 dark:text-slate-200">{student.name}</td>
-                        <td className="py-4">
-                          <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${
-                            student.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {student.status === 'active' ? 'アクティブ' : student.status}
-                          </span>
-                        </td>
-                        <td className="py-4 text-right">
-                          <Link href={`/admin/student/${student.id}`} className="text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold text-xs bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg transition-colors">
-                            詳細を見る
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-slate-500 text-sm">生徒が登録されていません</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <StudentListClient students={students || []} />
           </div>
         </div>
 

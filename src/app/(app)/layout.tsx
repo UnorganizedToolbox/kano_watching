@@ -24,6 +24,11 @@ export default async function AppLayout({
     .eq('id', user.id)
     .single();
 
+  if (profile?.status === 'disabled') {
+    await supabase.auth.signOut();
+    redirect('/login?error=このアカウントは管理者によって停止されています');
+  }
+
   const name = profile?.name || user.email?.split('@')[0] || 'Unknown';
   const role = profile?.role || 'student';
   const isAdmin = role === 'admin';

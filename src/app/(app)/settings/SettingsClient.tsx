@@ -32,6 +32,7 @@ function SettingsContent() {
   const [userId, setUserId] = useState<string | null>(null);
   const [unlockedTitles, setUnlockedTitles] = useState<any[]>([]);
   const [name, setName] = useState('Student');
+  const [nicknameLocked, setNicknameLocked] = useState(false);
   const [targetTitle, setTargetTitle] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -60,9 +61,10 @@ function SettingsContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        const { data: profile } = await supabase.from('profiles').select('avatar_seed, saved_avatars, name, target_date, target_title').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('avatar_seed, saved_avatars, name, target_date, target_title, nickname_locked').eq('id', user.id).single();
         if (profile) {
           if (profile.name) setName(profile.name);
+          setNicknameLocked(!!profile.nickname_locked);
           if (profile.target_title) setTargetTitle(profile.target_title);
           if (profile.target_date) setTargetDate(profile.target_date);
           if (profile.avatar_seed) setAvatarSeed(profile.avatar_seed);
@@ -325,8 +327,20 @@ function SettingsContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">ニックネーム</label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-darkbg-secondary focus:ring-2 focus:ring-brand-500 outline-none" />
-                  <p className="text-[10px] text-slate-400 mt-2">他のユーザーに公開される名前です。</p>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    disabled={nicknameLocked}
+                    className="w-full px-4 py-3 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-darkbg-secondary focus:ring-2 focus:ring-brand-500 outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-2">
+                    {nicknameLocked ? (
+                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-500 font-bold">
+                        <Lock className="w-3 h-3" /> 管理者によって固定されています。変更が必要な場合は管理者にお問い合わせください。
+                      </span>
+                    ) : '他のユーザーに公開される名前です。'}
+                  </p>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">

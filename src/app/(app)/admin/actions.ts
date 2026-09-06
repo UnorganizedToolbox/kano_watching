@@ -3,20 +3,55 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
+async function verifyAdmin() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('ログインしていません');
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  if (profile?.role !== 'admin') throw new Error('権限がありません');
+
+  return supabase;
+}
+
+export async function setStudentStatus(studentId: string, status: 'active' | 'disabled') {
+  const supabase = await verifyAdmin();
+
+  const { error } = await supabase.from('profiles').update({ status }).eq('id', studentId).eq('role', 'student');
+
+  if (error) {
+    console.error('Failed to update student status', error);
+    throw new Error('生徒のステータス更新に失敗しました');
+  }
+
+  revalidatePath('/admin');
+  revalidatePath(`/admin/student/${studentId}`);
+}
+
+export async function setStudentNickname(studentId: string, name: string, locked: boolean) {
+  const supabase = await verifyAdmin();
+
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('ニックネームを入力してください');
+
+  const { error } = await supabase.from('profiles').update({ name: trimmed, nickname_locked: locked }).eq('id', studentId).eq('role', 'student');
+
+  if (error) {
+    console.error('Failed to update student nickname', error);
+    throw new Error('ニックネームの更新に失敗しました');
+  }
+
+  revalidatePath('/admin');
+  revalidatePath(`/admin/student/${studentId}`);
+}
+
 export async function answerQuestion(formData: FormData) {
   const question_id = formData.get('question_id') as string;
   const answer_body = formData.get('answer_body') as string;
 
   if (!question_id || !answer_body) throw new Error('必要なデータがありません');
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) throw new Error('ログインしていません');
-
-  // Verify admin
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') throw new Error('権限がありません');
+  const supabase = await verifyAdmin();
 
   const { error } = await supabase.from('questions').update({
     status: 'answered',

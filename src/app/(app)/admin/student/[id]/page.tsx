@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock, BarChart2, MessageCircle } from "lucide-react";
+import AdminStudentControls from "../../components/AdminStudentControls";
 
 export default async function StudentDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -98,6 +99,13 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
 
         {/* Stats Column */}
         <div className="flex flex-col gap-6">
+          <AdminStudentControls
+            studentId={student.id}
+            initialName={student.name}
+            initialLocked={!!student.nickname_locked}
+            initialStatus={student.status}
+          />
+
           <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
             <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4 flex items-center gap-2">
               <Clock className="w-5 h-5 text-brand-500" />
