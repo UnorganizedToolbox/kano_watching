@@ -61,7 +61,10 @@ let sharedAudioCtx: AudioContext | null = null;
 let bgmNode: AudioBufferSourceNode | null = null;
 
 async function getAudioContext(): Promise<AudioContext> {
-  if (!sharedAudioCtx) {
+  // タブが非アクティブ/バックグラウンドになると 'suspended' ではなく 'closed' に
+  // 遷移することがある。closed になった AudioContext は二度と resume できないため、
+  // 新しく作り直す必要がある(これを見落とすと復帰後ずっと音が鳴らなくなる)。
+  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
     sharedAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   }
   // suspended は iOS Safari の autoplay policy による。必ず await で resume する
@@ -112,8 +115,8 @@ async function playBeepSound(type: SoundType) {
 
 function stopAmbientBgm() {
   if (bgmNode) {
-    try { bgmNode.stop(); } catch(e) {}
-    bgmNode.disconnect();
+    try { bgmNode.stop(); } catch (e) { /* ignore */ }
+    try { bgmNode.disconnect(); } catch (e) { /* AudioContext が既に closed の場合がある */ }
     bgmNode = null;
   }
 }
@@ -326,17 +329,11 @@ export default function PomodoroTimer() {
   }, [isRunning, targetEndTime, mode, handleTimerComplete]);
 
 
-  const handleRatingSubmit = async (rating: number) => {
+  const handleRatingSubmit = (rating: number) => {
     setShowRatingModal(false);
     if (sessionId) void logPomodoroEvent(sessionId, 'WORK', 'RATING_SUBMITTED', { rating });
-    try {
-      const res = await logPomodoro(subject, 25, rating);
-      if (res?.levelUp) {
-        setLevelUpData(res.levelUp);
-      }
-    } catch (e) {
-      console.error("Failed to log pomodoro", e);
-    }
+
+    // 先に休憩画面へ切り替える。DB書き込み(logPomodoro/実績評価)の完了は待たない。
     const nextPomoCount = pomoCount + 1;
     const isLongBreak = nextPomoCount % POMOS_PER_LONG_BREAK === 0;
     setPomoCount(nextPomoCount);
@@ -344,6 +341,15 @@ export default function PomodoroTimer() {
     setTimeLeft(isLongBreak ? LONG_BREAK_TIME : BREAK_TIME);
     setTargetEndTime(null);
     setAwaitingDecision(true);
+
+    // 記録とレベルアップ判定はバックグラウンドで実行し、結果が来たらモーダルで通知する
+    logPomodoro(subject, 25, rating)
+      .then((res) => {
+        if (res?.levelUp) setLevelUpData(res.levelUp);
+      })
+      .catch((e) => {
+        console.error("Failed to log pomodoro", e);
+      });
   };
 
   const toggleTimer = () => {
