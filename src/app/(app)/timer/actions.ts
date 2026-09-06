@@ -101,6 +101,30 @@ export async function askQuestion(formData: FormData) {
   return;
 }
 
+type PomodoroEventType = 'START' | 'PAUSE' | 'STOP' | 'COMPLETE' | 'CHECK_REMAINING_TIME' | 'RATING_SUBMITTED' | 'QUIT' | 'ABANDONED';
+type PomodoroMode = 'WORK' | 'BREAK' | 'LONG_BREAK';
+
+export async function logPomodoroEvent(
+  sessionId: string,
+  mode: PomodoroMode,
+  eventType: PomodoroEventType,
+  metadata: Record<string, unknown> = {}
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase.from('pomodoro_events').insert({
+    student_uuid: user.id,
+    session_id: sessionId,
+    mode,
+    event_type: eventType,
+    metadata,
+  });
+
+  if (error) console.error('Failed to log pomodoro event', error);
+}
+
 export async function logPomodoro(subject: string, minutes: number = 25, concentrationRating?: number, memo?: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

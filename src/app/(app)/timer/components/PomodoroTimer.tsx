@@ -1,15 +1,58 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { logPomodoro } from '../actions';
+import { logPomodoro, logPomodoroEvent } from '../actions';
 import { cn } from '@/lib/utils';
 import { PartyPopper, Lock, Volume2 } from 'lucide-react';
 
-type TimerMode = 'WORK' | 'BREAK';
+type TimerMode = 'WORK' | 'BREAK' | 'LONG_BREAK';
 type SoundType = 'chime' | 'retro' | 'modern';
 
 const WORK_TIME = 25 * 60;
 const BREAK_TIME = 5 * 60;
+const LONG_BREAK_TIME = 15 * 60;
+const POMOS_PER_LONG_BREAK = 4;
+const ABANDON_THRESHOLD_MS = 20 * 60 * 1000; // Startしたまま20分超過放置でタブを閉じたとみなす
+const STORAGE_KEY = 'learnflow_pomodoro_state_v1';
+
+function durationFor(mode: TimerMode) {
+  return mode === 'WORK' ? WORK_TIME : mode === 'LONG_BREAK' ? LONG_BREAK_TIME : BREAK_TIME;
+}
+
+type PersistedState = {
+  mode: TimerMode;
+  targetEndTime: number | null;
+  isRunning: boolean;
+  timeLeft: number;
+  sessionId: string | null;
+  pomoCount: number;
+  awaitingDecision: boolean;
+};
+
+function loadPersistedState(): PersistedState | null {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) as PersistedState : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedState(state: PersistedState) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // localStorage が使えない環境(プライベートモード等)では無視する
+  }
+}
+
+function clearPersistedState() {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 
 // AudioContext をアラーム音・BGM で共有（1インスタンスのみ）
@@ -147,10 +190,14 @@ export default function PomodoroTimer() {
   const [soundType, setSoundType] = useState<SoundType>('chime');
   const [bgmType, setBgmType] = useState<'none'|'white'|'pink'|'brown'>('none');
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [awaitingDecision, setAwaitingDecision] = useState(false);
+  const hasHydratedRef = useRef(false);
 
   const handleTimerComplete = useCallback(() => {
     playBeepSound(soundType);
     stopAmbientBgm();
+    if (sessionId) void logPomodoroEvent(sessionId, mode, 'COMPLETE');
 
     if (mode === 'WORK') {
       speakText("ポモドーロが終了しました。集中度を評価してください。");
@@ -159,11 +206,51 @@ export default function PomodoroTimer() {
       speakText("休憩が終わりました。次のポモドーロを開始しましょう。");
       setMode('WORK');
       setTimeLeft(WORK_TIME);
-    setTargetEndTime(null);
+      setTargetEndTime(null);
+      setAwaitingDecision(true);
     }
-  }, [soundType, mode]);
+  }, [soundType, mode, sessionId]);
 
-  
+  // 初回マウント時: リロード等で失われたタイマー状態を localStorage から復元する。
+  // Start したまま ABANDON_THRESHOLD_MS 以上経過している場合は「タブを閉じた」とみなし、
+  // ABANDONED イベントを記録して破棄する(復元しない)。
+  useEffect(() => {
+    const saved = loadPersistedState();
+    if (saved) {
+      if (saved.isRunning && saved.targetEndTime) {
+        const overdueMs = Date.now() - saved.targetEndTime;
+        if (overdueMs > ABANDON_THRESHOLD_MS) {
+          if (saved.sessionId) {
+            void logPomodoroEvent(saved.sessionId, saved.mode, 'ABANDONED', { overdue_seconds: Math.round(overdueMs / 1000) });
+          }
+          setPomoCount(saved.pomoCount);
+          clearPersistedState();
+        } else {
+          setMode(saved.mode);
+          setSessionId(saved.sessionId);
+          setPomoCount(saved.pomoCount);
+          setTargetEndTime(saved.targetEndTime);
+          setTimeLeft(Math.max(0, Math.round((saved.targetEndTime - Date.now()) / 1000)));
+          setIsRunning(true);
+        }
+      } else {
+        setMode(saved.mode);
+        setTimeLeft(saved.timeLeft);
+        setSessionId(saved.sessionId);
+        setPomoCount(saved.pomoCount);
+        setAwaitingDecision(saved.awaitingDecision);
+      }
+    }
+    hasHydratedRef.current = true;
+  }, []);
+
+  // 現在のタイマー状態を localStorage に保存し、リロード後も復元できるようにする
+  useEffect(() => {
+    if (!hasHydratedRef.current) return;
+    savePersistedState({ mode, targetEndTime, isRunning, timeLeft, sessionId, pomoCount, awaitingDecision });
+  }, [mode, targetEndTime, isRunning, timeLeft, sessionId, pomoCount, awaitingDecision]);
+
+
   // Setup Web Worker for accurate background timing (bypasses iOS Safari throttling)
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -241,6 +328,7 @@ export default function PomodoroTimer() {
 
   const handleRatingSubmit = async (rating: number) => {
     setShowRatingModal(false);
+    if (sessionId) void logPomodoroEvent(sessionId, 'WORK', 'RATING_SUBMITTED', { rating });
     try {
       const res = await logPomodoro(subject, 25, rating);
       if (res?.levelUp) {
@@ -249,43 +337,68 @@ export default function PomodoroTimer() {
     } catch (e) {
       console.error("Failed to log pomodoro", e);
     }
-    setPomoCount(p => p + 1);
-    setMode('BREAK');
-    setTimeLeft(BREAK_TIME);
+    const nextPomoCount = pomoCount + 1;
+    const isLongBreak = nextPomoCount % POMOS_PER_LONG_BREAK === 0;
+    setPomoCount(nextPomoCount);
+    setMode(isLongBreak ? 'LONG_BREAK' : 'BREAK');
+    setTimeLeft(isLongBreak ? LONG_BREAK_TIME : BREAK_TIME);
     setTargetEndTime(null);
+    setAwaitingDecision(true);
   };
 
   const toggleTimer = () => {
     if (!isRunning) {
+      const isFreshSegment = !sessionId || awaitingDecision;
+      const sid = isFreshSegment ? crypto.randomUUID() : sessionId!;
+      if (isFreshSegment) setSessionId(sid);
+      setAwaitingDecision(false);
       setIsRunning(true);
       setTargetEndTime(Date.now() + timeLeft * 1000);
       void getAudioContext(); // ユーザー操作のタイミングで AudioContext を unlock する
       playAmbientBgm(bgmType);
+      void logPomodoroEvent(sid, mode, 'START');
     } else {
       setIsRunning(false);
       setTargetEndTime(null);
       workerRef.current?.postMessage('stop');
       stopAmbientBgm();
+      if (sessionId) void logPomodoroEvent(sessionId, mode, 'PAUSE');
     }
   };
 
   const handleStop = () => {
     stopAmbientBgm();
+    if (sessionId) void logPomodoroEvent(sessionId, mode, 'STOP');
     setIsRunning(false);
-    setTimeLeft(mode === 'WORK' ? WORK_TIME : BREAK_TIME);
+    setTargetEndTime(null);
+    setTimeLeft(durationFor(mode));
+    setAwaitingDecision(false);
+    setSessionId(null);
+  };
+
+  const handleQuit = () => {
+    if (sessionId) void logPomodoroEvent(sessionId, mode, 'QUIT', { declined_mode: mode });
+    setAwaitingDecision(false);
+    setMode('WORK');
+    setTimeLeft(WORK_TIME);
+    setTargetEndTime(null);
+    setIsRunning(false);
+    setSessionId(null);
+    clearPersistedState();
   };
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
 
   const isWork = mode === 'WORK';
-  
+  const modeLabel = mode === 'WORK' ? '集中 (25分)' : mode === 'LONG_BREAK' ? '大休憩 (15分)' : '休憩 (5分)';
+
   return (
     <>
       <div className={cn(
         "card-glass border rounded-3xl p-10 flex flex-col items-center justify-center shadow-lg relative overflow-hidden flex-1 min-h-[400px] transition-colors duration-1000",
-        isWork 
-          ? "bg-white dark:bg-darkbg-secondary border-slate-200 dark:border-slate-800" 
+        isWork
+          ? "bg-white dark:bg-darkbg-secondary border-slate-200 dark:border-slate-800"
           : "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50"
       )}>
         <div className="w-full flex flex-wrap items-center justify-between gap-3 mb-6 z-20">
@@ -293,7 +406,7 @@ export default function PomodoroTimer() {
             "px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all shrink-0",
             isWork ? "bg-brand-500 text-white" : "bg-emerald-500 text-white"
           )}>
-            現在のモード: {isWork ? '集中 (25分)' : '休憩 (5分)'}
+            現在のモード: {modeLabel}
           </span>
 
           <div className="flex flex-wrap justify-end items-center gap-2">
@@ -374,67 +487,85 @@ export default function PomodoroTimer() {
             "text-sm font-bold mt-2 z-10",
             isWork ? "text-slate-600 dark:text-slate-300" : "text-emerald-700 dark:text-emerald-300"
           )}>
-            {isWork ? '集中モード' : 'リラックス'}
+            {mode === 'WORK' ? '集中モード' : mode === 'LONG_BREAK' ? '大休憩' : 'リラックス'}
           </span>
         </div>
-        
-        {isWork && !showTime && isRunning && (
+
+        {isWork && !showTime && isRunning ? (
           <button
-            onClick={() => { setShowTime(true); setTimeout(() => setShowTime(false), 3000); }}
+            onClick={() => {
+              setShowTime(true);
+              if (sessionId) void logPomodoroEvent(sessionId, mode, 'CHECK_REMAINING_TIME');
+              setTimeout(() => setShowTime(false), 3000);
+            }}
             className="mb-8 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-4 py-2 rounded-full hover:bg-slate-200 transition-colors"
           >
             残り時間を確認する
           </button>
-        )}
-        {isWork && showTime && isRunning && (
-           <div className="mb-8 h-8"></div>
-        )}
-        {!isWork && !isRunning && (
-          <div className="mb-8 h-8 flex items-center justify-center">
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 animate-pulse">
-              ↓ 「開始」を押して休憩をスタートしてください
-            </span>
-          </div>
-        )}
-        {((isWork && !isRunning) || (!isWork && isRunning)) && (
-           <div className="mb-8 h-8"></div>
+        ) : (
+          <div className="mb-8 h-8"></div>
         )}
 
-        <div className="flex gap-4 w-full max-w-sm z-10">
-          <button 
-            onClick={toggleTimer} 
-            className={cn(
-              "flex-1 py-4 text-white rounded-2xl font-bold font-title text-lg shadow-md transition-all active:scale-95",
-              isRunning 
-                ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20" 
-                : (isWork ? "bg-brand-600 hover:bg-brand-700 shadow-brand-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20")
-            )}
-          >
-            {isRunning ? <><i className="fa-solid fa-pause mr-2"></i> 一時停止</> : <><i className="fa-solid fa-play mr-2"></i> 開始</>}
-          </button>
-          
-          {isRunning && (
-            <button 
-              onClick={handleStop}
+        {awaitingDecision && !isRunning ? (
+          <div className="flex gap-4 w-full max-w-sm z-10">
+            <button
+              onClick={toggleTimer}
+              className={cn(
+                "flex-1 py-4 text-white rounded-2xl font-bold font-title text-lg shadow-md transition-all active:scale-95",
+                isWork ? "bg-brand-600 hover:bg-brand-700 shadow-brand-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20"
+              )}
+            >
+              <i className="fa-solid fa-play mr-2"></i>
+              {isWork ? '学習を再開する' : mode === 'LONG_BREAK' ? '大休憩を開始する' : '休憩を開始する'}
+            </button>
+            <button
+              onClick={handleQuit}
               className="flex-none px-6 py-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-bold shadow-md transition-all active:scale-95"
             >
-              <i className="fa-solid fa-stop mr-2"></i> 中止
+              終了する
             </button>
-          )}
-          {!isRunning && (
-            <button 
-              onClick={() => {
-                // For manual fast forward testing locally without breaking production
-                setTimeLeft(2);
-                setIsRunning(true);
-              }}
-              className="flex-none px-4 py-4 bg-transparent text-transparent hover:text-slate-300 dark:hover:text-slate-700 transition-all active:scale-95"
-              title="秘密のテストボタン"
+          </div>
+        ) : (
+          <div className="flex gap-4 w-full max-w-sm z-10">
+            <button
+              onClick={toggleTimer}
+              className={cn(
+                "flex-1 py-4 text-white rounded-2xl font-bold font-title text-lg shadow-md transition-all active:scale-95",
+                isRunning
+                  ? "bg-amber-500 hover:bg-amber-600 shadow-amber-500/20"
+                  : (isWork ? "bg-brand-600 hover:bg-brand-700 shadow-brand-500/20" : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20")
+              )}
             >
-              <i className="fa-solid fa-forward"></i>
+              {isRunning ? <><i className="fa-solid fa-pause mr-2"></i> 一時停止</> : <><i className="fa-solid fa-play mr-2"></i> 開始</>}
             </button>
-          )}
-        </div>
+
+            {isRunning && (
+              <button
+                onClick={handleStop}
+                className="flex-none px-6 py-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-bold shadow-md transition-all active:scale-95"
+              >
+                <i className="fa-solid fa-stop mr-2"></i> 中止
+              </button>
+            )}
+            {!isRunning && (
+              <button
+                onClick={() => {
+                  // For manual fast forward testing locally without breaking production
+                  const sid = crypto.randomUUID();
+                  setSessionId(sid);
+                  setTimeLeft(2);
+                  setTargetEndTime(Date.now() + 2000);
+                  setIsRunning(true);
+                  void logPomodoroEvent(sid, mode, 'START', { test: true });
+                }}
+                className="flex-none px-4 py-4 bg-transparent text-transparent hover:text-slate-300 dark:hover:text-slate-700 transition-all active:scale-95"
+                title="秘密のテストボタン"
+              >
+                <i className="fa-solid fa-forward"></i>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {levelUpData && (

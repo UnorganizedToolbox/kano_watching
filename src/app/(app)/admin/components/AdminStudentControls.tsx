@@ -53,6 +53,21 @@ export default function AdminStudentControls({
     <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
       <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">アカウント管理</h3>
 
+      <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-800 space-y-1.5">
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-slate-500 dark:text-slate-400">アカウント有効</span>
+          <span className={`font-bold ${status !== 'disabled' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+            {status !== 'disabled' ? 'はい' : 'いいえ'}
+          </span>
+        </div>
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-slate-500 dark:text-slate-400">ニックネーム固定</span>
+          <span className={`font-bold ${locked ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'}`}>
+            {locked ? 'あり' : 'なし'}
+          </span>
+        </div>
+      </div>
+
       <label className="text-xs font-bold text-slate-500 block mb-1">ニックネーム</label>
       <div className="flex gap-2 mb-2">
         <input

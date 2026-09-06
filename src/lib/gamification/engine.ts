@@ -129,23 +129,19 @@ export async function evaluateAchievements(userId: string) {
 
   if (newlyUnlocked.length === 0 && newlyRewardedMissions.length === 0) return null;
 
-  // Insert new permanent achievements
-  for (const u of newlyUnlocked) {
-    await supabase.from('student_achievements').insert({
+  // Insert new permanent achievements + mission reward logs (並列実行して待ち時間を短縮)
+  await Promise.all([
+    ...newlyUnlocked.map(u => supabase.from('student_achievements').insert({
       student_id: userId,
       achievement_id: u.id
-    });
-  }
-
-  // Insert mission reward logs
-  for (const mId of newlyRewardedMissions) {
-    await supabase.from('student_activity_logs').insert({
+    })),
+    ...newlyRewardedMissions.map(mId => supabase.from('student_activity_logs').insert({
       student_id: userId,
       activity_type: 'MISSION_REWARDED',
       activity_date: todayStr,
       metadata: { mission_id: mId }
-    });
-  }
+    })),
+  ]);
 
   // Handle EXP using pure calc_Lv_from_EXP
   const currentTotalExp = profile.exp || 0;

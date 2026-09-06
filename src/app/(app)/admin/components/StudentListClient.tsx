@@ -75,13 +75,13 @@ export default function StudentListClient({ students }: { students: Student[] })
                   <td className="py-4 text-slate-600 dark:text-slate-300 font-mono text-xs">{student.student_id}</td>
                   <td className="py-4 font-bold text-slate-800 dark:text-slate-200">{student.name}</td>
                   <td className="py-4">
-                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${
-                      student.status === 'active'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                        : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
-                    }`}>
-                      {student.status === 'active' ? 'アクティブ' : '停止中'}
-                    </span>
+                    {student.status === 'disabled' ? (
+                      <span className="px-2 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
+                        停止中
+                      </span>
+                    ) : (
+                      <span className="text-slate-300 dark:text-slate-700 text-xs">—</span>
+                    )}
                   </td>
                   <td className="py-4 text-right space-x-2 whitespace-nowrap">
                     <button
