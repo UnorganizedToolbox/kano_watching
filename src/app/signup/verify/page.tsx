@@ -1,4 +1,5 @@
 import { resendSignupEmail } from '../actions'
+import { FormSubmitButton } from '@/components/FormSubmitButton'
 
 export default async function VerifySignupPage({
   searchParams,
@@ -33,9 +34,11 @@ export default async function VerifySignupPage({
         )}
 
         <form action={resendSignupEmail.bind(null, email)}>
-          <button type="submit" className="text-xs text-brand-600 dark:text-brand-400 hover:underline">
-            メールが届かない場合は再送信する
-          </button>
+          <FormSubmitButton
+            label="メールが届かない場合は再送信する"
+            pendingLabel="送信中..."
+            className="text-xs text-brand-600 dark:text-brand-400 hover:underline bg-transparent"
+          />
         </form>
       </div>
     </div>

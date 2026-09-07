@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react';
-import { Lock, Unlock, ShieldOff, ShieldCheck } from 'lucide-react';
-import { setStudentNickname, setStudentStatus } from '../actions';
+import { useRouter } from 'next/navigation';
+import { Lock, Unlock, ShieldOff, ShieldCheck, Trash2 } from 'lucide-react';
+import { setStudentNickname, setStudentStatus, deleteStudent } from '../actions';
 
 export default function AdminStudentControls({
   studentId,
@@ -15,10 +16,12 @@ export default function AdminStudentControls({
   initialLocked: boolean;
   initialStatus: string;
 }) {
+  const router = useRouter();
   const [name, setName] = useState(initialName);
   const [locked, setLocked] = useState(initialLocked);
   const [status, setStatus] = useState(initialStatus);
   const [isPending, startTransition] = useTransition();
+  const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState('');
 
   const handleSaveNickname = () => {
@@ -58,6 +61,22 @@ export default function AdminStudentControls({
         setMessage(e instanceof Error ? e.message : '更新に失敗しました');
       }
     });
+  };
+
+  const handleDelete = async () => {
+    const typed = prompt(
+      `${name} のアカウントを完全に削除します。学習記録・質問・実績などすべてのデータが復元不可能になります。\n続行するには「削除」と入力してください。`
+    );
+    if (typed !== '削除') return;
+
+    setIsDeleting(true);
+    try {
+      await deleteStudent(studentId);
+      router.push('/admin');
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : '削除に失敗しました');
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -137,6 +156,19 @@ export default function AdminStudentControls({
             {status === 'disabled' ? 'アカウントを有効化する' : 'アカウントを無効化する'}
           </button>
         )}
+      </div>
+
+      <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+        <label className="text-xs font-bold text-rose-500 block mb-2">危険な操作</label>
+        <button
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40"
+        >
+          <Trash2 className="w-4 h-4" />
+          {isDeleting ? '削除中...' : 'アカウントを完全に削除する'}
+        </button>
+        <p className="text-[10px] text-slate-400 mt-1">学習記録・質問・実績を含め、すべてのデータが復元不可能になります。</p>
       </div>
 
       {message && <p className="text-xs text-slate-500 mt-3">{message}</p>}

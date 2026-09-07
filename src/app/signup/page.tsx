@@ -1,4 +1,5 @@
 import { signup } from './actions'
+import { FormSubmitButton } from '@/components/FormSubmitButton'
 
 export default async function SignupPage({
   searchParams,
@@ -43,9 +44,11 @@ export default async function SignupPage({
             <label className="block text-xs font-bold text-slate-500 mb-1" htmlFor="password">Password</label>
             <input className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white/60 dark:bg-darkbg-secondary/60 text-slate-900 dark:text-white" id="password" name="password" type="password" required minLength={6} />
           </div>
-          <button type="submit" className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold mt-2 shadow-md transition-all active:scale-95">
-            登録を申請する
-          </button>
+          <FormSubmitButton
+            label="登録を申請する"
+            pendingLabel="送信中..."
+            className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold mt-2 shadow-md transition-all active:scale-95"
+          />
         </form>
         <div className="mt-4 text-center">
           <a href="/login" className="text-xs text-brand-600 dark:text-brand-400 hover:underline">ログインはこちら</a>

@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 
 async function verifyAdmin() {
@@ -26,6 +27,23 @@ export async function setStudentStatus(studentId: string, status: 'active' | 'di
 
   revalidatePath('/admin');
   revalidatePath(`/admin/student/${studentId}`);
+}
+
+export async function deleteStudent(studentId: string) {
+  const supabase = await verifyAdmin();
+
+  const { data: target } = await supabase.from('profiles').select('role').eq('id', studentId).single();
+  if (!target || target.role !== 'student') throw new Error('削除対象が正しくありません');
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient.auth.admin.deleteUser(studentId);
+
+  if (error) {
+    console.error('Failed to delete student', error);
+    throw new Error('生徒の削除に失敗しました');
+  }
+
+  revalidatePath('/admin');
 }
 
 export async function setStudentNickname(studentId: string, name: string, locked: boolean) {

@@ -1,4 +1,4 @@
-import { SubmitButton } from "./SubmitButton"
+import { FormSubmitButton } from "@/components/FormSubmitButton"
 import { login } from './actions'
 
 // Note: Next.js page components can accept searchParams as a prop
@@ -25,9 +25,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <label className="block text-xs font-bold text-slate-500 mb-1" htmlFor="password">Password</label>
             <input className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white/60 dark:bg-slate-800/60 text-slate-900 dark:text-white" id="password" name="password" type="password" required />
           </div>
-          <button formAction={login} className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold mt-2 shadow-md transition-all active:scale-95">
-            ログイン
-          </button>
+          <FormSubmitButton
+            label="ログイン"
+            pendingLabel="ログイン中..."
+            className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold mt-2 shadow-md transition-all active:scale-95"
+          />
         </form>
 
         
