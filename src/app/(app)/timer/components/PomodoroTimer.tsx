@@ -5,6 +5,7 @@ import { logPomodoro, logPomodoroEvent } from '../actions';
 import { cn } from '@/lib/utils';
 import { PartyPopper, Lock } from 'lucide-react';
 import { getSoundPref, getBgmPref, renderAlarmBlobUrl, renderNoiseBlobUrl, type SoundType, type BgmType, type NoiseType } from '@/lib/pomodoroAudio';
+import { getSubjectOptions, OTHER_SUBJECT, type GradeLevel } from '@/lib/subjects';
 
 type TimerMode = 'WORK' | 'BREAK' | 'LONG_BREAK';
 
@@ -69,13 +70,15 @@ function speakText(text: string) {
   }
 }
 
-export default function PomodoroTimer() {
+export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel | null }) {
+  const subjectOptions = getSubjectOptions(gradeLevel);
   const [timeLeft, setTimeLeft] = useState(WORK_TIME);
   const [targetEndTime, setTargetEndTime] = useState<number | null>(null);
   const workerRef = React.useRef<Worker | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState<TimerMode>('WORK');
-  const [subject, setSubject] = useState('数学');
+  const [subject, setSubject] = useState(subjectOptions[0]);
+  const [customSubject, setCustomSubject] = useState('');
   const [levelUpData, setLevelUpData] = useState<{oldLevel: number, newLevel: number, rewardStones: number} | null>(null);
   const [pomoCount, setPomoCount] = useState(0);
   const [showTime, setShowTime] = useState(false);
@@ -316,7 +319,8 @@ export default function PomodoroTimer() {
     setAwaitingDecision(true);
 
     // 記録とレベルアップ判定はバックグラウンドで実行し、結果が来たらモーダルで通知する
-    logPomodoro(subject, 25, rating)
+    const effectiveSubject = subject === OTHER_SUBJECT ? (customSubject.trim() || OTHER_SUBJECT) : subject;
+    logPomodoro(effectiveSubject, 25, rating)
       .then((res) => {
         if (res?.levelUp) setLevelUpData(res.levelUp);
       })
@@ -395,17 +399,26 @@ export default function PomodoroTimer() {
         {isWork && (
           <div className="mb-6 flex flex-col items-center gap-2 z-10 transition-opacity">
             <label className="text-xs font-bold text-slate-500">学習科目</label>
-            <select 
-              value={subject} 
-              onChange={(e) => setSubject(e.target.value)} 
+            <select
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
               disabled={isRunning}
               className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
-              <option value="数学">数学</option>
-              <option value="英語">英語</option>
-              <option value="物理">物理</option>
-              <option value="化学">化学</option>
+              {subjectOptions.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
             </select>
+            {subject === OTHER_SUBJECT && (
+              <input
+                type="text"
+                value={customSubject}
+                onChange={(e) => setCustomSubject(e.target.value)}
+                disabled={isRunning}
+                placeholder="科目名を入力"
+                className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500 w-40 text-center"
+              />
+            )}
           </div>
         )}
 

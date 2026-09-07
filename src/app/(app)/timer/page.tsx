@@ -26,6 +26,8 @@ export default async function TimerPage() {
     redirect('/login');
   }
 
+  const { data: profile } = await supabase.from('profiles').select('grade_level').eq('id', user.id).single();
+
   // Fetch open questions for this user
   const { data: questions } = await supabase
     .from('questions')
@@ -38,7 +40,7 @@ export default async function TimerPage() {
       <div className="flex-1 grid grid-cols-12 gap-6 h-[calc(100vh-10rem)] min-h-[600px]">
         {/* Left Column (Timer & Current task) */}
         <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
-          <PomodoroTimer />
+          <PomodoroTimer gradeLevel={profile?.grade_level ?? null} />
           <RealtimeQuestions studentId={user.id} />
         </div>
 

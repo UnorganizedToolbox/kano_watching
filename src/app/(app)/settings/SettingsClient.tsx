@@ -9,6 +9,7 @@ import { linkGoogleAccount } from './actions';
 import { setTheme } from '../../actions/theme';
 import { ACHIEVEMENTS_DICT } from "@/lib/gamification/achievements";
 import PomodoroSoundSettings from './PomodoroSoundSettings';
+import { GRADE_LEVEL_OPTIONS, type GradeLevel } from '@/lib/subjects';
 import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle, Cloud } from 'lucide-react';
 
 type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai' | 'sync';
@@ -36,6 +37,7 @@ function SettingsContent() {
   const [nicknameLocked, setNicknameLocked] = useState(false);
   const [targetTitle, setTargetTitle] = useState('');
   const [targetDate, setTargetDate] = useState('');
+  const [gradeLevel, setGradeLevel] = useState<GradeLevel | ''>('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
@@ -46,7 +48,8 @@ function SettingsContent() {
     const { error } = await supabase.from('profiles').update({
       name,
       target_title: targetTitle,
-      target_date: targetDate || null
+      target_date: targetDate || null,
+      grade_level: gradeLevel || null
     }).eq('id', userId);
     setIsSaving(false);
     if (!error) {
@@ -62,12 +65,13 @@ function SettingsContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        const { data: profile } = await supabase.from('profiles').select('avatar_seed, saved_avatars, name, target_date, target_title, nickname_locked').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('avatar_seed, saved_avatars, name, target_date, target_title, nickname_locked, grade_level').eq('id', user.id).single();
         if (profile) {
           if (profile.name) setName(profile.name);
           setNicknameLocked(!!profile.nickname_locked);
           if (profile.target_title) setTargetTitle(profile.target_title);
           if (profile.target_date) setTargetDate(profile.target_date);
+          if (profile.grade_level) setGradeLevel(profile.grade_level as GradeLevel);
           if (profile.avatar_seed) setAvatarSeed(profile.avatar_seed);
           if (profile.saved_avatars && profile.saved_avatars.length > 0) setSavedAvatars(profile.saved_avatars);
         }
@@ -347,6 +351,21 @@ function SettingsContent() {
                       </span>
                     ) : '他のユーザーに公開される名前です。'}
                   </p>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">学年</label>
+                  <select
+                    value={gradeLevel}
+                    onChange={e => setGradeLevel(e.target.value as GradeLevel | '')}
+                    className="w-full px-4 py-3 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-darkbg-secondary focus:ring-2 focus:ring-brand-500 outline-none"
+                  >
+                    <option value="">未設定</option>
+                    {GRADE_LEVEL_OPTIONS.map(g => (
+                      <option key={g.value} value={g.value}>{g.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-2">ポモドーロで選べる学習科目の候補を、学年に応じて絞り込みます。</p>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
