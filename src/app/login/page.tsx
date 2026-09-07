@@ -32,6 +32,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
         
 
+        <div className="mt-6 text-center">
+          <a href="/signup" className="text-xs text-brand-600 dark:text-brand-400 hover:underline">新規登録はこちら</a>
+        </div>
+
         <div className="mt-8 text-center text-xs text-slate-500">
           ログインすることで、<br />
           <a href="/terms" className="underline hover:text-brand-500">利用規約</a> および <a href="/privacy" className="underline hover:text-brand-500">プライバシーポリシー</a> に同意したものとみなされます。

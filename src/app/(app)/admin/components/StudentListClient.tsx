@@ -19,11 +19,29 @@ export default function StudentListClient({ students }: { students: Student[] })
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return students;
-    return students.filter(s =>
-      s.name?.toLowerCase().includes(q) || s.student_id?.toLowerCase().includes(q)
-    );
+    const base = q
+      ? students.filter(s => s.name?.toLowerCase().includes(q) || s.student_id?.toLowerCase().includes(q))
+      : students;
+    // 承認待ちを先頭に集める(対応が必要なため)
+    return [...base].sort((a, b) => {
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      return 0;
+    });
   }, [students, query]);
+
+  const handleApprove = (student: Student) => {
+    setPendingId(student.id);
+    startTransition(async () => {
+      try {
+        await setStudentStatus(student.id, 'active');
+      } catch (e) {
+        alert(e instanceof Error ? e.message : '更新に失敗しました');
+      } finally {
+        setPendingId(null);
+      }
+    });
+  };
 
   const handleToggleStatus = (student: Student) => {
     const nextStatus = student.status === 'disabled' ? 'active' : 'disabled';
@@ -45,7 +63,14 @@ export default function StudentListClient({ students }: { students: Student[] })
   return (
     <>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="font-bold text-lg text-slate-800 dark:text-white">生徒一覧</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-bold text-lg text-slate-800 dark:text-white">生徒一覧</h3>
+          {students.some(s => s.status === 'pending') && (
+            <span className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-2 py-1 rounded-lg font-bold">
+              承認待ち {students.filter(s => s.status === 'pending').length} 件
+            </span>
+          )}
+        </div>
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -75,7 +100,11 @@ export default function StudentListClient({ students }: { students: Student[] })
                   <td className="py-4 text-slate-600 dark:text-slate-300 font-mono text-xs">{student.student_id}</td>
                   <td className="py-4 font-bold text-slate-800 dark:text-slate-200">{student.name}</td>
                   <td className="py-4">
-                    {student.status === 'disabled' ? (
+                    {student.status === 'pending' ? (
+                      <span className="px-2 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        承認待ち
+                      </span>
+                    ) : student.status === 'disabled' ? (
                       <span className="px-2 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
                         停止中
                       </span>
@@ -84,17 +113,27 @@ export default function StudentListClient({ students }: { students: Student[] })
                     )}
                   </td>
                   <td className="py-4 text-right space-x-2 whitespace-nowrap">
-                    <button
-                      onClick={() => handleToggleStatus(student)}
-                      disabled={isPending && pendingId === student.id}
-                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
-                        student.status === 'disabled'
-                          ? 'text-emerald-600 hover:text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20'
-                          : 'text-rose-600 hover:text-rose-700 bg-rose-50 dark:bg-rose-900/20'
-                      }`}
-                    >
-                      {student.status === 'disabled' ? '有効化' : '無効化'}
-                    </button>
+                    {student.status === 'pending' ? (
+                      <button
+                        onClick={() => handleApprove(student)}
+                        disabled={isPending && pendingId === student.id}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 text-emerald-600 hover:text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20"
+                      >
+                        承認する
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleToggleStatus(student)}
+                        disabled={isPending && pendingId === student.id}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                          student.status === 'disabled'
+                            ? 'text-emerald-600 hover:text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20'
+                            : 'text-rose-600 hover:text-rose-700 bg-rose-50 dark:bg-rose-900/20'
+                        }`}
+                      >
+                        {student.status === 'disabled' ? '有効化' : '無効化'}
+                      </button>
+                    )}
                     <Link href={`/admin/student/${student.id}`} className="text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold text-xs bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg transition-colors">
                       詳細を見る
                     </Link>

@@ -38,5 +38,5 @@ export async function GET(request: Request) {
     console.error('Auth callback error:', error)
   }
 
-  return NextResponse.redirect(`${origin}/login?error=Google連携に失敗しました`)
+  return NextResponse.redirect(`${origin}/login?error=` + encodeURIComponent('確認処理に失敗しました。もう一度お試しください。'))
 }

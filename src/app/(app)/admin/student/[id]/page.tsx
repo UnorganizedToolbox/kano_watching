@@ -60,6 +60,11 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-black font-title text-slate-800 dark:text-white">{student.name}</h2>
+            {student.status === 'pending' && (
+              <span className="px-2 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                承認待ち
+              </span>
+            )}
             {student.status === 'disabled' && (
               <span className="px-2 py-1 rounded-md text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
                 停止中

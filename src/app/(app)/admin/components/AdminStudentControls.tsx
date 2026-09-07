@@ -49,15 +49,30 @@ export default function AdminStudentControls({
     });
   };
 
+  const handleApprove = () => {
+    startTransition(async () => {
+      try {
+        await setStudentStatus(studentId, 'active');
+        setStatus('active');
+      } catch (e) {
+        setMessage(e instanceof Error ? e.message : '更新に失敗しました');
+      }
+    });
+  };
+
   return (
     <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
       <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">アカウント管理</h3>
 
       <div className="mb-4 pb-4 border-b border-slate-100 dark:border-slate-800 space-y-1.5">
         <div className="flex justify-between items-center text-sm">
-          <span className="text-slate-500 dark:text-slate-400">アカウント有効</span>
-          <span className={`font-bold ${status !== 'disabled' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-            {status !== 'disabled' ? 'はい' : 'いいえ'}
+          <span className="text-slate-500 dark:text-slate-400">アカウント状態</span>
+          <span className={`font-bold ${
+            status === 'pending' ? 'text-amber-600 dark:text-amber-400'
+            : status === 'disabled' ? 'text-rose-600 dark:text-rose-400'
+            : 'text-emerald-600 dark:text-emerald-400'
+          }`}>
+            {status === 'pending' ? '承認待ち' : status === 'disabled' ? '停止中' : '有効'}
           </span>
         </div>
         <div className="flex justify-between items-center text-sm">
@@ -98,19 +113,30 @@ export default function AdminStudentControls({
       </button>
 
       <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-        <label className="text-xs font-bold text-slate-500 block mb-2">アカウント状態</label>
-        <button
-          onClick={handleToggleStatus}
-          disabled={isPending}
-          className={`w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 ${
-            status === 'disabled'
-              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
-              : 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400'
-          }`}
-        >
-          {status === 'disabled' ? <ShieldCheck className="w-4 h-4" /> : <ShieldOff className="w-4 h-4" />}
-          {status === 'disabled' ? 'アカウントを有効化する' : 'アカウントを無効化する'}
-        </button>
+        <label className="text-xs font-bold text-slate-500 block mb-2">アカウント操作</label>
+        {status === 'pending' ? (
+          <button
+            onClick={handleApprove}
+            disabled={isPending}
+            className="w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            登録を承認する
+          </button>
+        ) : (
+          <button
+            onClick={handleToggleStatus}
+            disabled={isPending}
+            className={`w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 ${
+              status === 'disabled'
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                : 'bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400'
+            }`}
+          >
+            {status === 'disabled' ? <ShieldCheck className="w-4 h-4" /> : <ShieldOff className="w-4 h-4" />}
+            {status === 'disabled' ? 'アカウントを有効化する' : 'アカウントを無効化する'}
+          </button>
+        )}
       </div>
 
       {message && <p className="text-xs text-slate-500 mt-3">{message}</p>}

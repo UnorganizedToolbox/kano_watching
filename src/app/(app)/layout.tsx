@@ -24,9 +24,14 @@ export default async function AppLayout({
     .eq('id', user.id)
     .single();
 
+  if (profile?.status === 'pending') {
+    await supabase.auth.signOut();
+    redirect('/login?error=' + encodeURIComponent('登録申請を確認中です。管理者の承認をお待ちください。'));
+  }
+
   if (profile?.status === 'disabled') {
     await supabase.auth.signOut();
-    redirect('/login?error=このアカウントは管理者によって停止されています');
+    redirect('/login?error=' + encodeURIComponent('このアカウントは管理者によって停止されています。'));
   }
 
   const name = profile?.name || user.email?.split('@')[0] || 'Unknown';
