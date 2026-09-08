@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
-import { setStudentStatus } from '../actions';
+import { setStudentStatus, approveMember } from '../actions';
 
 type Student = {
   id: string;
@@ -12,7 +12,7 @@ type Student = {
   status: string;
 };
 
-export default function StudentListClient({ students }: { students: Student[] }) {
+export default function StudentListClient({ students, viewerRole }: { students: Student[]; viewerRole: 'admin' | 'teacher' }) {
   const [query, setQuery] = useState('');
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export default function StudentListClient({ students }: { students: Student[] })
     setPendingId(student.id);
     startTransition(async () => {
       try {
-        await setStudentStatus(student.id, 'active');
+        await approveMember(student.id);
       } catch (e) {
         alert(e instanceof Error ? e.message : '更新に失敗しました');
       } finally {
@@ -121,7 +121,7 @@ export default function StudentListClient({ students }: { students: Student[] })
                       >
                         承認する
                       </button>
-                    ) : (
+                    ) : viewerRole === 'admin' ? (
                       <button
                         onClick={() => handleToggleStatus(student)}
                         disabled={isPending && pendingId === student.id}
@@ -133,7 +133,7 @@ export default function StudentListClient({ students }: { students: Student[] })
                       >
                         {student.status === 'disabled' ? '有効化' : '無効化'}
                       </button>
-                    )}
+                    ) : null}
                     <Link href={`/admin/student/${student.id}`} className="text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold text-xs bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg transition-colors">
                       詳細を見る
                     </Link>

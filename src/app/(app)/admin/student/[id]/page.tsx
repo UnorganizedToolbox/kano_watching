@@ -12,7 +12,8 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data: adminProfile } = await supabase.from('profiles').select('role').eq('id', user?.id).single();
-  if (adminProfile?.role !== 'admin') redirect('/');
+  if (adminProfile?.role !== 'admin' && adminProfile?.role !== 'teacher') redirect('/');
+  const viewerRole = adminProfile.role as 'admin' | 'teacher';
 
   // Fetch student profile
   const { data: student, error: studentError } = await supabase
@@ -112,7 +113,9 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
             initialLocked={!!student.nickname_locked}
             initialStatus={student.status}
             initialRole={student.role}
+            initialOrganizationId={student.organization_id}
             organizations={organizations || []}
+            viewerRole={viewerRole}
           />
 
           <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">

@@ -61,7 +61,7 @@ export default async function AdminDashboard() {
         {/* Left Column: Students List */}
         <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
           <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col min-h-[500px]">
-            <StudentListClient students={students || []} />
+            <StudentListClient students={students || []} viewerRole={profile?.role === 'admin' ? 'admin' : 'teacher'} />
           </div>
         </div>
 

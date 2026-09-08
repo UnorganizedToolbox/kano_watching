@@ -11,10 +11,22 @@ export async function signup(formData: FormData) {
   const password = formData.get('password') as string;
   const name = formData.get('name') as string;
   const birthdate = formData.get('birthdate') as string;
-  const organization_id = formData.get('organization_id') as string;
+  const organizationIdInput = (formData.get('organization_id') as string)?.trim();
 
   if (!email || !password || !name || !birthdate) {
     redirect('/signup?error=' + encodeURIComponent('必須項目を入力してください'));
+  }
+
+  let organization_id = '';
+  if (organizationIdInput) {
+    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationIdInput);
+    const { data: org } = isValidUuid
+      ? await supabase.from('organizations').select('id').eq('id', organizationIdInput).maybeSingle()
+      : { data: null };
+    if (!org) {
+      redirect('/signup?error=' + encodeURIComponent('団体IDが見つかりません。所属する教師にご確認ください。'));
+    }
+    organization_id = organizationIdInput;
   }
 
   const headersList = await headers();

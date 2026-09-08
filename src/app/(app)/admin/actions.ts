@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -13,6 +14,38 @@ async function verifyAdmin() {
   if (profile?.role !== 'admin') throw new Error('権限がありません');
 
   return supabase;
+}
+
+async function verifyAdminOrTeacher() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('ログインしていません');
+
+  const { data: profile } = await supabase.from('profiles').select('role, organization_id').eq('id', user.id).single();
+  if (profile?.role !== 'admin' && profile?.role !== 'teacher') throw new Error('権限がありません');
+
+  return {
+    supabase,
+    callerRole: profile.role as 'admin' | 'teacher',
+    callerOrgId: profile.organization_id as string | null,
+  };
+}
+
+// 団体の人数上限(-1 は無制限)をチェックする。上限に達している場合は例外を投げる。
+async function checkOrgCapacity(supabase: SupabaseClient, organizationId: string) {
+  const { data: org } = await supabase.from('organizations').select('member_limit').eq('id', organizationId).single();
+  if (!org || org.member_limit === -1) return;
+
+  const { count } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .eq('status', 'active')
+    .in('role', ['student', 'teacher']);
+
+  if ((count || 0) >= org.member_limit) {
+    throw new Error(`この団体は人数の上限(${org.member_limit}人)に達しています`);
+  }
 }
 
 export async function setStudentStatus(studentId: string, status: 'active' | 'disabled') {
@@ -46,15 +79,63 @@ export async function deleteStudent(studentId: string) {
   revalidatePath('/admin');
 }
 
-export async function promoteToTeacher(userId: string, organizationId: string | null) {
-  const supabase = await verifyAdmin();
+// 承認待ち(pending)のアカウントを承認する。
+// 教師は自分の団体に所属する申請のみ承認可能。管理者は任意の団体を指定して承認できる
+// (organizationId を省略した場合は申請時に入力された団体のまま)。
+export async function approveMember(memberId: string, organizationId?: string | null) {
+  const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
 
-  const { data: target } = await supabase.from('profiles').select('role').eq('id', userId).single();
+  const { data: target } = await supabase.from('profiles').select('status, organization_id').eq('id', memberId).single();
+  if (!target) throw new Error('対象が見つかりません');
+  if (target.status !== 'pending') throw new Error('承認待ちのアカウントではありません');
+
+  let resolvedOrgId: string | null;
+  if (callerRole === 'teacher') {
+    if (!callerOrgId) throw new Error('あなたは団体に所属していません');
+    if (target.organization_id !== callerOrgId) throw new Error('自分の団体に所属する申請のみ承認できます');
+    resolvedOrgId = callerOrgId;
+  } else {
+    resolvedOrgId = organizationId !== undefined ? organizationId : target.organization_id;
+  }
+
+  if (resolvedOrgId) {
+    await checkOrgCapacity(supabase, resolvedOrgId);
+  }
+
+  const { error } = await supabase.from('profiles').update({
+    status: 'active',
+    organization_id: resolvedOrgId,
+  }).eq('id', memberId);
+
+  if (error) {
+    console.error('Failed to approve member', error);
+    throw new Error('承認に失敗しました');
+  }
+
+  revalidatePath('/admin');
+  revalidatePath(`/admin/student/${memberId}`);
+}
+
+// 教師は自分の団体に所属する生徒のみ、自団体の教師として昇格させられる。
+// 管理者は任意の生徒を、任意の団体を指定して昇格させられる。
+export async function promoteToTeacher(userId: string, organizationId?: string | null) {
+  const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
+
+  const { data: target } = await supabase.from('profiles').select('role, organization_id').eq('id', userId).single();
   if (!target || target.role !== 'student') throw new Error('対象は生徒アカウントではありません');
+
+  let resolvedOrgId: string | null;
+  if (callerRole === 'teacher') {
+    if (!callerOrgId) throw new Error('あなたは団体に所属していません');
+    if (target.organization_id !== callerOrgId) throw new Error('自分の団体に所属する生徒のみ昇格させられます');
+    resolvedOrgId = callerOrgId;
+  } else {
+    resolvedOrgId = organizationId !== undefined ? organizationId : target.organization_id;
+  }
 
   const { error } = await supabase.from('profiles').update({
     role: 'teacher',
-    organization_id: organizationId,
+    organization_id: resolvedOrgId,
   }).eq('id', userId);
 
   if (error) {
@@ -66,13 +147,32 @@ export async function promoteToTeacher(userId: string, organizationId: string | 
   revalidatePath(`/admin/student/${userId}`);
 }
 
+// 管理者が任意のユーザーの所属団体を直接変更する
+export async function setMemberOrganization(memberId: string, organizationId: string | null) {
+  const supabase = await verifyAdmin();
+
+  const { error } = await supabase.from('profiles').update({ organization_id: organizationId }).eq('id', memberId);
+
+  if (error) {
+    console.error('Failed to set member organization', error);
+    throw new Error('所属団体の変更に失敗しました');
+  }
+
+  revalidatePath('/admin');
+  revalidatePath(`/admin/student/${memberId}`);
+}
+
 export async function createOrganization(formData: FormData) {
   const supabase = await verifyAdmin();
 
   const name = (formData.get('name') as string)?.trim();
   if (!name) throw new Error('団体名を入力してください');
 
-  const { error } = await supabase.from('organizations').insert({ name });
+  const memberLimitRaw = (formData.get('member_limit') as string)?.trim();
+  const memberLimit = memberLimitRaw ? parseInt(memberLimitRaw, 10) : -1;
+  if (Number.isNaN(memberLimit) || memberLimit < -1) throw new Error('人数上限は -1(無制限)以上の整数で入力してください');
+
+  const { error } = await supabase.from('organizations').insert({ name, member_limit: memberLimit });
 
   if (error) {
     console.error('Failed to create organization', error);
