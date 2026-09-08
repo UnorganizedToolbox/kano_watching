@@ -46,6 +46,55 @@ export async function deleteStudent(studentId: string) {
   revalidatePath('/admin');
 }
 
+export async function promoteToTeacher(userId: string, organizationId: string | null) {
+  const supabase = await verifyAdmin();
+
+  const { data: target } = await supabase.from('profiles').select('role').eq('id', userId).single();
+  if (!target || target.role !== 'student') throw new Error('対象は生徒アカウントではありません');
+
+  const { error } = await supabase.from('profiles').update({
+    role: 'teacher',
+    organization_id: organizationId,
+  }).eq('id', userId);
+
+  if (error) {
+    console.error('Failed to promote to teacher', error);
+    throw new Error('教師への昇格に失敗しました');
+  }
+
+  revalidatePath('/admin');
+  revalidatePath(`/admin/student/${userId}`);
+}
+
+export async function createOrganization(formData: FormData) {
+  const supabase = await verifyAdmin();
+
+  const name = (formData.get('name') as string)?.trim();
+  if (!name) throw new Error('団体名を入力してください');
+
+  const { error } = await supabase.from('organizations').insert({ name });
+
+  if (error) {
+    console.error('Failed to create organization', error);
+    throw new Error('団体の作成に失敗しました。同名の団体が既に存在する可能性があります。');
+  }
+
+  revalidatePath('/admin/organizations');
+}
+
+export async function deleteOrganization(organizationId: string) {
+  const supabase = await verifyAdmin();
+
+  const { error } = await supabase.from('organizations').delete().eq('id', organizationId);
+
+  if (error) {
+    console.error('Failed to delete organization', error);
+    throw new Error('団体の削除に失敗しました');
+  }
+
+  revalidatePath('/admin/organizations');
+}
+
 export async function setStudentNickname(studentId: string, name: string, locked: boolean) {
   const supabase = await verifyAdmin();
 

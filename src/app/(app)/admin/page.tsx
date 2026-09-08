@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Building2 } from "lucide-react";
 import RealtimeAdminQuestions from "./components/RealtimeAdminQuestions";
 import SystemConfigToggle from "./components/SystemConfigToggle";
 import StudentListClient from "./components/StudentListClient";
@@ -37,8 +39,17 @@ export default async function AdminDashboard() {
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1400px] mx-auto w-full px-6 pt-2 pb-6">
       <div className="flex justify-between items-end mb-4">
-        <div>
+        <div className="flex items-center gap-3">
           <SystemConfigToggle />
+          {profile?.role === 'admin' && (
+            <Link
+              href="/admin/organizations"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-colors"
+            >
+              <Building2 className="w-4 h-4" />
+              団体管理
+            </Link>
+          )}
         </div>
         <div>
           <h2 className="text-2xl font-black font-title text-slate-800 dark:text-white mb-2">管理者ダッシュボード</h2>

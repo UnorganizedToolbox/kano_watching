@@ -2,24 +2,32 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, Unlock, ShieldOff, ShieldCheck, Trash2 } from 'lucide-react';
-import { setStudentNickname, setStudentStatus, deleteStudent } from '../actions';
+import { Lock, Unlock, ShieldOff, ShieldCheck, Trash2, GraduationCap } from 'lucide-react';
+import { setStudentNickname, setStudentStatus, deleteStudent, promoteToTeacher } from '../actions';
+
+type Organization = { id: string; name: string };
 
 export default function AdminStudentControls({
   studentId,
   initialName,
   initialLocked,
   initialStatus,
+  initialRole,
+  organizations,
 }: {
   studentId: string;
   initialName: string;
   initialLocked: boolean;
   initialStatus: string;
+  initialRole: string;
+  organizations: Organization[];
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [locked, setLocked] = useState(initialLocked);
   const [status, setStatus] = useState(initialStatus);
+  const [role, setRole] = useState(initialRole);
+  const [organizationId, setOrganizationId] = useState('');
   const [isPending, startTransition] = useTransition();
   const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState('');
@@ -59,6 +67,20 @@ export default function AdminStudentControls({
         setStatus('active');
       } catch (e) {
         setMessage(e instanceof Error ? e.message : '更新に失敗しました');
+      }
+    });
+  };
+
+  const handlePromote = () => {
+    if (!confirm(`${name} を教師に昇格させますか？`)) return;
+    startTransition(async () => {
+      try {
+        await promoteToTeacher(studentId, organizationId || null);
+        setRole('teacher');
+        setMessage('教師に昇格しました。');
+        setTimeout(() => setMessage(''), 3000);
+      } catch (e) {
+        setMessage(e instanceof Error ? e.message : '昇格に失敗しました');
       }
     });
   };
@@ -157,6 +179,37 @@ export default function AdminStudentControls({
           </button>
         )}
       </div>
+
+      {role === 'student' ? (
+        <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+          <label className="text-xs font-bold text-slate-500 block mb-2">教師への昇格</label>
+          <div className="flex gap-2">
+            <select
+              value={organizationId}
+              onChange={(e) => setOrganizationId(e.target.value)}
+              className="flex-1 px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
+            >
+              <option value="">担当団体なし</option>
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>{org.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handlePromote}
+            disabled={isPending}
+            className="w-full mt-2 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400"
+          >
+            <GraduationCap className="w-4 h-4" />
+            教師に昇格させる
+          </button>
+        </div>
+      ) : (
+        <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 text-sm">
+          <span className="text-slate-500 dark:text-slate-400">役割: </span>
+          <span className="font-bold text-indigo-600 dark:text-indigo-400">教師</span>
+        </div>
+      )}
 
       <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
         <label className="text-xs font-bold text-rose-500 block mb-2">危険な操作</label>

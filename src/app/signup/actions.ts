@@ -11,7 +11,7 @@ export async function signup(formData: FormData) {
   const password = formData.get('password') as string;
   const name = formData.get('name') as string;
   const birthdate = formData.get('birthdate') as string;
-  const affiliation = formData.get('affiliation') as string;
+  const organization_id = formData.get('organization_id') as string;
 
   if (!email || !password || !name || !birthdate) {
     redirect('/signup?error=' + encodeURIComponent('必須項目を入力してください'));
@@ -26,7 +26,7 @@ export async function signup(formData: FormData) {
     email,
     password,
     options: {
-      data: { name, birthdate, affiliation },
+      data: { name, birthdate, organization_id },
       emailRedirectTo: `${origin}/auth/callback?next=/signup/pending`,
     },
   });

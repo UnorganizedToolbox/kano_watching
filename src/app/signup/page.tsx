@@ -1,5 +1,6 @@
 import { signup } from './actions'
 import { FormSubmitButton } from '@/components/FormSubmitButton'
+import { createClient } from '@/utils/supabase/server'
 
 export default async function SignupPage({
   searchParams,
@@ -8,6 +9,9 @@ export default async function SignupPage({
 }) {
   const params = await searchParams;
   const error = params?.error as string | undefined;
+
+  const supabase = await createClient();
+  const { data: organizations } = await supabase.from('organizations').select('id, name').order('name');
 
   return (
     <div className="flex-1 flex justify-center items-center h-screen bg-slate-50 dark:bg-darkbg-primary py-8">
@@ -33,8 +37,13 @@ export default async function SignupPage({
             <input className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white/60 dark:bg-darkbg-secondary/60 text-slate-900 dark:text-white" id="birthdate" name="birthdate" type="date" required />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1" htmlFor="affiliation">所属団体（個人の場合は空欄でOK）</label>
-            <input className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white/60 dark:bg-darkbg-secondary/60 text-slate-900 dark:text-white" id="affiliation" name="affiliation" type="text" placeholder="例: ○○塾" />
+            <label className="block text-xs font-bold text-slate-500 mb-1" htmlFor="organization_id">所属団体（個人の場合は「個人」のままでOK）</label>
+            <select className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white/60 dark:bg-darkbg-secondary/60 text-slate-900 dark:text-white" id="organization_id" name="organization_id" defaultValue="">
+              <option value="">個人</option>
+              {organizations?.map(org => (
+                <option key={org.id} value={org.id}>{org.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1" htmlFor="email">Email</label>

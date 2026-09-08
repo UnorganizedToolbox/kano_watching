@@ -30,6 +30,8 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
     );
   }
 
+  const { data: organizations } = await supabase.from('organizations').select('id, name').order('name');
+
   // Fetch Pomodoro logs
   const { data: pomodoros } = await supabase
     .from('pomodoro_logs')
@@ -109,6 +111,8 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
             initialName={student.name}
             initialLocked={!!student.nickname_locked}
             initialStatus={student.status}
+            initialRole={student.role}
+            organizations={organizations || []}
           />
 
           <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
