@@ -29,6 +29,44 @@ export default async function DashboardPage() {
   const latestDiagnostic = diagnostics && diagnostics.length > 0 ? diagnostics[0] : null;
   const totalPomodoros = pomodoros?.length || 0;
 
+  // 所属団体の教師の大まかな学習実績(回数・時間・集中度)。詳細な操作ログは見せない。
+  let teacherStats: { name: string; totalHours: number; pomoCount: number; avgConcentration: number | null } | null = null;
+  if (profile?.organization_id) {
+    const { data: teachers } = await supabase
+      .from('profiles')
+      .select('id, name, total_study_minutes')
+      .eq('organization_id', profile.organization_id)
+      .eq('role', 'teacher')
+      .eq('status', 'active')
+      .limit(1);
+
+    const teacher = teachers?.[0];
+    if (teacher) {
+      const { count: pomoCount } = await supabase
+        .from('pomodoro_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('student_uuid', teacher.id);
+
+      const { data: activityLogs } = await supabase
+        .from('student_activity_logs')
+        .select('metadata')
+        .eq('student_id', teacher.id)
+        .eq('activity_type', 'POMODORO_COMPLETED');
+
+      const ratings = (activityLogs || [])
+        .map(a => (a.metadata as { concentrationRating?: number } | null)?.concentrationRating)
+        .filter((r): r is number => typeof r === 'number');
+      const avgConcentration = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
+
+      teacherStats = {
+        name: teacher.name,
+        totalHours: Math.round(((teacher.total_study_minutes || 0) / 60) * 10) / 10,
+        pomoCount: pomoCount || 0,
+        avgConcentration,
+      };
+    }
+  }
+
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1400px] mx-auto w-full px-6 pt-2 pb-6">
       
@@ -75,7 +113,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* Stats Analytics cards row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 shrink-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 shrink-0">
             <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 p-5 rounded-xl shadow-sm transition-all">
               <div className="flex justify-between items-center">
                 <span className="text-xs text-slate-400 font-medium">得点のブレ幅 (標準偏差 σ)</span>
@@ -98,6 +136,21 @@ export default async function DashboardPage() {
               </div>
               <p className="text-[10px] text-slate-400 mt-1">ポモドーロタイマーの履歴より</p>
             </div>
+
+            {teacherStats && (
+              <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 p-5 rounded-xl shadow-sm transition-all">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-400 font-medium">{teacherStats.name}先生の学習実績</span>
+                </div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-contrast">{teacherStats.pomoCount}</span>
+                  <span className="text-xs text-slate-400 font-bold">回 / 計{teacherStats.totalHours}時間</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {teacherStats.avgConcentration !== null ? `平均集中度 ${teacherStats.avgConcentration.toFixed(1)} / 5` : '集中度の記録はまだありません'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

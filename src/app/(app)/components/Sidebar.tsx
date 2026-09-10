@@ -72,6 +72,12 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
               <Users className="w-5 h-5" />
               <span>生徒一覧・管理</span>
             </Link>
+            {role === 'teacher' && (
+              <Link href="/timer" className={getLinkClass('/timer')}>
+                <Clock className="w-5 h-5" />
+                <span>ポモドーロタイマー</span>
+              </Link>
+            )}
             <button onClick={() => alert('未実装です')} className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20">
               <i className="fa-solid fa-chalkboard-user text-lg w-5 text-center"></i>
               <span>生徒指導 & 申請承認</span>
@@ -103,7 +109,7 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
         </a>
         
         <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.17.0</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.18.0</span>
         </div>
       </div>
     </div>

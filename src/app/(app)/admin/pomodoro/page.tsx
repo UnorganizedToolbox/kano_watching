@@ -74,7 +74,7 @@ export default async function TeacherPomodoroPage() {
         </Link>
         <div>
           <h2 className="text-2xl font-black font-title text-slate-800 dark:text-white">団体の学習状況</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">手本を見せましょう。生徒の学習状況が一覧で確認できます。</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">生徒の学習状況が一覧で確認できます。</p>
         </div>
       </div>
 

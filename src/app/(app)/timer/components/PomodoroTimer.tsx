@@ -506,24 +506,6 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
                 <i className="fa-solid fa-stop mr-2"></i> 中止
               </button>
             )}
-            {!isRunning && (
-              <button
-                onClick={() => {
-                  // For manual fast forward testing locally without breaking production
-                  const sid = crypto.randomUUID();
-                  setSessionId(sid);
-                  setTimeLeft(2);
-                  setTargetEndTime(Date.now() + 2000);
-                  setIsRunning(true);
-                  void startAudioForSession();
-                  void logPomodoroEvent(sid, mode, 'START', { test: true });
-                }}
-                className="flex-none px-4 py-4 bg-transparent text-transparent hover:text-slate-300 dark:hover:text-slate-700 transition-all active:scale-95"
-                title="秘密のテストボタン"
-              >
-                <i className="fa-solid fa-forward"></i>
-              </button>
-            )}
           </div>
         )}
       </div>
