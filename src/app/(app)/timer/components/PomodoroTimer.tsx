@@ -79,6 +79,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   const [mode, setMode] = useState<TimerMode>('WORK');
   const [subject, setSubject] = useState(subjectOptions[0]);
   const [customSubject, setCustomSubject] = useState('');
+  const effectiveSubject = subject === OTHER_SUBJECT ? (customSubject.trim() || OTHER_SUBJECT) : subject;
   const [levelUpData, setLevelUpData] = useState<{oldLevel: number, newLevel: number, rewardStones: number} | null>(null);
   const [pomoCount, setPomoCount] = useState(0);
   const [showTime, setShowTime] = useState(false);
@@ -319,7 +320,6 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     setAwaitingDecision(true);
 
     // 記録とレベルアップ判定はバックグラウンドで実行し、結果が来たらモーダルで通知する
-    const effectiveSubject = subject === OTHER_SUBJECT ? (customSubject.trim() || OTHER_SUBJECT) : subject;
     logPomodoro(effectiveSubject, 25, rating)
       .then((res) => {
         if (res?.levelUp) setLevelUpData(res.levelUp);
@@ -338,7 +338,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
       setIsRunning(true);
       setTargetEndTime(Date.now() + timeLeft * 1000);
       void startAudioForSession(); // ユーザー操作のタイミングで BGM・アラームを解錠する
-      void logPomodoroEvent(sid, mode, 'START');
+      void logPomodoroEvent(sid, mode, 'START', mode === 'WORK' ? { subject: effectiveSubject } : {});
     } else {
       setIsRunning(false);
       setTargetEndTime(null);

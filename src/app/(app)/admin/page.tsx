@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Building2 } from "lucide-react";
+import { Building2, Flame } from "lucide-react";
 import RealtimeAdminQuestions from "./components/RealtimeAdminQuestions";
 import SystemConfigToggle from "./components/SystemConfigToggle";
 import StudentListClient from "./components/StudentListClient";
@@ -48,6 +48,15 @@ export default async function AdminDashboard() {
             >
               <Building2 className="w-4 h-4" />
               団体管理
+            </Link>
+          )}
+          {profile?.role === 'teacher' && (
+            <Link
+              href="/admin/pomodoro"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-colors"
+            >
+              <Flame className="w-4 h-4" />
+              団体の学習状況
             </Link>
           )}
         </div>
