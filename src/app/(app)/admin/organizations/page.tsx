@@ -3,8 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { createOrganization } from "../actions";
-import { FormSubmitButton } from "@/components/FormSubmitButton";
+import CreateOrganizationForm from "../components/CreateOrganizationForm";
 import DeleteOrganizationButton from "../components/DeleteOrganizationButton";
 
 export default async function OrganizationsPage() {
@@ -45,29 +44,7 @@ export default async function OrganizationsPage() {
 
       <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
         <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4">新しい団体を追加</h3>
-        <form action={createOrganization} className="flex gap-2">
-          <input
-            type="text"
-            name="name"
-            required
-            placeholder="例: ○○塾"
-            className="flex-1 px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
-          />
-          <input
-            type="number"
-            name="member_limit"
-            defaultValue={-1}
-            min={-1}
-            title="人数上限(-1で無制限)"
-            className="w-24 px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
-          />
-          <FormSubmitButton
-            label="追加する"
-            pendingLabel="追加中..."
-            className="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-bold"
-          />
-        </form>
-        <p className="text-[10px] text-slate-400 mt-2">人数上限は -1 で無制限になります。</p>
+        <CreateOrganizationForm />
       </div>
 
       <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
