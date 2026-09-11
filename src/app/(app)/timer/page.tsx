@@ -6,6 +6,7 @@ import { askQuestion } from "./actions";
 import RealtimeQuestions from "./components/RealtimeQuestions";
 import PomodoroTimer from "./components/PomodoroTimer";
 import QAThreadList from "./components/QAThreadList";
+import { resolveEffectiveRules, type RuleMap } from "@/lib/rules";
 
 export default async function TimerPage() {
   const supabase = await createClient();
@@ -18,7 +19,7 @@ export default async function TimerPage() {
     .order('created_at', { ascending: false })
     .limit(1);
   
-  const questionsEnabled = !(configLogs && configLogs.length > 0 && configLogs[0].metadata && (configLogs[0].metadata as any).questions_enabled === false);
+  const globalQuestionsEnabled = !(configLogs && configLogs.length > 0 && configLogs[0].metadata && (configLogs[0].metadata as any).questions_enabled === false);
 
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -26,8 +27,16 @@ export default async function TimerPage() {
     redirect('/login');
   }
 
-  const { data: profile } = await supabase.from('profiles').select('grade_level, role').eq('id', user.id).single();
+  const { data: profile } = await supabase.from('profiles').select('grade_level, role, organization_id, rule_overrides').eq('id', user.id).single();
   const isTeacher = profile?.role === 'teacher';
+
+  let orgRules: RuleMap = {};
+  if (profile?.organization_id) {
+    const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
+    orgRules = (org?.rules as RuleMap) || {};
+  }
+  const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
+  const questionsEnabled = globalQuestionsEnabled && !effectiveRules.disable_questions;
 
   // 教師には質問箱(生徒→教師の連絡手段)は不要なので、ポモドーロのみ表示する
   if (isTeacher) {

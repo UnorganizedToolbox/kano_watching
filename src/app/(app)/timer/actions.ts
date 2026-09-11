@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { evaluateAchievements } from "@/lib/gamification/engine";
+import { resolveEffectiveRules, type RuleMap } from "@/lib/rules";
 
 export async function askQuestion(formData: FormData) {
   const supabase = await createClient();
@@ -14,7 +15,7 @@ export async function askQuestion(formData: FormData) {
     .eq('activity_type', 'SYSTEM_CONFIG')
     .order('created_at', { ascending: false })
     .limit(1);
-    
+
   if (configLogs && configLogs.length > 0 && configLogs[0].metadata) {
     const meta = configLogs[0].metadata as any;
     if (meta.questions_enabled === false) {
@@ -33,6 +34,17 @@ export async function askQuestion(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('ログインしていません');
+
+  const { data: askerProfile } = await supabase.from('profiles').select('organization_id, rule_overrides').eq('id', user.id).single();
+  let orgRules: RuleMap = {};
+  if (askerProfile?.organization_id) {
+    const { data: org } = await supabase.from('organizations').select('rules').eq('id', askerProfile.organization_id).single();
+    orgRules = (org?.rules as RuleMap) || {};
+  }
+  const effective = resolveEffectiveRules(orgRules, askerProfile?.rule_overrides as RuleMap);
+  if (effective.disable_questions) {
+    throw new Error('教師/管理者によって質問の投稿が禁止されています。');
+  }
 
   // April Fools Easter Egg
   const today = new Date();

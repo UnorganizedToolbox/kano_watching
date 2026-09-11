@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { calc_Lv_from_EXP } from '@/lib/gamification/level';
+import { resolveEffectiveRules, type RuleMap } from '@/lib/rules';
 import Sidebar from "./components/Sidebar";
 import HeaderDropdown from "./components/HeaderDropdown";
 
@@ -41,6 +42,13 @@ export default async function AppLayout({
   const exp = profile?.exp || 0;
   const avatarSeed = profile?.avatar_seed || 'LearnFlowUser123';
 
+  let orgRules: RuleMap = {};
+  if (profile?.organization_id) {
+    const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
+    orgRules = (org?.rules as RuleMap) || {};
+  }
+  const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
+
   return (
     <>
       <header className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 shrink-0 z-20">
@@ -61,7 +69,7 @@ export default async function AppLayout({
 
       <div className="flex flex-1 overflow-hidden relative z-10">
         <aside className="w-64 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
-          <Sidebar role={role} level={level} exp={exp} />
+          <Sidebar role={role} level={level} exp={exp} gamificationDisabled={effectiveRules.disable_gamification} />
         </aside>
 
         <main className="flex-1 overflow-y-auto px-20 py-4 h-[calc(100vh-4rem)] flex flex-col pb-16" id="main-content-scroll">

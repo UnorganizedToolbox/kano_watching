@@ -5,11 +5,12 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ProceduralAvatar from '../components/ProceduralAvatar';
 import { createClient } from '@/utils/supabase/client';
-import { linkGoogleAccount } from './actions';
+import { linkGoogleAccount, saveProfileSettings } from './actions';
 import { setTheme } from '../../actions/theme';
 import { ACHIEVEMENTS_DICT } from "@/lib/gamification/achievements";
 import PomodoroSoundSettings from './PomodoroSoundSettings';
 import { GRADE_LEVEL_OPTIONS, type GradeLevel } from '@/lib/subjects';
+import { resolveEffectiveRules, type RuleKey } from '@/lib/rules';
 import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle, Cloud } from 'lucide-react';
 
 type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai' | 'sync';
@@ -40,22 +41,26 @@ function SettingsContent() {
   const [gradeLevel, setGradeLevel] = useState<GradeLevel | ''>('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [effectiveRules, setEffectiveRules] = useState<Record<RuleKey, boolean>>({} as Record<RuleKey, boolean>);
 
   const handleSaveProfile = async () => {
     if (!userId) return;
     setIsSaving(true);
     setSaveMessage('');
-    const { error } = await supabase.from('profiles').update({
-      name,
-      target_title: targetTitle,
-      target_date: targetDate || null,
-      grade_level: gradeLevel || null
-    }).eq('id', userId);
-    setIsSaving(false);
-    if (!error) {
-      setSaveMessage('プロフィールを保存しました。');
-      setTimeout(() => setSaveMessage(''), 3000);
+    try {
+      const result = await saveProfileSettings({
+        name,
+        targetTitle,
+        targetDate,
+        gradeLevel,
+      });
+      setSaveMessage(result.nicknameBlocked ? 'プロフィールを保存しました(ニックネームは制限のため変更されませんでした)。' : 'プロフィールを保存しました。');
+      setTimeout(() => setSaveMessage(''), 4000);
       window.dispatchEvent(new Event('profileUpdated'));
+    } catch (e) {
+      setSaveMessage(e instanceof Error ? e.message : '保存に失敗しました。');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -65,7 +70,7 @@ function SettingsContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        const { data: profile } = await supabase.from('profiles').select('avatar_seed, saved_avatars, name, target_date, target_title, nickname_locked, grade_level').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('avatar_seed, saved_avatars, name, target_date, target_title, nickname_locked, grade_level, organization_id, rule_overrides').eq('id', user.id).single();
         if (profile) {
           if (profile.name) setName(profile.name);
           setNicknameLocked(!!profile.nickname_locked);
@@ -74,6 +79,13 @@ function SettingsContent() {
           if (profile.grade_level) setGradeLevel(profile.grade_level as GradeLevel);
           if (profile.avatar_seed) setAvatarSeed(profile.avatar_seed);
           if (profile.saved_avatars && profile.saved_avatars.length > 0) setSavedAvatars(profile.saved_avatars);
+
+          let orgRules = {};
+          if (profile.organization_id) {
+            const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
+            orgRules = org?.rules || {};
+          }
+          setEffectiveRules(resolveEffectiveRules(orgRules, profile.rule_overrides));
         }
         
         // Fetch achievements for titles
@@ -341,13 +353,13 @@ function SettingsContent() {
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    disabled={nicknameLocked}
+                    disabled={nicknameLocked || effectiveRules.disable_nickname_change}
                     className="w-full px-4 py-3 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-darkbg-secondary focus:ring-2 focus:ring-brand-500 outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <p className="text-[10px] text-slate-400 mt-2">
-                    {nicknameLocked ? (
+                    {(nicknameLocked || effectiveRules.disable_nickname_change) ? (
                       <span className="flex items-center gap-1 text-amber-600 dark:text-amber-500 font-bold">
-                        <Lock className="w-3 h-3" /> 管理者によって固定されています。変更が必要な場合は管理者にお問い合わせください。
+                        <Lock className="w-3 h-3" /> 管理者/教師によって固定されています。変更が必要な場合はお問い合わせください。
                       </span>
                     ) : '他のユーザーに公開される名前です。'}
                   </p>
@@ -447,17 +459,26 @@ function SettingsContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">デザインスキン</label>
-                  <select 
+                  <select
                     value={currentTheme}
-                    onChange={(e) => {
+                    disabled={effectiveRules.disable_theme_change}
+                    onChange={async (e) => {
                       const newTheme = e.target.value;
+                      const prevClassName = document.body.className;
                       // Replace existing theme class
                       document.body.className = document.body.className.replace(/(theme-\w+|glass|brutalist|clay|lofi|aurora|cafe|matcha|default)/g, '').trim() + ' ' + newTheme;
-                      
-                      setTheme(newTheme);
                       setCurrentTheme(newTheme);
+
+                      try {
+                        await setTheme(newTheme);
+                      } catch (err) {
+                        document.body.className = prevClassName;
+                        const match = prevClassName.match(/theme-\w+/);
+                        if (match) setCurrentTheme(match[0]);
+                        alert(err instanceof Error ? err.message : 'テーマの変更に失敗しました');
+                      }
                     }}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="theme-glass">Glassmorphism (透過ガラス・アチーブ連動壁紙)</option>
                     <option value="theme-brutalist">Neo-Brutalism (ネオ・ブルータリズム)</option>

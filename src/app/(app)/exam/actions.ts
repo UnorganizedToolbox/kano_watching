@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { resolveEffectiveRules, type RuleMap } from "@/lib/rules";
 
 export async function submitExam(formData: FormData) {
   const q1 = formData.get('q1') as string;
@@ -14,6 +15,17 @@ export async function submitExam(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('ログインしていません');
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id, rule_overrides').eq('id', user.id).single();
+  let orgRules: RuleMap = {};
+  if (profile?.organization_id) {
+    const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
+    orgRules = (org?.rules as RuleMap) || {};
+  }
+  const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
+  if (effectiveRules.disable_exam_registration) {
+    throw new Error('教師/管理者によって実力診断テストの受験が禁止されています。');
+  }
 
   // Calculate score
   let score = 0;

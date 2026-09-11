@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { RULE_DEFS, type RuleMap } from "@/lib/rules";
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -213,7 +214,7 @@ export async function setStudentNickname(studentId: string, name: string, locked
 }
 
 export async function addAdminReply(questionId: string, text: string) {
-  const supabase = await verifyAdmin();
+  const { supabase } = await verifyAdminOrTeacher();
 
   const trimmed = text.trim();
   if (!trimmed) throw new Error('返信内容を入力してください');
@@ -255,7 +256,7 @@ export async function answerQuestion(formData: FormData) {
 
   if (!question_id || !answer_body) throw new Error('必要なデータがありません');
 
-  const supabase = await verifyAdmin();
+  const { supabase } = await verifyAdminOrTeacher();
 
   const { error } = await supabase.from('questions').update({
     status: 'answered',
@@ -271,4 +272,155 @@ export async function answerQuestion(formData: FormData) {
   revalidatePath('/admin');
   revalidatePath('/timer');
   return;
+}
+
+function sanitizeRuleMap(input: unknown): RuleMap {
+  const out: RuleMap = {};
+  if (!input || typeof input !== 'object') return out;
+  const knownKeys = RULE_DEFS.map(r => r.key);
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    const match = knownKeys.find(k => k === key);
+    if (match && typeof value === 'boolean') {
+      out[match] = value;
+    }
+  }
+  return out;
+}
+
+// 一括管理: 団体単位のルールを設定する。
+// 教師は自分の団体のみ。管理者は任意の団体を指定できる。
+export async function setOrganizationRules(organizationId: string | undefined, rules: RuleMap) {
+  const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
+
+  let targetOrgId: string;
+  if (callerRole === 'teacher') {
+    if (!callerOrgId) throw new Error('あなたは団体に所属していません');
+    targetOrgId = callerOrgId;
+  } else {
+    if (!organizationId) throw new Error('団体を指定してください');
+    targetOrgId = organizationId;
+  }
+
+  const { error } = await supabase.from('organizations').update({ rules: sanitizeRuleMap(rules) }).eq('id', targetOrgId);
+
+  if (error) {
+    console.error('Failed to update organization rules', error);
+    throw new Error('団体ルールの更新に失敗しました');
+  }
+
+  revalidatePath('/admin/rules');
+  revalidatePath('/admin');
+}
+
+// 個別管理: 生徒単位でルールを上書きする(団体のルールより優先)。
+// 教師は自団体の生徒のみ。管理者は任意の生徒を指定できる。
+export async function setStudentRuleOverrides(studentId: string, overrides: RuleMap) {
+  const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
+
+  const { data: target } = await supabase.from('profiles').select('organization_id').eq('id', studentId).single();
+  if (!target) throw new Error('対象が見つかりません');
+
+  if (callerRole === 'teacher') {
+    if (!callerOrgId || target.organization_id !== callerOrgId) {
+      throw new Error('自分の団体に所属するユーザーのみ設定できます');
+    }
+  }
+
+  const { error } = await supabase.from('profiles').update({ rule_overrides: sanitizeRuleMap(overrides) }).eq('id', studentId);
+
+  if (error) {
+    console.error('Failed to update student rule overrides', error);
+    throw new Error('個別ルールの更新に失敗しました');
+  }
+
+  revalidatePath('/admin');
+  revalidatePath(`/admin/student/${studentId}`);
+}
+
+// 問い合わせ: 教師 -> 管理者
+export async function submitTeacherInquiry(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('ログインしていません');
+
+  const { data: profile } = await supabase.from('profiles').select('role, organization_id').eq('id', user.id).single();
+  if (profile?.role !== 'teacher') throw new Error('権限がありません');
+
+  const title = (formData.get('title') as string)?.trim();
+  const body = (formData.get('body') as string)?.trim();
+  if (!title || !body) throw new Error('タイトルと内容を入力してください');
+
+  const { error } = await supabase.from('teacher_inquiries').insert({
+    teacher_id: user.id,
+    organization_id: profile.organization_id,
+    title,
+    body,
+  });
+
+  if (error) {
+    console.error('Failed to submit teacher inquiry', error);
+    throw new Error('問い合わせの送信に失敗しました');
+  }
+
+  revalidatePath('/admin/inquiries');
+}
+
+export async function replyToInquiry(inquiryId: string, text: string) {
+  const supabase = await verifyAdmin();
+
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error('返信内容を入力してください');
+
+  const { error } = await supabase.from('teacher_inquiries').update({
+    admin_reply: trimmed,
+    status: 'answered',
+    answered_at: new Date().toISOString(),
+  }).eq('id', inquiryId);
+
+  if (error) {
+    console.error('Failed to reply to inquiry', error);
+    throw new Error('返信の送信に失敗しました');
+  }
+
+  revalidatePath('/admin/inquiries');
+}
+
+// 成績登録: 教師/管理者が生徒の診断結果(得点・弱点・所見)を手動登録する。
+export async function registerGrade(formData: FormData) {
+  const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
+
+  const studentId = formData.get('student_id') as string;
+  const scoreRaw = (formData.get('total_score') as string)?.trim();
+  const weaknesses = (formData.get('weaknesses') as string)?.trim();
+  const recommendation = (formData.get('recommendation') as string)?.trim();
+
+  if (!studentId || !scoreRaw) throw new Error('生徒と得点は必須です');
+
+  const totalScore = parseInt(scoreRaw, 10);
+  if (Number.isNaN(totalScore) || totalScore < 0 || totalScore > 100) throw new Error('得点は0〜100の整数で入力してください');
+
+  const { data: target } = await supabase.from('profiles').select('organization_id, role').eq('id', studentId).single();
+  if (!target || target.role !== 'student') throw new Error('対象が見つかりません');
+
+  if (callerRole === 'teacher') {
+    if (!callerOrgId || target.organization_id !== callerOrgId) {
+      throw new Error('自分の団体に所属する生徒のみ登録できます');
+    }
+  }
+
+  const { error } = await supabase.from('diagnostic_results').insert({
+    student_uuid: studentId,
+    total_score: totalScore,
+    weaknesses: weaknesses || null,
+    recommendation: recommendation || null,
+    answers_json: { manual_entry: true, registered_by: callerRole },
+  });
+
+  if (error) {
+    console.error('Failed to register grade', error);
+    throw new Error('成績の登録に失敗しました');
+  }
+
+  revalidatePath(`/admin/student/${studentId}`);
+  revalidatePath('/');
 }

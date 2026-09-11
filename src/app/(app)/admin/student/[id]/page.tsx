@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock, BarChart2, MessageCircle } from "lucide-react";
 import AdminStudentControls from "../../components/AdminStudentControls";
+import StudentRuleOverrides from "../../components/StudentRuleOverrides";
+import GradeRegisterForm from "../../components/GradeRegisterForm";
 
 export default async function StudentDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -117,6 +119,13 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
             organizations={organizations || []}
             viewerRole={viewerRole}
           />
+
+          {student.role === 'student' && (
+            <>
+              <StudentRuleOverrides studentId={student.id} initialOverrides={student.rule_overrides || {}} />
+              <GradeRegisterForm studentId={student.id} />
+            </>
+          )}
 
           <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
             <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-4 flex items-center gap-2">

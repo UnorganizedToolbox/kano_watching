@@ -1,12 +1,31 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { submitExam } from "./actions";
+import { resolveEffectiveRules, type RuleMap } from "@/lib/rules";
 
 export default async function ExamPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) redirect('/login');
+
+  const { data: profile } = await supabase.from('profiles').select('organization_id, rule_overrides').eq('id', user.id).single();
+  let orgRules: RuleMap = {};
+  if (profile?.organization_id) {
+    const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
+    orgRules = (org?.rules as RuleMap) || {};
+  }
+  const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
+
+  if (effectiveRules.disable_exam_registration) {
+    return (
+      <section className="flex-1 flex flex-col items-center justify-center gap-4 max-w-[600px] mx-auto w-full px-6 py-16 text-center">
+        <span className="px-3 py-1 bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 rounded-full text-xs font-bold">受験停止中</span>
+        <h2 className="text-xl font-black font-title text-slate-800 dark:text-white">現在、実力診断テストの受験は無効化されています</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">教師/管理者にお問い合わせください。</p>
+      </section>
+    );
+  }
 
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[800px] mx-auto w-full px-6 pt-8 pb-16 animate-in fade-in slide-in-from-bottom-4">

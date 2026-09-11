@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal, Gamepad2 } from "lucide-react";
+import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal, Gamepad2, ShieldCheck, Mail } from "lucide-react";
 
 interface SidebarProps {
   role: string;
   level?: number;
   exp?: number;
+  gamificationDisabled?: boolean;
 }
 
-export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
+export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled = false }: SidebarProps) {
   const pathname = usePathname();
 
   const getLinkClass = (href: string) => {
@@ -31,23 +32,25 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
       <nav className="flex-1 flex flex-col gap-1 p-4 overflow-y-auto">
         {role === 'student' ? (
           <>
-            <Link href="/game" className="mb-4 block">
-              <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer group relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
-                  <span className="text-[10px] mr-0.5">Lv.</span>{level}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <p className="text-xs font-bold text-brand-700 dark:text-brand-300 truncate pr-2">ゲームポータル <Gamepad2 className="inline w-3 h-3 ml-0.5 opacity-70" /></p>
-                    <span className="text-[9px] text-brand-600/70 dark:text-brand-400/70 font-mono">{exp}/{requiredExp}</span>
+            {!gamificationDisabled && (
+              <Link href="/game" className="mb-4 block">
+                <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer group relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
+                    <span className="text-[10px] mr-0.5">Lv.</span>{level}
                   </div>
-                  <div className="w-full bg-brand-200/60 dark:bg-brand-900/50 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-brand-500 h-full rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <p className="text-xs font-bold text-brand-700 dark:text-brand-300 truncate pr-2">ゲームポータル <Gamepad2 className="inline w-3 h-3 ml-0.5 opacity-70" /></p>
+                      <span className="text-[9px] text-brand-600/70 dark:text-brand-400/70 font-mono">{exp}/{requiredExp}</span>
+                    </div>
+                    <div className="w-full bg-brand-200/60 dark:bg-brand-900/50 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-brand-500 h-full rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            )}
 
             <Link href="/" className={getLinkClass('/')}>
               <LayoutDashboard className="w-5 h-5" />
@@ -78,10 +81,14 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
                 <span>ポモドーロタイマー</span>
               </Link>
             )}
-            <button onClick={() => alert('未実装です')} className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20">
-              <i className="fa-solid fa-chalkboard-user text-lg w-5 text-center"></i>
-              <span>生徒指導 & 申請承認</span>
-            </button>
+            <Link href="/admin/rules" className={getLinkClass('/admin/rules')}>
+              <ShieldCheck className="w-5 h-5" />
+              <span>一括・個別管理</span>
+            </Link>
+            <Link href="/admin/inquiries" className={getLinkClass('/admin/inquiries')}>
+              <Mail className="w-5 h-5" />
+              <span>{role === 'teacher' ? '問い合わせ' : '問い合わせ管理'}</span>
+            </Link>
             <button onClick={() => alert('未実装です')} className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/20">
               <i className="fa-solid fa-plus-minus text-lg w-5 text-center"></i>
               <span>CBT問題作成・配信</span>
@@ -109,7 +116,7 @@ export default function Sidebar({ role, level = 1, exp = 0 }: SidebarProps) {
         </a>
         
         <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.18.1</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.19.0</span>
         </div>
       </div>
     </div>
