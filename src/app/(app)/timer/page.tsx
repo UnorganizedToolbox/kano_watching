@@ -26,7 +26,17 @@ export default async function TimerPage() {
     redirect('/login');
   }
 
-  const { data: profile } = await supabase.from('profiles').select('grade_level').eq('id', user.id).single();
+  const { data: profile } = await supabase.from('profiles').select('grade_level, role').eq('id', user.id).single();
+  const isTeacher = profile?.role === 'teacher';
+
+  // 教師には質問箱(生徒→教師の連絡手段)は不要なので、ポモドーロのみ表示する
+  if (isTeacher) {
+    return (
+      <section className="flex-1 flex flex-col gap-6 max-w-[700px] mx-auto w-full px-6 pt-2 pb-6">
+        <PomodoroTimer gradeLevel={null} />
+      </section>
+    );
+  }
 
   // Fetch open questions for this user
   const { data: questions } = await supabase
