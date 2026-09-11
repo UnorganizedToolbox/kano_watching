@@ -2,9 +2,10 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { calc_Lv_from_EXP } from '@/lib/gamification/level';
-import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from '@/lib/rules';
+import { resolveEffectiveRules, resolveEffectivePinnedTheme, type RuleMap, type OrgRuleMap } from '@/lib/rules';
 import Sidebar from "./components/Sidebar";
 import HeaderDropdown from "./components/HeaderDropdown";
+import ThemeEnforcer from "./components/ThemeEnforcer";
 
 export default async function AppLayout({
   children,
@@ -48,9 +49,11 @@ export default async function AppLayout({
     orgRules = (org?.rules as OrgRuleMap) || {};
   }
   const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
+  const pinnedTheme = resolveEffectivePinnedTheme(orgRules, profile?.rule_overrides as RuleMap);
 
   return (
     <>
+      <ThemeEnforcer pinnedTheme={pinnedTheme} />
       <header className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 shrink-0 z-20">
         <div className="flex items-center gap-4">
           <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/30">

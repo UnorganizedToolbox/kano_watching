@@ -10,7 +10,7 @@ import { setTheme } from '../../actions/theme';
 import { ACHIEVEMENTS_DICT } from "@/lib/gamification/achievements";
 import PomodoroSoundSettings from './PomodoroSoundSettings';
 import { GRADE_LEVEL_OPTIONS, type GradeLevel } from '@/lib/subjects';
-import { resolveEffectiveRules, type RuleKey } from '@/lib/rules';
+import { resolveEffectiveRules, resolveEffectivePinnedTheme, type RuleKey } from '@/lib/rules';
 import { Lock, Settings2, User, Gamepad2, Palette, CreditCard, Sparkles, AlertTriangle, Cloud } from 'lucide-react';
 
 type Tab = 'general' | 'profile' | 'gamification' | 'theme' | 'billing' | 'ai' | 'sync';
@@ -86,6 +86,12 @@ function SettingsContent() {
             orgRules = org?.rules || {};
           }
           setEffectiveRules(resolveEffectiveRules(orgRules, profile.rule_overrides));
+
+          const pinnedTheme = resolveEffectivePinnedTheme(orgRules, profile.rule_overrides);
+          if (pinnedTheme) {
+            document.body.className = document.body.className.replace(/(theme-\w+|glass|brutalist|clay|lofi|aurora|cafe|matcha|default)/g, '').trim() + ' ' + pinnedTheme;
+            setCurrentTheme(pinnedTheme);
+          }
         }
         
         // Fetch achievements for titles

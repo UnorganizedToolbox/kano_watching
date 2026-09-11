@@ -4,7 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { RULE_DEFS, type RuleMap, type OrgRuleMap } from "@/lib/rules";
+import { RULE_DEFS, type RuleMap, type OrgRuleMap, isValidThemeValue } from "@/lib/rules";
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -299,6 +299,10 @@ function sanitizeRuleMap(input: unknown): RuleMap {
   if (!input || typeof input !== 'object') return out;
   const knownKeys = RULE_DEFS.map(r => r.key);
   for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (key === 'pinned_theme') {
+      if (value === null || isValidThemeValue(value)) out.pinned_theme = value as string | null;
+      continue;
+    }
     const match = knownKeys.find(k => k === key);
     if (match && typeof value === 'boolean') {
       out[match] = value;
@@ -314,6 +318,10 @@ function sanitizeOrgRuleMap(input: unknown): OrgRuleMap {
   if (!input || typeof input !== 'object') return out;
   const knownKeys = RULE_DEFS.map(r => r.key);
   for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (key === 'pinned_theme') {
+      if (value === null || isValidThemeValue(value)) out.pinned_theme = value as string | null;
+      continue;
+    }
     const match = knownKeys.find(k => k === key);
     if (match && typeof value === 'string' && ORG_RULE_VALUES.has(value)) {
       out[match] = value as OrgRuleMap[typeof match];

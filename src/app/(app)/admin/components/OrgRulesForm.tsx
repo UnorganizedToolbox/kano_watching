@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { setOrganizationRules } from '../actions';
-import { RULE_DEFS, normalizeOrgRuleValue, type OrgRuleMap, type OrgRuleValue } from '@/lib/rules';
+import { RULE_DEFS, normalizeOrgRuleValue, THEME_OPTIONS, isValidThemeValue, type OrgRuleMap, type OrgRuleValue } from '@/lib/rules';
 import { ShieldCheck } from 'lucide-react';
 
 const OPTIONS: { value: OrgRuleValue; label: string }[] = [
@@ -22,6 +22,7 @@ export default function OrgRulesForm({ organizationId, organizationName, initial
     for (const def of RULE_DEFS) {
       normalized[def.key] = normalizeOrgRuleValue(initialRules?.[def.key]);
     }
+    normalized.pinned_theme = isValidThemeValue(initialRules?.pinned_theme) ? initialRules.pinned_theme : null;
     return normalized;
   });
   const [isPending, startTransition] = useTransition();
@@ -30,6 +31,11 @@ export default function OrgRulesForm({ organizationId, organizationName, initial
 
   const setValue = (key: typeof RULE_DEFS[number]['key'], value: OrgRuleValue) => {
     setRules(prev => ({ ...prev, [key]: value }));
+    setSaved(false);
+  };
+
+  const setPinnedTheme = (value: string) => {
+    setRules(prev => ({ ...prev, pinned_theme: value || null }));
     setSaved(false);
   };
 
@@ -66,8 +72,9 @@ export default function OrgRulesForm({ organizationId, organizationName, initial
                 <button
                   key={opt.value}
                   type="button"
+                  disabled={def.key === 'disable_theme_change' && !!rules.pinned_theme}
                   onClick={() => setValue(def.key, opt.value)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                     rules[def.key] === opt.value
                       ? opt.value === 'forced'
                         ? 'bg-rose-600 text-white'
@@ -81,6 +88,25 @@ export default function OrgRulesForm({ organizationId, organizationName, initial
                 </button>
               ))}
             </div>
+
+            {def.key === 'disable_theme_change' && (
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
+                  特定のテーマに固定する(任意)
+                </label>
+                <p className="text-[10px] text-slate-400 mb-2">選択すると、上の禁止設定に関わらずそのテーマが全生徒に強制適用され、変更もできなくなります。</p>
+                <select
+                  value={rules.pinned_theme || ''}
+                  onChange={(e) => setPinnedTheme(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none"
+                >
+                  <option value="">固定しない</option>
+                  {THEME_OPTIONS.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         ))}
       </div>
