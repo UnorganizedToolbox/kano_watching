@@ -35,6 +35,12 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
 
   const { data: organizations } = await supabase.from('organizations').select('id, name').order('name');
 
+  let studentOrgRules: Record<string, unknown> = {};
+  if (student.organization_id) {
+    const { data: studentOrg } = await supabase.from('organizations').select('rules').eq('id', student.organization_id).single();
+    studentOrgRules = (studentOrg?.rules as Record<string, unknown>) || {};
+  }
+
   // Fetch Pomodoro logs
   const { data: pomodoros } = await supabase
     .from('pomodoro_logs')
@@ -122,7 +128,7 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
 
           {student.role === 'student' && (
             <>
-              <StudentRuleOverrides studentId={student.id} initialOverrides={student.rule_overrides || {}} />
+              <StudentRuleOverrides studentId={student.id} initialOverrides={student.rule_overrides || {}} orgRules={studentOrgRules} />
               <GradeRegisterForm studentId={student.id} />
             </>
           )}

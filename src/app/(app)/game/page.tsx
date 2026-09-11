@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import GamePortalClient from "./GamePortalClient";
-import { resolveEffectiveRules, type RuleMap } from "@/lib/rules";
+import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from "@/lib/rules";
 
 export default async function GamePortalPage() {
   const supabase = await createClient();
@@ -19,10 +19,10 @@ export default async function GamePortalPage() {
     .eq('id', user.id)
     .single();
 
-  let orgRules: RuleMap = {};
+  let orgRules: OrgRuleMap = {};
   if (profile?.organization_id) {
     const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
-    orgRules = (org?.rules as RuleMap) || {};
+    orgRules = (org?.rules as OrgRuleMap) || {};
   }
   const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
   if (effectiveRules.disable_gamification) {

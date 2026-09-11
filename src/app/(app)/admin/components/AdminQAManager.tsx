@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { answerQuestion, addAdminReply } from '../actions';
 
 type Reply = {
   role: 'student' | 'admin';
   text: string;
+  image_url?: string | null;
   created_at: string;
 };
 
@@ -45,14 +46,41 @@ export default function AdminQAManager({ questions }: { questions: Question[] })
   const [answeringId, setAnsweringId] = useState<string | null>(null);
   const [replyingId, setReplyingId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [replyImage, setReplyImage] = useState<File | null>(null);
+  const [answerText, setAnswerText] = useState('');
   const [isPending, startTransition] = useTransition();
+  const replyFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSendReply = (questionId: string) => {
-    if (!replyText.trim()) return;
+  const handleSendAnswer = (questionId: string) => {
+    if (!answerText.trim()) return;
+    const formData = new FormData();
+    formData.set('question_id', questionId);
+    formData.set('answer_body', answerText);
+
     startTransition(async () => {
       try {
-        await addAdminReply(questionId, replyText);
+        await answerQuestion(formData);
+        setAnsweringId(null);
+        setAnswerText('');
+      } catch (e) {
+        alert(e instanceof Error ? e.message : '回答の送信に失敗しました');
+      }
+    });
+  };
+
+  const handleSendReply = (questionId: string) => {
+    if (!replyText.trim() && !replyImage) return;
+    const formData = new FormData();
+    formData.set('question_id', questionId);
+    formData.set('text', replyText);
+    if (replyImage) formData.set('image', replyImage);
+
+    startTransition(async () => {
+      try {
+        await addAdminReply(formData);
         setReplyText('');
+        setReplyImage(null);
+        if (replyFileInputRef.current) replyFileInputRef.current.value = '';
         setReplyingId(null);
       } catch (e) {
         alert(e instanceof Error ? e.message : '返信の送信に失敗しました');
@@ -155,65 +183,81 @@ export default function AdminQAManager({ questions }: { questions: Question[] })
                       <span className={`text-[10px] font-bold block mb-1 ${r.role === 'admin' ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500'}`}>
                         {r.role === 'admin' ? 'あなた' : q.profiles?.name || '生徒'} ({new Date(r.created_at).toLocaleString()}):
                       </span>
-                      <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300">{r.text}</p>
+                      {r.text && <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300">{r.text}</p>}
+                      {r.image_url && (
+                        <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={r.image_url} alt="添付画像" className="max-w-full h-auto max-h-48 object-contain" />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
 
-              {q.status !== 'resolved' && q.status !== 'open' && (
+              {/* 一度でも回答済みならスレッド形式の返信を使う(未回答=生徒からの新しい反応待ちに戻っても
+                  最初の回答フォームではなく返信フォームを表示する) */}
+              {q.status !== 'resolved' && q.answer_body && (
                 replyingId === q.id ? (
-                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex gap-2">
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="返信する..."
+                        autoFocus
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendReply(q.id)}
+                        className="flex-1 px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                      <button
+                        onClick={() => handleSendReply(q.id)}
+                        disabled={isPending}
+                        className="px-3 py-1.5 bg-brand-600 text-white text-xs font-bold rounded-md hover:bg-brand-700 disabled:opacity-50"
+                      >
+                        送信
+                      </button>
+                    </div>
                     <input
-                      type="text"
-                      value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      placeholder="返信する..."
-                      autoFocus
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendReply(q.id)}
-                      className="flex-1 px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      ref={replyFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setReplyImage(e.target.files?.[0] || null)}
+                      className="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300"
                     />
-                    <button
-                      onClick={() => handleSendReply(q.id)}
-                      disabled={isPending}
-                      className="px-3 py-1.5 bg-brand-600 text-white text-xs font-bold rounded-md hover:bg-brand-700 disabled:opacity-50"
-                    >
-                      送信
-                    </button>
                   </div>
                 ) : (
                   <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-                    <button onClick={() => { setReplyingId(q.id); setReplyText(''); }} className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    <button onClick={() => { setReplyingId(q.id); setReplyText(''); setReplyImage(null); }} className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                       返信する
                     </button>
                   </div>
                 )
               )}
 
-              {q.status === 'open' && (
+              {q.status !== 'resolved' && !q.answer_body && (
                 answeringId === q.id ? (
-                  <form action={answerQuestion} className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
-                    <input type="hidden" name="question_id" value={q.id} />
+                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
                     <textarea
-                      required
-                      name="answer_body"
+                      value={answerText}
+                      onChange={(e) => setAnswerText(e.target.value)}
                       rows={3}
                       placeholder="回答を入力してください..."
                       className="w-full px-3 py-2 text-xs text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-slate-50 dark:bg-slate-900 resize-none"
                       autoFocus
                     ></textarea>
                     <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => setAnsweringId(null)} className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                      <button type="button" onClick={() => { setAnsweringId(null); setAnswerText(''); }} className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                         キャンセル
                       </button>
-                      <button type="submit" onClick={() => setTimeout(() => setAnsweringId(null), 100)} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-600 text-white hover:bg-brand-700 transition-colors">
+                      <button type="button" onClick={() => handleSendAnswer(q.id)} disabled={isPending} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-50">
                         回答を送信
                       </button>
                     </div>
-                  </form>
+                  </div>
                 ) : (
                   <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-                    <button onClick={() => setAnsweringId(q.id)} className="text-[10px] font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1 rounded-md hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
+                    <button onClick={() => { setAnsweringId(q.id); setAnswerText(''); }} className="text-[10px] font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1 rounded-md hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
                       回答する
                     </button>
                   </div>

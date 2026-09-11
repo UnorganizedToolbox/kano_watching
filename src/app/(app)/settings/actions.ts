@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
-import { resolveEffectiveRules, type RuleMap } from '@/lib/rules'
+import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from '@/lib/rules'
 
 export async function linkGoogleAccount() {
   const supabase = await createClient()
@@ -30,10 +30,10 @@ export async function linkGoogleAccount() {
 }
 
 async function getEffectiveRulesFor(supabase: Awaited<ReturnType<typeof createClient>>, organizationId: string | null, overrides: unknown) {
-  let orgRules: RuleMap = {};
+  let orgRules: OrgRuleMap = {};
   if (organizationId) {
     const { data: org } = await supabase.from('organizations').select('rules').eq('id', organizationId).single();
-    orgRules = (org?.rules as RuleMap) || {};
+    orgRules = (org?.rules as OrgRuleMap) || {};
   }
   return resolveEffectiveRules(orgRules, overrides as RuleMap);
 }

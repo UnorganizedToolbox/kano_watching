@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
-import { resolveEffectiveRules, type RuleMap } from '@/lib/rules'
+import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from '@/lib/rules'
 
 export async function setTheme(theme: string) {
   const supabase = await createClient()
@@ -11,10 +11,10 @@ export async function setTheme(theme: string) {
   if (user) {
     const { data: profile } = await supabase.from('profiles').select('organization_id, rule_overrides').eq('id', user.id).single()
     if (profile) {
-      let orgRules: RuleMap = {}
+      let orgRules: OrgRuleMap = {}
       if (profile.organization_id) {
         const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single()
-        orgRules = (org?.rules as RuleMap) || {}
+        orgRules = (org?.rules as OrgRuleMap) || {}
       }
       const effective = resolveEffectiveRules(orgRules, profile.rule_overrides as RuleMap)
       if (effective.disable_theme_change) {

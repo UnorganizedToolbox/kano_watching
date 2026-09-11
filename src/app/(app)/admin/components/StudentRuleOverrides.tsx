@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { setStudentRuleOverrides } from '../actions';
-import { RULE_DEFS, type RuleKey, type RuleMap } from '@/lib/rules';
+import { RULE_DEFS, normalizeOrgRuleValue, type RuleKey, type RuleMap, type OrgRuleMap } from '@/lib/rules';
 import { ShieldCheck } from 'lucide-react';
 
 type OverrideValue = 'inherit' | 'on' | 'off';
@@ -16,7 +16,7 @@ function toValueMap(overrides: RuleMap): Record<RuleKey, OverrideValue> {
   return v;
 }
 
-export default function StudentRuleOverrides({ studentId, initialOverrides }: { studentId: string; initialOverrides: RuleMap }) {
+export default function StudentRuleOverrides({ studentId, initialOverrides, orgRules }: { studentId: string; initialOverrides: RuleMap; orgRules?: OrgRuleMap }) {
   const [values, setValues] = useState<Record<RuleKey, OverrideValue>>(() => toValueMap(initialOverrides || {}));
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -47,26 +47,33 @@ export default function StudentRuleOverrides({ studentId, initialOverrides }: { 
         <ShieldCheck className="w-5 h-5 text-brand-500" />
         個別管理
       </h3>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">この生徒だけに適用するルールです。「団体設定に従う」以外を選ぶと、団体の一括設定より優先されます。</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">この生徒だけに適用するルールです。「団体設定に従う」以外を選ぶと、団体の一括設定より優先されます(ただし団体側が「強制禁止」の場合は上書きできません)。</p>
 
       <div className="space-y-2">
-        {RULE_DEFS.map(def => (
-          <div key={def.key} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 dark:border-slate-800/60 last:border-0">
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{def.label}</span>
-            <select
-              value={values[def.key]}
-              onChange={(e) => {
-                setValues(prev => ({ ...prev, [def.key]: e.target.value as OverrideValue }));
-                setSaved(false);
-              }}
-              className="px-2 py-1 text-[11px] border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none"
-            >
-              <option value="inherit">団体設定に従う</option>
-              <option value="on">禁止する</option>
-              <option value="off">許可する</option>
-            </select>
-          </div>
-        ))}
+        {RULE_DEFS.map(def => {
+          const forced = normalizeOrgRuleValue(orgRules?.[def.key]) === 'forced';
+          return (
+            <div key={def.key} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-50 dark:border-slate-800/60 last:border-0">
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                {def.label}
+                {forced && <span className="ml-1.5 text-[9px] font-bold text-rose-500">(団体で強制禁止中)</span>}
+              </span>
+              <select
+                value={forced ? 'on' : values[def.key]}
+                disabled={forced}
+                onChange={(e) => {
+                  setValues(prev => ({ ...prev, [def.key]: e.target.value as OverrideValue }));
+                  setSaved(false);
+                }}
+                className="px-2 py-1 text-[11px] border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <option value="inherit">団体設定に従う</option>
+                <option value="on">禁止する</option>
+                <option value="off">許可する</option>
+              </select>
+            </div>
+          );
+        })}
       </div>
 
       {error && <p className="text-rose-500 text-xs font-bold mt-3">{error}</p>}

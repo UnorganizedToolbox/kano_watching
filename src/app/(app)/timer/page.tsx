@@ -1,12 +1,11 @@
-import { SubmitQuestionButton } from "./components/SubmitQuestionButton"
 export const dynamic = "force-dynamic";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import { askQuestion } from "./actions";
 import RealtimeQuestions from "./components/RealtimeQuestions";
 import PomodoroTimer from "./components/PomodoroTimer";
 import QAThreadList from "./components/QAThreadList";
-import { resolveEffectiveRules, type RuleMap } from "@/lib/rules";
+import AskQuestionForm from "./components/AskQuestionForm";
+import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from "@/lib/rules";
 
 export default async function TimerPage() {
   const supabase = await createClient();
@@ -30,10 +29,10 @@ export default async function TimerPage() {
   const { data: profile } = await supabase.from('profiles').select('grade_level, role, organization_id, rule_overrides').eq('id', user.id).single();
   const isTeacher = profile?.role === 'teacher';
 
-  let orgRules: RuleMap = {};
+  let orgRules: OrgRuleMap = {};
   if (profile?.organization_id) {
     const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
-    orgRules = (org?.rules as RuleMap) || {};
+    orgRules = (org?.rules as OrgRuleMap) || {};
   }
   const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
   const questionsEnabled = globalQuestionsEnabled && !effectiveRules.disable_questions;
@@ -86,17 +85,7 @@ export default async function TimerPage() {
                   <p className="text-xs text-rose-500/80 dark:text-rose-400/80 mt-1">教師の回答をお待ちいただくか、後ほどお試しください。</p>
                 </div>
               ) : (
-                <form action={askQuestion} className="flex flex-col gap-2">
-
-                <input required type="text" name="title" placeholder="質問のタイトル (例: 青チャートP45について)" className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-900" />
-                <textarea required name="body" rows={3} placeholder="質問内容を詳しく書いてください..." className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-900 resize-none"></textarea>
-                
-                <div className="flex items-center gap-2 mb-1">
-                  <input type="file" name="image" accept="image/*" className="text-xs text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300 w-full" />
-                </div>
-                
-                <SubmitQuestionButton />
-              </form>
+                <AskQuestionForm />
               )}
             </div>
           </div>

@@ -2,22 +2,34 @@
 
 import { useState, useTransition } from 'react';
 import { setOrganizationRules } from '../actions';
-import { RULE_DEFS, type RuleMap } from '@/lib/rules';
+import { RULE_DEFS, normalizeOrgRuleValue, type OrgRuleMap, type OrgRuleValue } from '@/lib/rules';
 import { ShieldCheck } from 'lucide-react';
+
+const OPTIONS: { value: OrgRuleValue; label: string }[] = [
+  { value: 'off', label: '許可' },
+  { value: 'on', label: '禁止(生徒側で上書き可)' },
+  { value: 'forced', label: '強制禁止(上書き不可)' },
+];
 
 export default function OrgRulesForm({ organizationId, organizationName, initialRules, isAdmin }: {
   organizationId: string;
   organizationName: string;
-  initialRules: RuleMap;
+  initialRules: OrgRuleMap;
   isAdmin: boolean;
 }) {
-  const [rules, setRules] = useState<RuleMap>(initialRules || {});
+  const [rules, setRules] = useState<OrgRuleMap>(() => {
+    const normalized: OrgRuleMap = {};
+    for (const def of RULE_DEFS) {
+      normalized[def.key] = normalizeOrgRuleValue(initialRules?.[def.key]);
+    }
+    return normalized;
+  });
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const toggle = (key: typeof RULE_DEFS[number]['key']) => {
-    setRules(prev => ({ ...prev, [key]: !prev[key] }));
+  const setValue = (key: typeof RULE_DEFS[number]['key'], value: OrgRuleValue) => {
+    setRules(prev => ({ ...prev, [key]: value }));
     setSaved(false);
   };
 
@@ -40,22 +52,36 @@ export default function OrgRulesForm({ organizationId, organizationName, initial
         <ShieldCheck className="w-5 h-5 text-brand-500" />
         一括管理: {organizationName}
       </h3>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">団体に所属する全生徒に適用される制限です。個別管理で生徒ごとに上書きできます。</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
+        団体に所属する全生徒に適用される制限です。「禁止」は個別管理で生徒ごとに上書きできますが、「強制禁止」は個別管理でも変更できません。
+      </p>
 
       <div className="space-y-3">
         {RULE_DEFS.map(def => (
-          <label key={def.key} className="flex items-start justify-between gap-4 p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer transition-colors">
-            <div>
-              <p className="font-bold text-sm text-slate-700 dark:text-slate-200">{def.label}を禁止</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{def.description}</p>
+          <div key={def.key} className="p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+            <p className="font-bold text-sm text-slate-700 dark:text-slate-200">{def.label}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{def.description}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setValue(def.key, opt.value)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                    rules[def.key] === opt.value
+                      ? opt.value === 'forced'
+                        ? 'bg-rose-600 text-white'
+                        : opt.value === 'on'
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-emerald-500 text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-            <input
-              type="checkbox"
-              checked={!!rules[def.key]}
-              onChange={() => toggle(def.key)}
-              className="w-5 h-5 mt-1 accent-brand-600 shrink-0"
-            />
-          </label>
+          </div>
         ))}
       </div>
 

@@ -2,7 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import { resolveEffectiveRules, type RuleMap } from "@/lib/rules";
+import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from "@/lib/rules";
 
 export async function submitExam(formData: FormData) {
   const q1 = formData.get('q1') as string;
@@ -17,10 +17,10 @@ export async function submitExam(formData: FormData) {
   if (!user) throw new Error('ログインしていません');
 
   const { data: profile } = await supabase.from('profiles').select('organization_id, rule_overrides').eq('id', user.id).single();
-  let orgRules: RuleMap = {};
+  let orgRules: OrgRuleMap = {};
   if (profile?.organization_id) {
     const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
-    orgRules = (org?.rules as RuleMap) || {};
+    orgRules = (org?.rules as OrgRuleMap) || {};
   }
   const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
   if (effectiveRules.disable_exam_registration) {

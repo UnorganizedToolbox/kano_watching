@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { submitExam } from "./actions";
-import { resolveEffectiveRules, type RuleMap } from "@/lib/rules";
+import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from "@/lib/rules";
 
 export default async function ExamPage() {
   const supabase = await createClient();
@@ -10,10 +10,10 @@ export default async function ExamPage() {
   if (!user) redirect('/login');
 
   const { data: profile } = await supabase.from('profiles').select('organization_id, rule_overrides').eq('id', user.id).single();
-  let orgRules: RuleMap = {};
+  let orgRules: OrgRuleMap = {};
   if (profile?.organization_id) {
     const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
-    orgRules = (org?.rules as RuleMap) || {};
+    orgRules = (org?.rules as OrgRuleMap) || {};
   }
   const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
 

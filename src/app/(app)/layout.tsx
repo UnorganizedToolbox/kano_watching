@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { calc_Lv_from_EXP } from '@/lib/gamification/level';
-import { resolveEffectiveRules, type RuleMap } from '@/lib/rules';
+import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from '@/lib/rules';
 import Sidebar from "./components/Sidebar";
 import HeaderDropdown from "./components/HeaderDropdown";
 
@@ -42,10 +42,10 @@ export default async function AppLayout({
   const exp = profile?.exp || 0;
   const avatarSeed = profile?.avatar_seed || 'LearnFlowUser123';
 
-  let orgRules: RuleMap = {};
+  let orgRules: OrgRuleMap = {};
   if (profile?.organization_id) {
     const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
-    orgRules = (org?.rules as RuleMap) || {};
+    orgRules = (org?.rules as OrgRuleMap) || {};
   }
   const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
 

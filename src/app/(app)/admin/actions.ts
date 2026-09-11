@@ -4,7 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { RULE_DEFS, type RuleMap } from "@/lib/rules";
+import { RULE_DEFS, type RuleMap, type OrgRuleMap } from "@/lib/rules";
 
 async function verifyAdmin() {
   const supabase = await createClient();
@@ -213,11 +213,15 @@ export async function setStudentNickname(studentId: string, name: string, locked
   revalidatePath(`/admin/student/${studentId}`);
 }
 
-export async function addAdminReply(questionId: string, text: string) {
+export async function addAdminReply(formData: FormData) {
+  const questionId = formData.get('question_id') as string;
+  const text = (formData.get('text') as string) || '';
+  const image = formData.get('image') as File | null;
+
   const { supabase } = await verifyAdminOrTeacher();
 
   const trimmed = text.trim();
-  if (!trimmed) throw new Error('返信内容を入力してください');
+  if (!trimmed && !(image && image.size > 0)) throw new Error('返信内容を入力してください');
 
   const { data: question, error: fetchError } = await supabase
     .from('questions')
@@ -230,9 +234,25 @@ export async function addAdminReply(questionId: string, text: string) {
     throw new Error('質問が見つかりませんでした');
   }
 
+  let image_url: string | null = null;
+  if (image && image.size > 0) {
+    const fileExt = image.name.split('.').pop();
+    const filePath = `replies/${questionId}-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage.from('qa_images').upload(filePath, image);
+    if (uploadError) {
+      console.error('Failed to upload reply image', uploadError);
+      throw new Error(`画像のアップロードに失敗しました: ${uploadError.message}`);
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('qa_images').getPublicUrl(filePath);
+    image_url = publicUrlData.publicUrl;
+  }
+
   const updatedReplies = [...(question.replies || []), {
     role: 'admin',
     text: trimmed,
+    image_url,
     created_at: new Date().toISOString(),
   }];
 
@@ -287,9 +307,24 @@ function sanitizeRuleMap(input: unknown): RuleMap {
   return out;
 }
 
+const ORG_RULE_VALUES = new Set(['off', 'on', 'forced']);
+
+function sanitizeOrgRuleMap(input: unknown): OrgRuleMap {
+  const out: OrgRuleMap = {};
+  if (!input || typeof input !== 'object') return out;
+  const knownKeys = RULE_DEFS.map(r => r.key);
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    const match = knownKeys.find(k => k === key);
+    if (match && typeof value === 'string' && ORG_RULE_VALUES.has(value)) {
+      out[match] = value as OrgRuleMap[typeof match];
+    }
+  }
+  return out;
+}
+
 // 一括管理: 団体単位のルールを設定する。
 // 教師は自分の団体のみ。管理者は任意の団体を指定できる。
-export async function setOrganizationRules(organizationId: string | undefined, rules: RuleMap) {
+export async function setOrganizationRules(organizationId: string | undefined, rules: OrgRuleMap) {
   const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
 
   let targetOrgId: string;
@@ -301,7 +336,7 @@ export async function setOrganizationRules(organizationId: string | undefined, r
     targetOrgId = organizationId;
   }
 
-  const { error } = await supabase.from('organizations').update({ rules: sanitizeRuleMap(rules) }).eq('id', targetOrgId);
+  const { error } = await supabase.from('organizations').update({ rules: sanitizeOrgRuleMap(rules) }).eq('id', targetOrgId);
 
   if (error) {
     console.error('Failed to update organization rules', error);

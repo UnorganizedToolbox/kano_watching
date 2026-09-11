@@ -3,7 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { evaluateAchievements } from "@/lib/gamification/engine";
-import { resolveEffectiveRules, type RuleMap } from "@/lib/rules";
+import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from "@/lib/rules";
 
 export async function askQuestion(formData: FormData) {
   const supabase = await createClient();
@@ -36,10 +36,10 @@ export async function askQuestion(formData: FormData) {
   if (!user) throw new Error('ログインしていません');
 
   const { data: askerProfile } = await supabase.from('profiles').select('organization_id, rule_overrides').eq('id', user.id).single();
-  let orgRules: RuleMap = {};
+  let orgRules: OrgRuleMap = {};
   if (askerProfile?.organization_id) {
     const { data: org } = await supabase.from('organizations').select('rules').eq('id', askerProfile.organization_id).single();
-    orgRules = (org?.rules as RuleMap) || {};
+    orgRules = (org?.rules as OrgRuleMap) || {};
   }
   const effective = resolveEffectiveRules(orgRules, askerProfile?.rule_overrides as RuleMap);
   if (effective.disable_questions) {
@@ -58,13 +58,13 @@ export async function askQuestion(formData: FormData) {
     const fileName = `${user.id}-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
     const filePath = `questions/${fileName}`;
 
-    const { error: uploadError, data } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('qa_images')
       .upload(filePath, image);
 
     if (uploadError) {
       console.error('Failed to upload image', uploadError);
-      throw new Error('画像のアップロードに失敗しました');
+      throw new Error(`画像のアップロードに失敗しました: ${uploadError.message}`);
     }
 
     const { data: publicUrlData } = supabase.storage
@@ -111,6 +111,91 @@ export async function askQuestion(formData: FormData) {
 
   revalidatePath('/timer');
   return;
+}
+
+// 生徒が自分の質問スレッドに返信する。返信が来た(=先生の反応待ち)ことが分かるよう、
+// 質問のステータスは常に 'open'(未回答) に戻す。
+export async function replyToQuestion(formData: FormData) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('ログインしていません');
+
+  const questionId = formData.get('question_id') as string;
+  const text = (formData.get('text') as string) || '';
+  const image = formData.get('image') as File | null;
+  const trimmed = text.trim();
+
+  if (!trimmed && !(image && image.size > 0)) throw new Error('返信内容を入力してください');
+
+  const { data: question, error: fetchError } = await supabase
+    .from('questions')
+    .select('replies, student_uuid, status')
+    .eq('id', questionId)
+    .single();
+
+  if (fetchError || !question) throw new Error('質問が見つかりませんでした');
+  if (question.student_uuid !== user.id) throw new Error('この質問に返信する権限がありません');
+  if (question.status === 'resolved') throw new Error('解決済みの質問には返信できません');
+
+  const { data: askerProfile } = await supabase.from('profiles').select('organization_id, rule_overrides').eq('id', user.id).single();
+  let orgRules: OrgRuleMap = {};
+  if (askerProfile?.organization_id) {
+    const { data: org } = await supabase.from('organizations').select('rules').eq('id', askerProfile.organization_id).single();
+    orgRules = (org?.rules as OrgRuleMap) || {};
+  }
+  const effective = resolveEffectiveRules(orgRules, askerProfile?.rule_overrides as RuleMap);
+  if (effective.disable_questions) {
+    throw new Error('教師/管理者によって質問箱の利用が禁止されています。');
+  }
+
+  let image_url: string | null = null;
+  if (image && image.size > 0) {
+    const fileExt = image.name.split('.').pop();
+    const filePath = `replies/${user.id}-${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage.from('qa_images').upload(filePath, image);
+    if (uploadError) {
+      console.error('Failed to upload reply image', uploadError);
+      throw new Error(`画像のアップロードに失敗しました: ${uploadError.message}`);
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('qa_images').getPublicUrl(filePath);
+    image_url = publicUrlData.publicUrl;
+  }
+
+  const updatedReplies = [...(question.replies || []), {
+    role: 'student',
+    text: trimmed,
+    image_url,
+    created_at: new Date().toISOString(),
+  }];
+
+  const { error } = await supabase.from('questions').update({
+    replies: updatedReplies,
+    status: 'open',
+  }).eq('id', questionId);
+
+  if (error) {
+    console.error('Failed to reply to question', error);
+    throw new Error('返信の送信に失敗しました');
+  }
+
+  revalidatePath('/timer');
+}
+
+export async function resolveQuestion(questionId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('ログインしていません');
+
+  const { error } = await supabase.from('questions').update({ status: 'resolved' }).eq('id', questionId).eq('student_uuid', user.id);
+
+  if (error) {
+    console.error('Failed to resolve question', error);
+    throw new Error('解決済みへの変更に失敗しました');
+  }
+
+  revalidatePath('/timer');
 }
 
 type PomodoroEventType = 'START' | 'PAUSE' | 'STOP' | 'COMPLETE' | 'CHECK_REMAINING_TIME' | 'RATING_SUBMITTED' | 'QUIT' | 'ABANDONED';
