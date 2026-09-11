@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { answerQuestion, addAdminReply } from '../actions';
+import { Star } from 'lucide-react';
 
 type Reply = {
   role: 'student' | 'admin';
@@ -19,6 +20,7 @@ type Question = {
   answer_body: string | null;
   replies: Reply[] | null;
   created_at: string;
+  is_favorited?: boolean;
   profiles: {
     name: string;
     student_id: string;
@@ -153,6 +155,9 @@ export default function AdminQAManager({ questions }: { questions: Question[] })
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${STATUS_STYLE[q.status].badge}`}>
                     {STATUS_STYLE[q.status].label}
                   </span>
+                  {q.is_favorited && (
+                    <Star className="w-3.5 h-3.5 text-amber-500" fill="currentColor" />
+                  )}
                 </div>
                 <span className="text-[10px] text-slate-400">{new Date(q.created_at).toLocaleDateString()}</span>
               </div>

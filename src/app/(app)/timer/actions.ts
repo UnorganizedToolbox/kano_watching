@@ -1,9 +1,60 @@
 'use server'
 
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { evaluateAchievements } from "@/lib/gamification/engine";
 import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from "@/lib/rules";
+import { FAVORITE_QUESTION_LIMIT, RESOLVED_QUESTION_RETENTION_LIMIT } from "@/lib/qaLimits";
+
+// Supabase Storage の公開URLから "qa_images" バケット内のパスを逆算する。
+// 例: https://xxx.supabase.co/storage/v1/object/public/qa_images/questions/foo.png -> questions/foo.png
+function extractQaImagePath(url: string): string | null {
+  const marker = '/qa_images/';
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return url.slice(idx + marker.length);
+}
+
+// 解決済みかつお気に入りでない質問が保持上限を超えた分を、古いものから
+// 画像(storage)ごと削除する。RLSの owner 制約(教師が投稿した返信画像など)を
+// 気にせず確実に削除できるよう service_role クライアントを使う。
+async function cleanupOldResolvedQuestions(studentId: string) {
+  const supabase = await createClient();
+  const { data: eligible } = await supabase
+    .from('questions')
+    .select('id, image_url, replies')
+    .eq('student_uuid', studentId)
+    .eq('status', 'resolved')
+    .eq('is_favorited', false)
+    .order('created_at', { ascending: false });
+
+  if (!eligible || eligible.length <= RESOLVED_QUESTION_RETENTION_LIMIT) return;
+
+  const toDelete = eligible.slice(RESOLVED_QUESTION_RETENTION_LIMIT);
+  const imagePaths: string[] = [];
+  for (const q of toDelete) {
+    if (q.image_url) {
+      const p = extractQaImagePath(q.image_url);
+      if (p) imagePaths.push(p);
+    }
+    for (const r of (q.replies as { image_url?: string | null }[] | null) || []) {
+      if (r.image_url) {
+        const p = extractQaImagePath(r.image_url);
+        if (p) imagePaths.push(p);
+      }
+    }
+  }
+
+  const adminClient = createAdminClient();
+  if (imagePaths.length > 0) {
+    const { error: storageError } = await adminClient.storage.from('qa_images').remove(imagePaths);
+    if (storageError) console.error('Failed to remove old QA images', storageError);
+  }
+
+  const { error: deleteError } = await adminClient.from('questions').delete().in('id', toDelete.map(q => q.id));
+  if (deleteError) console.error('Failed to delete old resolved questions', deleteError);
+}
 
 export async function askQuestion(formData: FormData) {
   const supabase = await createClient();
@@ -195,7 +246,44 @@ export async function resolveQuestion(questionId: string) {
     throw new Error('解決済みへの変更に失敗しました');
   }
 
+  await cleanupOldResolvedQuestions(user.id);
+
   revalidatePath('/timer');
+}
+
+// お気に入りの切り替え。お気に入りにした質問は自動削除の対象から外れる。
+// 上限(FAVORITE_QUESTION_LIMIT)を超えて新たにお気に入りにすることはできない。
+export async function toggleQuestionFavorite(questionId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('ログインしていません');
+
+  const { data: question } = await supabase.from('questions').select('student_uuid, is_favorited').eq('id', questionId).single();
+  if (!question || question.student_uuid !== user.id) throw new Error('この質問を操作する権限がありません');
+
+  const nextValue = !question.is_favorited;
+
+  if (nextValue) {
+    const { count } = await supabase
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .eq('student_uuid', user.id)
+      .eq('is_favorited', true);
+
+    if ((count || 0) >= FAVORITE_QUESTION_LIMIT) {
+      throw new Error(`お気に入りは最大${FAVORITE_QUESTION_LIMIT}件までです`);
+    }
+  }
+
+  const { error } = await supabase.from('questions').update({ is_favorited: nextValue }).eq('id', questionId);
+
+  if (error) {
+    console.error('Failed to toggle question favorite', error);
+    throw new Error('お気に入りの更新に失敗しました');
+  }
+
+  revalidatePath('/timer');
+  return nextValue;
 }
 
 type PomodoroEventType = 'START' | 'PAUSE' | 'STOP' | 'COMPLETE' | 'CHECK_REMAINING_TIME' | 'RATING_SUBMITTED' | 'QUIT' | 'ABANDONED';

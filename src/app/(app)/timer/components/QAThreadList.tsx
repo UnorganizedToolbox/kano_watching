@@ -4,7 +4,9 @@ import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
-import { replyToQuestion, resolveQuestion } from '../actions';
+import { replyToQuestion, resolveQuestion, toggleQuestionFavorite } from '../actions';
+import { FAVORITE_QUESTION_LIMIT } from '@/lib/qaLimits';
+import { Star } from 'lucide-react';
 
 type Reply = {
   role: 'student' | 'admin';
@@ -22,6 +24,7 @@ type Question = {
   answer_body: string | null;
   replies: Reply[] | null;
   created_at: string;
+  is_favorited?: boolean;
 };
 
 export default function QAThreadList({ initialQuestions }: { initialQuestions: Question[] }) {
@@ -42,6 +45,19 @@ export default function QAThreadList({ initialQuestions }: { initialQuestions: Q
         await resolveQuestion(id);
         setQuestions(prev => prev.map(q => q.id === id ? { ...q, status: 'resolved' } : q));
         router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '更新に失敗しました');
+      }
+    });
+  };
+
+  const handleToggleFavorite = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setError(null);
+    startTransition(async () => {
+      try {
+        const next = await toggleQuestionFavorite(id);
+        setQuestions(prev => prev.map(q => q.id === id ? { ...q, is_favorited: next } : q));
       } catch (err) {
         setError(err instanceof Error ? err.message : '更新に失敗しました');
       }
@@ -83,6 +99,9 @@ export default function QAThreadList({ initialQuestions }: { initialQuestions: Q
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {error && (
+        <p className="text-rose-500 text-[11px] font-bold bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg px-3 py-2">{error}</p>
+      )}
       {questions.length > 0 ? (
         questions.map(q => (
           <div
@@ -106,6 +125,14 @@ export default function QAThreadList({ initialQuestions }: { initialQuestions: Q
               </span>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-slate-400">{new Date(q.created_at).toLocaleDateString()}</span>
+                <button
+                  onClick={(e) => handleToggleFavorite(q.id, e)}
+                  disabled={isPending}
+                  title={q.is_favorited ? 'お気に入りを解除' : `お気に入りに追加(最大${FAVORITE_QUESTION_LIMIT}件)`}
+                  className={`p-1 rounded disabled:opacity-50 transition-colors ${q.is_favorited ? 'text-amber-500' : 'text-slate-300 dark:text-slate-600 hover:text-amber-400'}`}
+                >
+                  <Star className="w-3.5 h-3.5" fill={q.is_favorited ? 'currentColor' : 'none'} />
+                </button>
                 {q.status === 'answered' && (
                   <button onClick={(e) => handleResolve(q.id, e)} disabled={isPending} className="px-2 py-1 bg-brand-500 hover:bg-brand-600 text-white text-[10px] font-bold rounded shadow-sm disabled:opacity-50">
                     解決済にする
