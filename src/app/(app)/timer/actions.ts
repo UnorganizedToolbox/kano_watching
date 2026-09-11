@@ -5,7 +5,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { evaluateAchievements } from "@/lib/gamification/engine";
 import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from "@/lib/rules";
-import { FAVORITE_QUESTION_LIMIT, RESOLVED_QUESTION_RETENTION_LIMIT } from "@/lib/qaLimits";
+import { FAVORITE_QUESTION_LIMIT, RESOLVED_QUESTION_RETENTION_LIMIT, RESOLVED_QUESTION_RETENTION_DAYS } from "@/lib/qaLimits";
 
 // Supabase Storage の公開URLから "qa_images" バケット内のパスを逆算する。
 // 例: https://xxx.supabase.co/storage/v1/object/public/qa_images/questions/foo.png -> questions/foo.png
@@ -16,22 +16,33 @@ function extractQaImagePath(url: string): string | null {
   return url.slice(idx + marker.length);
 }
 
-// 解決済みかつお気に入りでない質問が保持上限を超えた分を、古いものから
-// 画像(storage)ごと削除する。RLSの owner 制約(教師が投稿した返信画像など)を
-// 気にせず確実に削除できるよう service_role クライアントを使う。
+// 解決済みかつお気に入りでない質問のうち、(a) 保持件数の上限を超えた分、または
+// (b) 作成から一定日数(RESOLVED_QUESTION_RETENTION_DAYS)経過した分を、
+// 画像(storage)ごと削除する。お気に入りは件数・日数どちらの対象からも常に除外される。
+// RLSの owner 制約(教師が投稿した返信画像など)を気にせず確実に削除できるよう
+// service_role クライアントを使う。
 async function cleanupOldResolvedQuestions(studentId: string) {
   const supabase = await createClient();
   const { data: eligible } = await supabase
     .from('questions')
-    .select('id, image_url, replies')
+    .select('id, image_url, replies, created_at')
     .eq('student_uuid', studentId)
     .eq('status', 'resolved')
     .eq('is_favorited', false)
     .order('created_at', { ascending: false });
 
-  if (!eligible || eligible.length <= RESOLVED_QUESTION_RETENTION_LIMIT) return;
+  if (!eligible || eligible.length === 0) return;
 
-  const toDelete = eligible.slice(RESOLVED_QUESTION_RETENTION_LIMIT);
+  const cutoff = Date.now() - RESOLVED_QUESTION_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const beyondCountCap = eligible.slice(RESOLVED_QUESTION_RETENTION_LIMIT);
+  const beyondAgeCap = eligible.filter(q => new Date(q.created_at).getTime() < cutoff);
+
+  const toDeleteById = new Map<string, (typeof eligible)[number]>();
+  for (const q of [...beyondCountCap, ...beyondAgeCap]) toDeleteById.set(q.id, q);
+  const toDelete = Array.from(toDeleteById.values());
+
+  if (toDelete.length === 0) return;
+
   const imagePaths: string[] = [];
   for (const q of toDelete) {
     if (q.image_url) {
@@ -143,6 +154,7 @@ export async function askQuestion(formData: FormData) {
       throw new Error('質問の送信に失敗しました');
     }
 
+    await cleanupOldResolvedQuestions(user.id);
     revalidatePath('/timer');
     return;
   }
@@ -160,6 +172,7 @@ export async function askQuestion(formData: FormData) {
     throw new Error('質問の送信に失敗しました');
   }
 
+  await cleanupOldResolvedQuestions(user.id);
   revalidatePath('/timer');
   return;
 }

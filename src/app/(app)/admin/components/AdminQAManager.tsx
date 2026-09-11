@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { answerQuestion, addAdminReply } from '../actions';
+import { processQaImage } from '@/lib/imageProcessing';
 import { Star } from 'lucide-react';
 
 type Reply = {
@@ -49,9 +50,22 @@ export default function AdminQAManager({ questions }: { questions: Question[] })
   const [replyingId, setReplyingId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replyImage, setReplyImage] = useState<File | null>(null);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [answerText, setAnswerText] = useState('');
   const [isPending, startTransition] = useTransition();
   const replyFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setReplyImage(null);
+      return;
+    }
+    setIsProcessingImage(true);
+    const processed = await processQaImage(file);
+    setReplyImage(processed);
+    setIsProcessingImage(false);
+  };
 
   const handleSendAnswer = (questionId: string) => {
     if (!answerText.trim()) return;
@@ -217,19 +231,22 @@ export default function AdminQAManager({ questions }: { questions: Question[] })
                       />
                       <button
                         onClick={() => handleSendReply(q.id)}
-                        disabled={isPending}
+                        disabled={isPending || isProcessingImage}
                         className="px-3 py-1.5 bg-brand-600 text-white text-xs font-bold rounded-md hover:bg-brand-700 disabled:opacity-50"
                       >
                         送信
                       </button>
                     </div>
-                    <input
-                      ref={replyFileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setReplyImage(e.target.files?.[0] || null)}
-                      className="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={replyFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300"
+                      />
+                      {isProcessingImage && <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-[10px]"></i>}
+                    </div>
                   </div>
                 ) : (
                   <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">

@@ -6,6 +6,7 @@ import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
 import { replyToQuestion, resolveQuestion, toggleQuestionFavorite } from '../actions';
 import { FAVORITE_QUESTION_LIMIT } from '@/lib/qaLimits';
+import { processQaImage } from '@/lib/imageProcessing';
 import { Star } from 'lucide-react';
 
 type Reply = {
@@ -32,10 +33,23 @@ export default function QAThreadList({ initialQuestions }: { initialQuestions: Q
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replyImage, setReplyImage] = useState<File | null>(null);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setReplyImage(null);
+      return;
+    }
+    setIsProcessingImage(true);
+    const processed = await processQaImage(file);
+    setReplyImage(processed);
+    setIsProcessingImage(false);
+  };
 
   const handleResolve = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -194,17 +208,20 @@ export default function QAThreadList({ initialQuestions }: { initialQuestions: Q
                         className="flex-1 px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         onKeyDown={e => e.key === 'Enter' && handleReply(q.id)}
                       />
-                      <button onClick={() => handleReply(q.id)} disabled={isPending} className="px-3 py-1.5 bg-slate-800 text-white text-xs font-bold rounded-md hover:bg-slate-900 disabled:opacity-50">
+                      <button onClick={() => handleReply(q.id)} disabled={isPending || isProcessingImage} className="px-3 py-1.5 bg-slate-800 text-white text-xs font-bold rounded-md hover:bg-slate-900 disabled:opacity-50">
                         送信
                       </button>
                     </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={e => setReplyImage(e.target.files?.[0] || null)}
-                      className="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300"
+                      />
+                      {isProcessingImage && <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-[10px]"></i>}
+                    </div>
                   </div>
                 )}
               </div>
