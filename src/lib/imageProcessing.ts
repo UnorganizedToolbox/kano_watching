@@ -37,8 +37,19 @@ export async function processQaImage(file: File): Promise<File> {
     const ctx = canvas.getContext('2d');
     if (!ctx) return file;
 
-    ctx.filter = 'grayscale(1)';
     ctx.drawImage(img, 0, 0, width, height);
+
+    // ctx.filter = 'grayscale(1)' はSafari/iOS Safariでサポートが弱く、
+    // エラーも出さず無視されることがあるため、ピクセル単位で確実に変換する。
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      data[i] = gray;
+      data[i + 1] = gray;
+      data[i + 2] = gray;
+    }
+    ctx.putImageData(imageData, 0, 0);
 
     const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY));
     if (!blob) return file;
