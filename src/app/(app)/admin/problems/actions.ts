@@ -138,7 +138,7 @@ export async function saveTemplate(input: TemplateInput): Promise<SaveTemplateRe
     const { error } = await supabase.from('problem_templates').update(row).eq('id', input.id);
     if (error) {
       console.error('Failed to update problem template', error);
-      return { ok: false, error: 'テンプレートの更新に失敗しました' };
+      return { ok: false, error: `テンプレートの更新に失敗しました: ${error.message}` };
     }
     revalidatePath('/admin/problems');
     revalidatePath(`/admin/problems/${input.id}/edit`);
@@ -148,7 +148,7 @@ export async function saveTemplate(input: TemplateInput): Promise<SaveTemplateRe
   const { data, error } = await supabase.from('problem_templates').insert(row).select('id').single();
   if (error) {
     console.error('Failed to create problem template', error);
-    return { ok: false, error: 'テンプレートの作成に失敗しました' };
+    return { ok: false, error: `テンプレートの作成に失敗しました: ${error.message}` };
   }
 
   revalidatePath('/admin/problems');
@@ -161,7 +161,7 @@ export async function deleteTemplate(id: string) {
   const { error } = await supabase.from('problem_templates').delete().eq('id', id);
   if (error) {
     console.error('Failed to delete problem template', error);
-    throw new Error('テンプレートの削除に失敗しました');
+    throw new Error(`テンプレートの削除に失敗しました: ${error.message}`);
   }
 
   revalidatePath('/admin/problems');
