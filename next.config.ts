@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
     "/admin/**": [
       "./node_modules/@myriaddreamin/typst-ts-node-compiler/**",
       "./node_modules/@myriaddreamin/typst-ts-node-compiler-linux-x64-gnu/**",
+      "./assets/fonts/**",
     ],
   },
 };

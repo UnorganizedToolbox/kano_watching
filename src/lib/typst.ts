@@ -6,9 +6,19 @@
 // ネイティブアドオン(.node、約50MB)の読み込みに失敗した場合でもサーバー
 // アクション全体をクラッシュさせず、呼び出し元にエラーとして返せるよう、
 // 静的importではなく関数内で動的requireする。
+//
+// フォントについて: Vercelのサーバーレス実行環境には日本語フォントが
+// インストールされていない(ローカル開発機と違いシステムフォントに頼れない)。
+// そのため日本語を含む問題文が文字化け/空白になる。これを避けるため、
+// Noto Sans JP(OFLライセンス、assets/fonts/ に同梱)をメモリ上のフォント
+// として明示的にコンパイラへ渡す。
+
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 const WORKSPACE = '/typst-workspace';
 const ENTRY_PATH = `${WORKSPACE}/main.typ`;
+const FONT_PATH = path.join(process.cwd(), 'assets/fonts/NotoSansJP-Variable.ttf');
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let compiler: any = null;
@@ -17,7 +27,11 @@ function getCompiler() {
   if (!compiler) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { NodeCompiler } = require('@myriaddreamin/typst-ts-node-compiler');
-    compiler = NodeCompiler.create({ workspace: WORKSPACE });
+    const fontBuffer = readFileSync(FONT_PATH);
+    compiler = NodeCompiler.create({
+      workspace: WORKSPACE,
+      fontArgs: [{ fontBlobs: [fontBuffer] }],
+    });
   }
   return compiler;
 }
