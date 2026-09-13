@@ -14,7 +14,7 @@ export default async function AdminAssignmentsPage() {
 
   const { data: assignments } = await supabase
     .from('problem_assignments')
-    .select('id, target_type, target_student_ids, delivery_mode, due_at, grading_mode, created_at, problem_templates:template_id (title), organizations:organization_id (name)')
+    .select('id, target_type, target_student_ids, delivery_mode, due_at, grading_mode, created_at, problem_decks:deck_id (title), organizations:organization_id (name)')
     .order('created_at', { ascending: false });
 
   return (
@@ -35,7 +35,7 @@ export default async function AdminAssignmentsPage() {
             <AssignmentRow
               key={a.id}
               id={a.id}
-              title={(a.problem_templates as unknown as { title: string } | null)?.title || '(タイトル未設定)'}
+              title={(a.problem_decks as unknown as { title: string } | null)?.title || '(タイトル未設定)'}
               organizationName={(a.organizations as unknown as { name: string } | null)?.name || '団体未設定'}
               targetType={a.target_type}
               targetCount={(a.target_student_ids as string[] | null)?.length ?? 0}

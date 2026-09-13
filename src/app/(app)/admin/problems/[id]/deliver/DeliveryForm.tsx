@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import { createAssignment, type TargetType, type DeliveryMode, type GradingMode } from './actions';
 
 export default function DeliveryForm({
-  templateId,
+  target,
   students,
 }: {
-  templateId: string;
+  target: { kind: 'template' | 'deck'; id: string };
   students: { id: string; name: string; student_id: string }[];
 }) {
   const router = useRouter();
@@ -35,7 +35,8 @@ export default function DeliveryForm({
     startTransition(async () => {
       try {
         const result = await createAssignment({
-          templateId,
+          templateId: target.kind === 'template' ? target.id : undefined,
+          deckId: target.kind === 'deck' ? target.id : undefined,
           targetType,
           targetStudentIds: [...selectedStudents],
           deliveryMode,

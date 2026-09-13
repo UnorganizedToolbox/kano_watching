@@ -2,58 +2,51 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { submitAttempt, retryAttempt } from './actions';
+import { submitAttempt, retryAttempt, type SubResultRow } from './actions';
 
-interface SubResult {
-  label: string;
-  points: number;
-  earnedPoints: number;
-  submittedAnswer: string;
-  correct: boolean;
-}
-
-interface AttemptView {
-  id: string;
-  status: 'in_progress' | 'submitted' | 'graded';
-  submittedWork: string | null;
+export interface QuestionView {
+  svgDataUri: string | null;
+  svgError: string | null;
+  subQuestions: { label: string; points: number }[];
   submittedAnswers: string[];
-  subResults: SubResult[] | null;
-  score: number | null;
+  subResults: SubResultRow[] | null;
 }
 
 export default function AttemptClient({
   assignmentId,
-  attempt,
-  subQuestions,
-  svgDataUri,
-  svgError,
+  attemptId,
+  status,
+  submittedWork,
+  score,
+  questions,
   canRetry,
 }: {
   assignmentId: string;
-  attempt: AttemptView;
-  subQuestions: { label: string; points: number }[];
-  svgDataUri: string | null;
-  svgError: string | null;
+  attemptId: string;
+  status: 'in_progress' | 'submitted' | 'graded';
+  submittedWork: string | null;
+  score: number | null;
+  questions: QuestionView[];
   canRetry: boolean;
 }) {
   const router = useRouter();
-  const isLocked = attempt.status !== 'in_progress';
-  const [work, setWork] = useState(attempt.submittedWork ?? '');
-  const [answers, setAnswers] = useState<string[]>(
-    subQuestions.map((_, i) => attempt.submittedAnswers[i] ?? ''),
+  const isLocked = status !== 'in_progress';
+  const [work, setWork] = useState(submittedWork ?? '');
+  const [answers, setAnswers] = useState<string[][]>(
+    questions.map(q => q.subQuestions.map((_, i) => q.submittedAnswers[i] ?? '')),
   );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, startSubmitTransition] = useTransition();
   const [isRetrying, startRetryTransition] = useTransition();
 
-  const updateAnswer = (idx: number, value: string) => {
-    setAnswers(prev => prev.map((a, i) => (i === idx ? value : a)));
+  const updateAnswer = (qIdx: number, sIdx: number, value: string) => {
+    setAnswers(prev => prev.map((qa, i) => (i === qIdx ? qa.map((a, j) => (j === sIdx ? value : a)) : qa)));
   };
 
   const handleSubmit = () => {
     setError(null);
     startSubmitTransition(async () => {
-      const result = await submitAttempt({ attemptId: attempt.id, assignmentId, work, answers });
+      const result = await submitAttempt({ attemptId, assignmentId, work, answers });
       if (result.ok) {
         router.refresh();
       } else {
@@ -76,23 +69,52 @@ export default function AttemptClient({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-        <h3 className="font-bold text-slate-800 dark:text-white mb-3">問題</h3>
-        <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 overflow-auto">
-          {svgError ? (
-            <pre className="text-xs text-rose-500 whitespace-pre-wrap">{svgError}</pre>
-          ) : svgDataUri ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={svgDataUri} alt="問題" className="max-w-full bg-white" />
-          ) : (
-            <p className="text-xs text-slate-400">問題を読み込めませんでした。</p>
-          )}
+      {questions.map((q, qIdx) => (
+        <div key={qIdx} className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-4">
+          <h3 className="font-bold text-slate-800 dark:text-white">問題 {questions.length > 1 ? qIdx + 1 : ''}</h3>
+          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 overflow-auto">
+            {q.svgError ? (
+              <pre className="text-xs text-rose-500 whitespace-pre-wrap">{q.svgError}</pre>
+            ) : q.svgDataUri ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={q.svgDataUri} alt="問題" className="max-w-full bg-white" />
+            ) : (
+              <p className="text-xs text-slate-400">問題を読み込めませんでした。</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {q.subQuestions.map((sq, sIdx) => {
+              const result = q.subResults?.[sIdx];
+              return (
+                <div key={sIdx}>
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-1">
+                    {sq.label ? `${sq.label} ` : '最終解答'}
+                    <span className="text-[10px] text-slate-400 font-normal ml-1">({sq.points}点)</span>
+                  </label>
+                  <input
+                    value={answers[qIdx]?.[sIdx] ?? ''}
+                    onChange={e => updateAnswer(qIdx, sIdx, e.target.value)}
+                    disabled={isLocked}
+                    className={`w-full px-3 py-2 text-sm border rounded-xl bg-slate-50 dark:bg-slate-900 outline-none font-mono disabled:opacity-60 ${
+                      result ? (result.correct ? 'border-brand-400' : 'border-rose-400') : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {result && (
+                    <p className={`text-[11px] font-bold mt-1 ${result.correct ? 'text-brand-600' : 'text-rose-500'}`}>
+                      {result.correct ? `正解 (+${result.earnedPoints}点)` : '不正解 (0点)'}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ))}
 
       <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-4">
         <div>
-          <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-1">途中式(任意)</label>
+          <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-1">途中式(任意・全問共通のメモ欄)</label>
           <textarea
             value={work}
             onChange={e => setWork(e.target.value)}
@@ -102,39 +124,12 @@ export default function AttemptClient({
           />
         </div>
 
-        <div className="flex flex-col gap-3">
-          {subQuestions.map((sq, idx) => {
-            const result = attempt.subResults?.[idx];
-            return (
-              <div key={idx}>
-                <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-1">
-                  {sq.label ? `${sq.label} ` : '最終解答'}
-                  <span className="text-[10px] text-slate-400 font-normal ml-1">({sq.points}点)</span>
-                </label>
-                <input
-                  value={answers[idx] ?? ''}
-                  onChange={e => updateAnswer(idx, e.target.value)}
-                  disabled={isLocked}
-                  className={`w-full px-3 py-2 text-sm border rounded-xl bg-slate-50 dark:bg-slate-900 outline-none font-mono disabled:opacity-60 ${
-                    result ? (result.correct ? 'border-brand-400' : 'border-rose-400') : 'border-slate-200 dark:border-slate-700'
-                  }`}
-                />
-                {result && (
-                  <p className={`text-[11px] font-bold mt-1 ${result.correct ? 'text-brand-600' : 'text-rose-500'}`}>
-                    {result.correct ? `正解 (+${result.earnedPoints}点)` : '不正解 (0点)'}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {attempt.status === 'graded' && attempt.score !== null && (
+        {status === 'graded' && score !== null && (
           <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
-            スコア: <span className="text-brand-600">{Math.round(attempt.score)}%</span>
+            スコア: <span className="text-brand-600">{Math.round(score)}%</span>
           </p>
         )}
-        {attempt.status === 'submitted' && (
+        {status === 'submitted' && (
           <p className="text-sm font-bold text-slate-500">提出済み(採点待ち)</p>
         )}
 

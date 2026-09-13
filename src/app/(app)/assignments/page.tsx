@@ -10,7 +10,7 @@ interface AssignmentRow {
   delivery_mode: DeliveryMode;
   due_at: string | null;
   grading_mode: 'manual' | 'auto_exact';
-  problem_templates: { title: string } | null;
+  problem_decks: { title: string } | null;
 }
 
 const DELIVERY_MODE_LABEL: Record<DeliveryMode, string> = {
@@ -29,7 +29,7 @@ export default async function StudentAssignmentsPage() {
 
   const { data: assignments } = await supabase
     .from('problem_assignments')
-    .select('id, delivery_mode, due_at, grading_mode, problem_templates:template_id (title)')
+    .select('id, delivery_mode, due_at, grading_mode, problem_decks:deck_id (title)')
     .order('created_at', { ascending: false });
 
   const { data: attempts } = await supabase
@@ -78,7 +78,7 @@ export default async function StudentAssignmentsPage() {
                 className="flex items-center justify-between px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors gap-4"
               >
                 <div className="min-w-0">
-                  <p className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate">{a.problem_templates?.title || '(タイトル未設定)'}</p>
+                  <p className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate">{a.problem_decks?.title || '(タイトル未設定)'}</p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
                     {DELIVERY_MODE_LABEL[a.delivery_mode]}
                     {a.delivery_mode === 'deadline' && a.due_at && ` ・ 締切 ${new Date(a.due_at).toLocaleString()}`}

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Send } from "lucide-react";
 
 export default async function DecksPage() {
   const supabase = await createClient();
@@ -14,6 +14,7 @@ export default async function DecksPage() {
   const { data: decks } = await supabase
     .from('problem_decks')
     .select('id, title, created_at, organizations:organization_id (name)')
+    .eq('is_implicit', false)
     .order('created_at', { ascending: false });
 
   return (
@@ -36,19 +37,20 @@ export default async function DecksPage() {
       <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm divide-y divide-slate-100 dark:divide-slate-800">
         {decks && decks.length > 0 ? (
           decks.map((d) => (
-            <Link
-              key={d.id}
-              href={`/admin/decks/${d.id}/edit`}
-              className="flex items-center justify-between px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-            >
-              <div>
-                <p className="font-bold text-sm text-slate-700 dark:text-slate-200">{d.title}</p>
+            <div key={d.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors gap-4">
+              <Link href={`/admin/decks/${d.id}/edit`} className="min-w-0 flex-1">
+                <p className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate">{d.title}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">
                   {(d.organizations as unknown as { name: string } | null)?.name || '団体未設定'} ・ {new Date(d.created_at).toLocaleDateString()}
                 </p>
+              </Link>
+              <div className="flex items-center gap-4 shrink-0">
+                <Link href={`/admin/decks/${d.id}/deliver`} className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 font-bold transition-colors">
+                  <Send className="w-3.5 h-3.5" /> 配信
+                </Link>
+                <Link href={`/admin/decks/${d.id}/edit`} className="text-xs text-brand-600 dark:text-brand-400 font-bold">編集 →</Link>
               </div>
-              <span className="text-xs text-brand-600 dark:text-brand-400 font-bold">編集 →</span>
-            </Link>
+            </div>
           ))
         ) : (
           <p className="text-sm text-slate-400 px-6 py-12 text-center">まだデッキがありません。「新規作成」から作成してください。</p>

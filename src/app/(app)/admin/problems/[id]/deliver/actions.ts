@@ -14,6 +14,7 @@ async function verifyAdminOrTeacher() {
 
   return {
     supabase,
+    userId: user.id,
     callerRole: profile.role as 'admin' | 'teacher',
     callerOrgId: profile.organization_id as string | null,
   };
@@ -24,7 +25,8 @@ export type DeliveryMode = 'deadline' | 'no_deadline' | 'permanent';
 export type GradingMode = 'manual' | 'auto_exact';
 
 export interface AssignmentInput {
-  templateId: string;
+  templateId?: string; // 単一テンプレートを配信する場合(内部で1件だけのデッキに包む)
+  deckId?: string; // デッキを配信する場合
   targetType: TargetType;
   targetStudentIds: string[];
   deliveryMode: DeliveryMode;
@@ -40,20 +42,58 @@ export interface CreateAssignmentResult {
 
 export async function createAssignment(input: AssignmentInput): Promise<CreateAssignmentResult> {
   try {
-    const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
+    const { supabase, userId, callerRole, callerOrgId } = await verifyAdminOrTeacher();
 
-    const { data: template } = await supabase
-      .from('problem_templates')
-      .select('id, organization_id')
-      .eq('id', input.templateId)
-      .single();
+    let organizationId: string;
+    let deckId: string;
 
-    if (!template) return { ok: false, error: 'テンプレートが見つかりません' };
+    if (input.templateId) {
+      const { data: template } = await supabase
+        .from('problem_templates')
+        .select('id, organization_id, title')
+        .eq('id', input.templateId)
+        .single();
 
-    if (callerRole === 'teacher') {
-      if (!callerOrgId || template.organization_id !== callerOrgId) {
+      if (!template) return { ok: false, error: 'テンプレートが見つかりません' };
+      if (callerRole === 'teacher' && (!callerOrgId || template.organization_id !== callerOrgId)) {
         return { ok: false, error: '自分の団体のテンプレートのみ配信できます' };
       }
+      organizationId = template.organization_id;
+
+      // このテンプレート1つだけを含む非表示のデッキを作成する(デッキ管理画面には出てこない)
+      const { data: implicitDeck, error: deckError } = await supabase.from('problem_decks').insert({
+        teacher_id: userId,
+        organization_id: organizationId,
+        title: template.title,
+        is_implicit: true,
+      }).select('id').single();
+      if (deckError || !implicitDeck) return { ok: false, error: `内部デッキの作成に失敗しました: ${deckError?.message}` };
+
+      const { error: itemError } = await supabase.from('deck_items').insert({
+        parent_deck_id: implicitDeck.id,
+        position: 0,
+        child_kind: 'template',
+        child_template_id: input.templateId,
+        weight: 1,
+      });
+      if (itemError) return { ok: false, error: `内部デッキの構成に失敗しました: ${itemError.message}` };
+
+      deckId = implicitDeck.id;
+    } else if (input.deckId) {
+      const { data: deck } = await supabase
+        .from('problem_decks')
+        .select('id, organization_id')
+        .eq('id', input.deckId)
+        .single();
+
+      if (!deck) return { ok: false, error: 'デッキが見つかりません' };
+      if (callerRole === 'teacher' && (!callerOrgId || deck.organization_id !== callerOrgId)) {
+        return { ok: false, error: '自分の団体のデッキのみ配信できます' };
+      }
+      organizationId = deck.organization_id;
+      deckId = input.deckId;
+    } else {
+      return { ok: false, error: '配信対象(テンプレートまたはデッキ)が指定されていません' };
     }
 
     if (input.targetType === 'students' && input.targetStudentIds.length === 0) {
@@ -63,12 +103,10 @@ export async function createAssignment(input: AssignmentInput): Promise<CreateAs
       return { ok: false, error: '締切日時を入力してください' };
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-
     const { data, error } = await supabase.from('problem_assignments').insert({
-      template_id: input.templateId,
-      teacher_id: user?.id,
-      organization_id: template.organization_id,
+      deck_id: deckId,
+      teacher_id: userId,
+      organization_id: organizationId,
       target_type: input.targetType,
       target_student_ids: input.targetType === 'students' ? input.targetStudentIds : [],
       delivery_mode: input.deliveryMode,

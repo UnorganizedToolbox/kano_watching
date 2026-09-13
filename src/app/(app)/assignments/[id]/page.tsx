@@ -6,11 +6,20 @@ import { ArrowLeft } from "lucide-react";
 import { renderProblem } from "@/lib/cbt/render";
 import { renderTypstToSvg } from "@/lib/typst";
 import type { TemplateKind, SubQuestionDef, PairItem } from "@/lib/cbt/types";
+import type { QuestionInstance, SubResultRow } from "../actions";
 import StartAttemptButton from "../StartAttemptButton";
-import AttemptClient from "../AttemptClient";
+import AttemptClient, { type QuestionView } from "../AttemptClient";
 
 function buildProblemTypstSource(problemText: string): string {
   return `#set page(width: auto, height: auto, margin: 0.6em)\n#set text(size: 16pt)\n\n${problemText}\n`;
+}
+
+interface TemplateRow {
+  id: string;
+  kind: TemplateKind;
+  problem_template: string;
+  sub_questions: SubQuestionDef[];
+  pairs: PairItem[];
 }
 
 export default async function AssignmentAttemptPage(props: { params: Promise<{ id: string }> }) {
@@ -21,7 +30,7 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
 
   const { data: assignment, error } = await supabase
     .from('problem_assignments')
-    .select('id, delivery_mode, due_at, grading_mode, problem_templates:template_id (title, kind, problem_template, sub_questions, pairs)')
+    .select('id, delivery_mode, due_at, grading_mode, problem_decks:deck_id (title)')
     .eq('id', id)
     .single();
 
@@ -34,17 +43,11 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
     );
   }
 
-  const template = assignment.problem_templates as unknown as {
-    title: string;
-    kind: TemplateKind;
-    problem_template: string;
-    sub_questions: SubQuestionDef[];
-    pairs: PairItem[];
-  };
+  const deckTitle = (assignment.problem_decks as unknown as { title: string } | null)?.title || '(タイトル未設定)';
 
   const { data: attempts } = await supabase
     .from('problem_attempts')
-    .select('id, resolved_variables, submitted_work, submitted_answers, status, sub_results, score')
+    .select('id, questions, submitted_work, submitted_answers, status, sub_results, score')
     .eq('assignment_id', id)
     .eq('student_id', user.id)
     .order('attempt_number', { ascending: false })
@@ -56,33 +59,42 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
     ? new Date(assignment.due_at) < new Date()
     : false;
 
-  let svgDataUri: string | null = null;
-  let svgError: string | null = null;
-  let subQuestionMeta: { label: string; points: number }[] = [];
+  let questionViews: QuestionView[] = [];
 
   if (attempt) {
-    try {
-      const { problemText, subAnswers } = renderProblem(
-        {
-          kind: template.kind,
-          problem_template: template.problem_template,
-          subQuestions: template.sub_questions,
-          pairs: template.pairs,
-        },
-        attempt.resolved_variables as Record<string, number>,
-      );
-      // 正答(answerTexts)はクライアントに渡さない。ラベル・配点のみ渡す。
-      subQuestionMeta = subAnswers.map(sa => ({ label: sa.label, points: sa.points }));
+    const questions = attempt.questions as QuestionInstance[];
+    const uniqueIds = [...new Set(questions.map(q => q.templateId))];
+    const { data: templateRows } = await supabase
+      .from('problem_templates')
+      .select('id, kind, problem_template, sub_questions, pairs')
+      .in('id', uniqueIds);
+    const templateById = new Map((templateRows ?? []).map(t => [t.id, t as TemplateRow]));
+    const submittedAnswers = (attempt.submitted_answers as string[][] | null) ?? [];
+    const subResultsAll = attempt.sub_results as SubResultRow[][] | null;
 
-      const result = renderTypstToSvg(buildProblemTypstSource(problemText));
-      if (result.ok) {
-        svgDataUri = `data:image/svg+xml;base64,${Buffer.from(result.svg).toString('base64')}`;
-      } else {
-        svgError = result.error;
+    questionViews = questions.map((q, qi) => {
+      const template = templateById.get(q.templateId);
+      if (!template) {
+        return { svgDataUri: null, svgError: `テンプレート(id=${q.templateId})が見つかりません`, subQuestions: [], submittedAnswers: [], subResults: null };
       }
-    } catch (e) {
-      svgError = e instanceof Error ? e.message : String(e);
-    }
+      try {
+        const { problemText, subAnswers } = renderProblem(
+          { kind: template.kind, problem_template: template.problem_template, subQuestions: template.sub_questions, pairs: template.pairs },
+          q.resolvedVariables,
+        );
+        const result = renderTypstToSvg(buildProblemTypstSource(problemText));
+        const svgDataUri = result.ok ? `data:image/svg+xml;base64,${Buffer.from(result.svg).toString('base64')}` : null;
+        return {
+          svgDataUri,
+          svgError: result.ok ? null : result.error,
+          subQuestions: subAnswers.map(sa => ({ label: sa.label, points: sa.points })),
+          submittedAnswers: submittedAnswers[qi] ?? [],
+          subResults: subResultsAll?.[qi] ?? null,
+        };
+      } catch (e) {
+        return { svgDataUri: null, svgError: e instanceof Error ? e.message : String(e), subQuestions: [], submittedAnswers: [], subResults: null };
+      }
+    });
   }
 
   return (
@@ -92,7 +104,7 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h2 className="text-2xl font-black font-title text-slate-800 dark:text-white">{template.title}</h2>
+          <h2 className="text-2xl font-black font-title text-slate-800 dark:text-white">{deckTitle}</h2>
           {isOverdue && <p className="text-xs text-rose-500 font-bold mt-0.5">締切を過ぎています</p>}
         </div>
       </div>
@@ -102,17 +114,11 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
       ) : (
         <AttemptClient
           assignmentId={id}
-          attempt={{
-            id: attempt.id,
-            status: attempt.status,
-            submittedWork: attempt.submitted_work,
-            submittedAnswers: (attempt.submitted_answers as string[] | null) ?? [],
-            subResults: attempt.sub_results as { label: string; points: number; earnedPoints: number; submittedAnswer: string; correct: boolean }[] | null,
-            score: attempt.score,
-          }}
-          subQuestions={subQuestionMeta}
-          svgDataUri={svgDataUri}
-          svgError={svgError}
+          attemptId={attempt.id}
+          status={attempt.status}
+          submittedWork={attempt.submitted_work}
+          score={attempt.score}
+          questions={questionViews}
           canRetry={!isOverdue}
         />
       )}
