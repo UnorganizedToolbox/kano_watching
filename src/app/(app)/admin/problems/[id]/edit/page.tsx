@@ -52,7 +52,7 @@ export default async function EditProblemTemplatePage(props: { params: Promise<{
         initialVariables={(template.variables as VariableDef[]) || []}
         initialConstraints={(template.constraints as string[]) || []}
         initialProblemTemplate={template.problem_template}
-        initialAnswerTemplate={template.answer_template}
+        initialAnswerTemplates={(template.answer_templates as string[]) || ['']}
         initialOrganizationId={template.organization_id}
         organizations={organizations || []}
         isAdmin={isAdmin}

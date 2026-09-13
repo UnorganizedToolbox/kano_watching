@@ -18,6 +18,13 @@ function sequenceRandom(values: number[]): () => number {
   };
 }
 
+// 呼び出し回数を事前に数えなくて良いよう、末尾に到達したら先頭へ戻る版。
+// (常に同じ値を繰り返すだけで良い「本当に不可能なケース」のテスト用)
+function repeatingRandom(values: number[]): () => number {
+  let i = 0;
+  return () => values[i++ % values.length];
+}
+
 describe('resolveVariables', () => {
   it('resolves independent variables within their declared range', () => {
     const result = resolveVariables({
@@ -59,16 +66,42 @@ describe('resolveVariables', () => {
     }
   });
 
-  it('fails with a clear error after exceeding the retry limit', () => {
+  it('fails with a clear error after exhausting both per-variable retries and restarts', () => {
     const result = resolveVariables({
       variables: [v('A', '1', '1'), v('B', '1', '1')],
-      constraints: ['A != B'], // 常に不可能(A,Bともに1固定)
-    }, { maxRetries: 3, random: sequenceRandom(new Array(10).fill(0)) });
+      constraints: ['A != B'], // 常に不可能(A,Bともに1固定。何度やり直しても解決しない)
+    }, { maxRetries: 3, maxRestarts: 2, random: repeatingRandom([0]) });
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toMatch(/A != B/);
-      expect(result.error).toMatch(/3回試行/);
+      expect(result.error).toMatch(/3回試行/); // 各試行での再抽選上限
+    }
+  });
+
+  it('recovers via restart when a variable draw creates a structural dead end (regression for the "A<B" bug)', () => {
+    // A in [99,100], B in [0,100], 制約 A<B。
+    // 1回目の試行でA=100を引くと、Bをどれだけ再抽選してもA<Bを満たせない
+    // (Bの最大値も100なので)。以前はこの1回の失敗で即エラーになっていたが、
+    // 現在は試行全体をやり直し、A=99(→B=100で成立)に落ち着く。
+    const result = resolveVariables({
+      variables: [v('A', '99', '100'), v('B', '0', '100')],
+      constraints: ['A < B'],
+    }, {
+      maxRetries: 2,
+      maxRestarts: 3,
+      random: sequenceRandom([
+        pick(1, 2), // 1回目の試行: A=100(袋小路)
+        0, 0, 0,    // Bを3回(attempts 0,1,2)抽選するがすべて失敗 → 再抽選上限超過
+        pick(0, 2), // 2回目の試行: A=99
+        pick(100, 101), // B=100 (99<100を満たす、一発で成功)
+      ]),
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.values.A).toBe(99);
+      expect(result.values.B).toBe(100);
     }
   });
 

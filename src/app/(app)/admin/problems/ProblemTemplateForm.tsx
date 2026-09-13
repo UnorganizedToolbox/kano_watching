@@ -58,7 +58,7 @@ export default function ProblemTemplateForm({
   initialVariables = [EMPTY_VARIABLE],
   initialConstraints = [],
   initialProblemTemplate = '',
-  initialAnswerTemplate = '',
+  initialAnswerTemplates = [''],
   organizations,
   isAdmin,
   initialOrganizationId,
@@ -68,7 +68,7 @@ export default function ProblemTemplateForm({
   initialVariables?: VariableDef[];
   initialConstraints?: string[];
   initialProblemTemplate?: string;
-  initialAnswerTemplate?: string;
+  initialAnswerTemplates?: string[];
   organizations: { id: string; name: string }[];
   isAdmin: boolean;
   initialOrganizationId?: string | null;
@@ -79,7 +79,7 @@ export default function ProblemTemplateForm({
   const [variables, setVariables] = useState<VariableDef[]>(initialVariables);
   const [constraints, setConstraints] = useState<string[]>(initialConstraints);
   const [problemTemplate, setProblemTemplate] = useState(initialProblemTemplate);
-  const [answerTemplate, setAnswerTemplate] = useState(initialAnswerTemplate);
+  const [answerTemplates, setAnswerTemplates] = useState<string[]>(initialAnswerTemplates.length > 0 ? initialAnswerTemplates : ['']);
 
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState(false);
@@ -107,6 +107,12 @@ export default function ProblemTemplateForm({
   const addConstraint = () => setConstraints(prev => [...prev, '']);
   const removeConstraint = (idx: number) => setConstraints(prev => prev.filter((_, i) => i !== idx));
 
+  const updateAnswerTemplate = (idx: number, value: string) => {
+    setAnswerTemplates(prev => prev.map((a, i) => (i === idx ? value : a)));
+  };
+  const addAnswerTemplate = () => setAnswerTemplates(prev => [...prev, '']);
+  const removeAnswerTemplate = (idx: number) => setAnswerTemplates(prev => prev.filter((_, i) => i !== idx));
+
   const buildInput = (): TemplateInput => ({
     id: templateId,
     organizationId: isAdmin ? organizationId : undefined,
@@ -114,7 +120,7 @@ export default function ProblemTemplateForm({
     variables,
     constraints,
     problemTemplate,
-    answerTemplate,
+    answerTemplates,
   });
 
   const handleSave = () => {
@@ -136,7 +142,7 @@ export default function ProblemTemplateForm({
   const handlePreview = () => {
     setPreviewError(null);
     startPreviewTransition(async () => {
-      const result = await previewTemplate({ variables, constraints, problemTemplate, answerTemplate });
+      const result = await previewTemplate({ variables, constraints, problemTemplate, answerTemplates });
       if (result.ok) {
         const blob = new Blob([result.svg], { type: 'image/svg+xml' });
         setPreviewImgUrl(URL.createObjectURL(blob));
@@ -292,15 +298,30 @@ export default function ProblemTemplateForm({
             className="w-full px-3 py-2 text-sm font-mono border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 outline-none resize-none"
           />
 
-          <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mt-4 mb-1">正答・解説テンプレート</label>
-          <textarea
-            value={answerTemplate}
-            onChange={e => setAnswerTemplate(e.target.value)}
-            rows={3}
-            spellCheck={false}
-            placeholder={'(x - {{A}})(x - {{B}})'}
-            className="w-full px-3 py-2 text-sm font-mono border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 outline-none resize-none"
-          />
+          <div className="flex items-center justify-between mt-4 mb-1">
+            <label className="text-sm font-bold text-slate-700 dark:text-slate-200">正答テンプレート</label>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">表記違いの別解(例: <code>(x-1)(x-2)</code> と <code>(x-2)(x-1)</code>)は行を追加して複数登録できます。採点時は空白を無視して比較します。</p>
+          <div className="space-y-2">
+            {answerTemplates.map((a, idx) => (
+              <div key={idx} className="flex gap-2">
+                <input
+                  value={a}
+                  onChange={e => updateAnswerTemplate(idx, e.target.value)}
+                  placeholder="(x - {{A}})(x - {{B}})"
+                  className="flex-1 min-w-0 px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
+                />
+                {answerTemplates.length > 1 && (
+                  <button onClick={() => removeAnswerTemplate(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button onClick={addAnswerTemplate} className="mt-2 flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> 別解を追加
+          </button>
         </div>
 
         <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-3">

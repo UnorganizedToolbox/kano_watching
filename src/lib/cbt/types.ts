@@ -16,13 +16,16 @@ export interface ProblemTemplateDef {
   variables: VariableDef[];
   constraints: string[]; // 例: ["A < B", "forall(A) A*A != B"]
   problem_template: string;
-  answer_template: string;
+  // 正答は複数登録できる((x-1)(x-2) と (x-2)(x-1) のように書き方が違うだけの
+  // 別解や、積分の別の書き方などをすべて正答として扱えるようにするため)。
+  answer_templates: string[];
 }
 
 export type ResolvedVariables = Record<string, number>;
 
 export interface ResolveOptions {
   maxRetries?: number; // 1変数あたりの再抽選上限(既定100)
+  maxRestarts?: number; // 1変数の再抽選上限に達した際、試行全体をやり直す回数の上限(既定50)
   random?: () => number; // 乱数源の差し替え(テスト用)
 }
 
@@ -45,3 +48,4 @@ export const PRACTICAL_BOUND: Record<VarType, number> = {
 };
 
 export const DEFAULT_MAX_RETRIES = 100;
+export const DEFAULT_MAX_RESTARTS = 50;

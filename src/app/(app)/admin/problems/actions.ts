@@ -32,7 +32,7 @@ export interface TemplateInput {
   variables: VariableDef[];
   constraints: string[];
   problemTemplate: string;
-  answerTemplate: string;
+  answerTemplates: string[]; // 表記違いの別解等を複数登録できる
 }
 
 const NAME_RE = /^[A-Za-z]+$/;
@@ -64,6 +64,13 @@ function sanitizeConstraints(input: unknown): string[] {
   return input.map(c => String(c ?? '').trim()).filter(c => c.length > 0);
 }
 
+function sanitizeAnswerTemplates(input: unknown): string[] {
+  if (!Array.isArray(input)) throw new Error('正答の形式が不正です');
+  const list = input.map(a => String(a ?? '').trim()).filter(a => a.length > 0);
+  if (list.length === 0) throw new Error('正答を1つ以上入力してください');
+  return list;
+}
+
 export interface SaveTemplateResult {
   ok: boolean;
   error?: string;
@@ -76,13 +83,14 @@ export async function saveTemplate(input: TemplateInput): Promise<SaveTemplateRe
   const title = input.title.trim();
   if (!title) return { ok: false, error: 'タイトルを入力してください' };
   if (!input.problemTemplate.trim()) return { ok: false, error: '問題文を入力してください' };
-  if (!input.answerTemplate.trim()) return { ok: false, error: '正答テンプレートを入力してください' };
 
   let variables: VariableDef[];
   let constraints: string[];
+  let answerTemplates: string[];
   try {
     variables = sanitizeVariables(input.variables);
     constraints = sanitizeConstraints(input.constraints);
+    answerTemplates = sanitizeAnswerTemplates(input.answerTemplates);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -100,9 +108,19 @@ export async function saveTemplate(input: TemplateInput): Promise<SaveTemplateRe
   }
 
   // 保存前検証: 実際に生成可能かどうかを確認する
-  const validation = validateTemplate({ variables, constraints }, 100);
+  const validation = validateTemplate({ variables, constraints });
   if (!validation.ok) {
     return { ok: false, error: `保存前検証に失敗しました: ${validation.error}` };
+  }
+
+  // 問題文・正答テンプレートの {{式}} が壊れていないかも合わせて確認する
+  const resolvedForCheck = resolveVariables({ variables, constraints });
+  if (resolvedForCheck.ok) {
+    try {
+      renderProblem(input.problemTemplate, answerTemplates, resolvedForCheck.values);
+    } catch (e) {
+      return { ok: false, error: `問題文/正答テンプレートの埋め込み評価に失敗しました: ${e instanceof Error ? e.message : String(e)}` };
+    }
   }
 
   const row = {
@@ -112,7 +130,7 @@ export async function saveTemplate(input: TemplateInput): Promise<SaveTemplateRe
     variables,
     constraints,
     problem_template: input.problemTemplate,
-    answer_template: input.answerTemplate,
+    answer_templates: answerTemplates,
     updated_at: new Date().toISOString(),
   };
 
@@ -154,15 +172,18 @@ export interface PreviewInput {
   variables: VariableDef[];
   constraints: string[];
   problemTemplate: string;
-  answerTemplate: string;
+  answerTemplates: string[];
 }
 
 export type PreviewResult =
   | { ok: true; svg: string; values: Record<string, number> }
   | { ok: false; error: string };
 
-function buildTypstSource(problemText: string, answerText: string): string {
-  return `#set page(width: auto, height: auto, margin: 0.6em)\n#set text(size: 16pt)\n\n${problemText}\n\n正答: ${answerText}\n`;
+function buildTypstSource(problemText: string, answerTexts: string[]): string {
+  const answerLine = answerTexts.length > 1
+    ? `正答: ${answerTexts.join(' または ')}`
+    : `正答: ${answerTexts[0] ?? ''}`;
+  return `#set page(width: auto, height: auto, margin: 0.6em)\n#set text(size: 16pt)\n\n${problemText}\n\n${answerLine}\n`;
 }
 
 export async function previewTemplate(input: PreviewInput): Promise<PreviewResult> {
@@ -170,9 +191,11 @@ export async function previewTemplate(input: PreviewInput): Promise<PreviewResul
 
   let variables: VariableDef[];
   let constraints: string[];
+  let answerTemplates: string[];
   try {
     variables = sanitizeVariables(input.variables);
     constraints = sanitizeConstraints(input.constraints);
+    answerTemplates = sanitizeAnswerTemplates(input.answerTemplates);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -186,14 +209,14 @@ export async function previewTemplate(input: PreviewInput): Promise<PreviewResul
   }
 
   let problemText: string;
-  let answerText: string;
+  let answerTexts: string[];
   try {
-    ({ problemText, answerText } = renderProblem(input.problemTemplate, input.answerTemplate, resolved.values));
+    ({ problemText, answerTexts } = renderProblem(input.problemTemplate, answerTemplates, resolved.values));
   } catch (e) {
     return { ok: false, error: `テンプレートの埋め込み評価に失敗しました: ${e instanceof Error ? e.message : String(e)}` };
   }
 
-  const typstResult = renderTypstToSvg(buildTypstSource(problemText, answerText));
+  const typstResult = renderTypstToSvg(buildTypstSource(problemText, answerTexts));
   if (!typstResult.ok) {
     return { ok: false, error: `Typstレンダリングに失敗しました: ${typstResult.error}` };
   }

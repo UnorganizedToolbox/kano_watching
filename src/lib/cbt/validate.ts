@@ -1,6 +1,10 @@
 // 保存前検証: テンプレートが実際に生成可能かどうかを、複数回試行して確認する。
-// 実装イメージ文書 2章 / 4章を参照。生成そのものに失敗した場合はそのエラーを
-// そのまま返す。「たまたま運悪く失敗した」ケースと区別しないシンプルな実装。
+// 実装イメージ文書 2章 / 4章を参照。
+//
+// resolveVariables() 自体が内部で「試行全体のやり直し」(既定50回)を行うため、
+// 1回の呼び出しだけでもかなり強力な検証になっている。そのため外側のループ回数は
+// 少なめ(既定5回)にして、無駄な計算量の掛け算(外側 x 内側restart x 変数ごとの
+// 再抽選)を避けている。
 
 import { resolveVariables } from './resolve';
 import type { ProblemTemplateDef } from './types';
@@ -13,7 +17,7 @@ export interface ValidateResult {
 
 export function validateTemplate(
   template: Pick<ProblemTemplateDef, 'variables' | 'constraints'>,
-  tries = 100,
+  tries = 5,
 ): ValidateResult {
   for (let i = 0; i < tries; i++) {
     const result = resolveVariables(template);
