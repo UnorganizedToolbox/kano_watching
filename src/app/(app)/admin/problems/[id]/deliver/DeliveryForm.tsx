@@ -7,9 +7,11 @@ import { createAssignment, type TargetType, type DeliveryMode, type GradingMode 
 export default function DeliveryForm({
   target,
   students,
+  isAdmin,
 }: {
   target: { kind: 'template' | 'deck'; id: string };
   students: { id: string; name: string; student_id: string }[];
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const [targetType, setTargetType] = useState<TargetType>('organization');
@@ -67,6 +69,12 @@ export default function DeliveryForm({
             <input type="radio" checked={targetType === 'students'} onChange={() => setTargetType('students')} />
             生徒を個別選択
           </label>
+          {isAdmin && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="radio" checked={targetType === 'all'} onChange={() => setTargetType('all')} />
+              団体を問わず全員(管理者のみ)
+            </label>
+          )}
         </div>
 
         {targetType === 'students' && (

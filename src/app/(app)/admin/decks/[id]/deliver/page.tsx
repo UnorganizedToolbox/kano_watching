@@ -48,7 +48,7 @@ export default async function DeliverDeckPage(props: { params: Promise<{ id: str
         </div>
       </div>
 
-      <DeliveryForm target={{ kind: 'deck', id: deck.id }} students={students || []} />
+      <DeliveryForm target={{ kind: 'deck', id: deck.id }} students={students || []} isAdmin={profile.role === 'admin'} />
     </section>
   );
 }

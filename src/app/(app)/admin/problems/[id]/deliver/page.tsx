@@ -48,7 +48,7 @@ export default async function DeliverProblemPage(props: { params: Promise<{ id: 
         </div>
       </div>
 
-      <DeliveryForm target={{ kind: 'template', id: template.id }} students={students || []} />
+      <DeliveryForm target={{ kind: 'template', id: template.id }} students={students || []} isAdmin={profile.role === 'admin'} />
     </section>
   );
 }

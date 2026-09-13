@@ -54,7 +54,7 @@ export default function AssignmentRow({
       <div className="min-w-0">
         <p className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate">{title}</p>
         <p className="text-[10px] text-slate-400 mt-0.5">
-          {organizationName} ・ {targetType === 'organization' ? '団体全員' : `生徒${targetCount}名`} ・ {DELIVERY_MODE_LABEL[deliveryMode]}
+          {organizationName} ・ {targetType === 'organization' ? '団体全員' : targetType === 'all' ? '全団体・全員' : `生徒${targetCount}名`} ・ {DELIVERY_MODE_LABEL[deliveryMode]}
           {dueAt && ` (締切 ${new Date(dueAt).toLocaleString()})`} ・ {GRADING_MODE_LABEL[gradingMode]} ・ {new Date(createdAt).toLocaleDateString()}
         </p>
         {error && <p className="text-rose-500 text-xs font-bold mt-1">{error}</p>}

@@ -20,7 +20,7 @@ async function verifyAdminOrTeacher() {
   };
 }
 
-export type TargetType = 'organization' | 'students';
+export type TargetType = 'organization' | 'students' | 'all';
 export type DeliveryMode = 'deadline' | 'no_deadline' | 'permanent';
 export type GradingMode = 'manual' | 'auto_exact';
 
@@ -98,6 +98,9 @@ export async function createAssignment(input: AssignmentInput): Promise<CreateAs
 
     if (input.targetType === 'students' && input.targetStudentIds.length === 0) {
       return { ok: false, error: '配信先の生徒を1人以上選択してください' };
+    }
+    if (input.targetType === 'all' && callerRole !== 'admin') {
+      return { ok: false, error: '団体を問わず全員への配信は管理者のみ選択できます' };
     }
     if (input.deliveryMode === 'deadline' && !input.dueAt) {
       return { ok: false, error: '締切日時を入力してください' };
