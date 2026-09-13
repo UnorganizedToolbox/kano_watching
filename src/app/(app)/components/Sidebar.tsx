@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal, Gamepad2, ShieldCheck, Mail } from "lucide-react";
+import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal, Gamepad2, ShieldCheck, Mail, Send, ClipboardList } from "lucide-react";
 import { useMobileNav } from "./MobileNavContext";
 
 interface SidebarProps {
@@ -76,6 +76,10 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
               <i className="fa-solid fa-chart-pie w-5 text-center text-lg"></i>
               <span>Progress</span>
             </Link>
+            <Link href="/assignments" className={getLinkClass('/assignments')}>
+              <ClipboardList className="w-5 h-5" />
+              <span>課題</span>
+            </Link>
           </>
         ) : (
           <>
@@ -100,7 +104,10 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
             <Link href="/admin/problems" className={getLinkClass('/admin/problems')}>
               <i className="fa-solid fa-plus-minus text-lg w-5 text-center"></i>
               <span>CBT問題作成</span>
-              <span className="ml-auto text-[8px] bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded font-bold">配信は今後実装</span>
+            </Link>
+            <Link href="/admin/assignments" className={getLinkClass('/admin/assignments')}>
+              <Send className="w-5 h-5" />
+              <span>配信済み一覧</span>
             </Link>
             {role === 'admin' && (
               <Link href="/admin/playground" className={getLinkClass('/admin/playground')}>
@@ -131,7 +138,7 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
         </a>
         
         <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.27.1</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.28.0</span>
         </div>
       </div>
     </div>
