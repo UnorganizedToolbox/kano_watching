@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderTemplate, renderProblem, normalizeAnswerText, isAnswerCorrect } from './render';
+import type { ProblemTemplateDef } from './types';
 
 describe('renderTemplate', () => {
   it('substitutes a plain variable', () => {
@@ -24,14 +25,49 @@ describe('renderTemplate', () => {
     expect(renderTemplate('{{A}}/{{B}}', { A: 3, B: 6 })).toBe('3/6');
   });
 
-  it('renders a problem with multiple accepted answers', () => {
-    const { problemText, answerTexts } = renderProblem(
-      '次の二次式を因数分解しなさい。 $ x^2 - {{A+B}} x + {{A*B}} $',
-      ['(x - {{A}})(x - {{B}})', '(x - {{B}})(x - {{A}})'],
+  it('renders a problem with multiple accepted answers (single sub-question)', () => {
+    const { problemText, subAnswers } = renderProblem(
+      {
+        kind: 'variable',
+        problem_template: '次の二次式を因数分解しなさい。 $ x^2 - {{A+B}} x + {{A*B}} $',
+        subQuestions: [{ label: '', points: 1, answerTemplates: ['(x - {{A}})(x - {{B}})', '(x - {{B}})(x - {{A}})'] }],
+      },
       { A: 1, B: 2 },
     );
     expect(problemText).toBe('次の二次式を因数分解しなさい。 $ x^2 - 3 x + 2 $');
-    expect(answerTexts).toEqual(['(x - 1)(x - 2)', '(x - 2)(x - 1)']);
+    expect(subAnswers).toHaveLength(1);
+    expect(subAnswers[0].answerTexts).toEqual(['(x - 1)(x - 2)', '(x - 2)(x - 1)']);
+  });
+
+  it('renders a multi-part problem (大問) with independently scored sub-questions', () => {
+    const template: Pick<ProblemTemplateDef, 'kind' | 'problem_template' | 'subQuestions'> = {
+      kind: 'variable',
+      problem_template: '次の連立方程式を解け。 x + y = {{A+B}}, x - y = {{A-B}}',
+      subQuestions: [
+        { label: '(1) x =', points: 5, answerTemplates: ['{{A}}'] },
+        { label: '(2) y =', points: 3, answerTemplates: ['{{B}}'] },
+      ],
+    };
+    const { subAnswers } = renderProblem(template, { A: 4, B: 1 });
+    expect(subAnswers).toEqual([
+      { label: '(1) x =', points: 5, answerTexts: ['4'] },
+      { label: '(2) y =', points: 3, answerTexts: ['1'] },
+    ]);
+  });
+
+  it('renders a pair_choice problem by picking the pair at the resolved index', () => {
+    const template: Pick<ProblemTemplateDef, 'kind' | 'problem_template' | 'subQuestions' | 'pairs'> = {
+      kind: 'pair_choice',
+      problem_template: '次の日本語を英語にしなさい: {{q}}',
+      subQuestions: [{ label: '', points: 2, answerTemplates: [] }],
+      pairs: [
+        { question: '今、始めよう', answer: 'begin now' },
+        { question: '俺の隊にはいれよ', answer: 'join my squad' },
+      ],
+    };
+    const { problemText, subAnswers } = renderProblem(template, { pairIndex: 1 });
+    expect(problemText).toBe('次の日本語を英語にしなさい: 俺の隊にはいれよ');
+    expect(subAnswers).toEqual([{ label: '', points: 2, answerTexts: ['join my squad'] }]);
   });
 });
 

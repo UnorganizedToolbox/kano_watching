@@ -21,12 +21,14 @@ import { parseConstraint, constraintDependencies, evaluateConstraint, type Varia
 import {
   type VariableDef,
   type ProblemTemplateDef,
+  type PairItem,
   type ResolveResult,
   type ResolveOptions,
   type ResolvedVariables,
   PRACTICAL_BOUND,
   DEFAULT_MAX_RETRIES,
   DEFAULT_MAX_RESTARTS,
+  PAIR_INDEX_KEY,
 } from './types';
 
 function resolveBound(field: string, type: VariableDef['type'], scope: Record<string, number>): number {
@@ -174,4 +176,25 @@ export function resolveVariables(template: Pick<ProblemTemplateDef, 'variables' 
     ok: false,
     error: `制約 "${lastRetryExhaustedSource}" を満たす値の組み合わせが見つかりませんでした(${maxRestarts + 1}回試行、各${maxRetries}回再抽選)`,
   };
+}
+
+// kind === 'pair_choice' 用: 登録された組(pair)の中から1つをランダムに選ぶだけ。
+// resolveVariablesと戻り値の形(ResolveResult)を揃え、resolved_variablesの
+// スキーマを分けずに { pairIndex: N } として保存できるようにする。
+export function resolvePairChoice(pairs: PairItem[], random: () => number = Math.random): ResolveResult {
+  if (pairs.length === 0) {
+    return { ok: false, error: '組(question/answerのペア)を1つ以上登録してください' };
+  }
+  const idx = Math.floor(random() * pairs.length);
+  return { ok: true, values: { [PAIR_INDEX_KEY]: idx } };
+}
+
+export function resolveTemplate(
+  template: Pick<ProblemTemplateDef, 'kind' | 'variables' | 'constraints' | 'pairs'>,
+  options: ResolveOptions = {},
+): ResolveResult {
+  if (template.kind === 'pair_choice') {
+    return resolvePairChoice(template.pairs ?? [], options.random ?? Math.random);
+  }
+  return resolveVariables(template, options);
 }

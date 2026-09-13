@@ -2,9 +2,9 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
-import { resolveVariables } from "@/lib/cbt/resolve";
+import { resolveTemplate } from "@/lib/cbt/resolve";
 import { renderProblem, isAnswerCorrect } from "@/lib/cbt/render";
-import type { VariableDef } from "@/lib/cbt/types";
+import type { VariableDef, TemplateKind, SubQuestionDef, PairItem } from "@/lib/cbt/types";
 
 async function verifyStudent() {
   const supabase = await createClient();
@@ -21,17 +21,19 @@ interface AssignmentWithTemplate {
   due_at: string | null;
   grading_mode: 'manual' | 'auto_exact';
   problem_templates: {
+    kind: TemplateKind;
     variables: VariableDef[];
     constraints: string[];
     problem_template: string;
-    answer_templates: string[];
+    sub_questions: SubQuestionDef[];
+    pairs: PairItem[];
   };
 }
 
 async function loadAssignment(supabase: SupabaseClient, assignmentId: string): Promise<AssignmentWithTemplate> {
   const { data, error } = await supabase
     .from('problem_assignments')
-    .select('id, delivery_mode, due_at, grading_mode, problem_templates:template_id (variables, constraints, problem_template, answer_templates)')
+    .select('id, delivery_mode, due_at, grading_mode, problem_templates:template_id (kind, variables, constraints, problem_template, sub_questions, pairs)')
     .eq('id', assignmentId)
     .single();
   if (error || !data) throw new Error('配信が見つかりません');
@@ -59,9 +61,11 @@ export async function startAttempt(assignmentId: string): Promise<ActionResult> 
       .eq('assignment_id', assignmentId)
       .eq('student_id', userId);
 
-    const resolved = resolveVariables({
+    const resolved = resolveTemplate({
+      kind: assignment.problem_templates.kind,
       variables: assignment.problem_templates.variables,
       constraints: assignment.problem_templates.constraints,
+      pairs: assignment.problem_templates.pairs,
     });
     if (!resolved.ok) {
       return { ok: false, error: `問題の生成に失敗しました: ${resolved.error}` };
@@ -95,15 +99,12 @@ export interface SubmitAttemptInput {
   attemptId: string;
   assignmentId: string;
   work: string;
-  finalAnswer: string;
+  answers: string[]; // 小問ごとの最終解答(subQuestionsと同じ順序)
 }
 
 export async function submitAttempt(input: SubmitAttemptInput): Promise<ActionResult> {
   try {
     const { supabase, userId } = await verifyStudent();
-
-    const finalAnswer = input.finalAnswer.trim();
-    if (!finalAnswer) return { ok: false, error: '最終解答を入力してください' };
 
     const { data: attempt, error: attemptError } = await supabase
       .from('problem_attempts')
@@ -117,22 +118,44 @@ export async function submitAttempt(input: SubmitAttemptInput): Promise<ActionRe
 
     const assignment = await loadAssignment(supabase, input.assignmentId);
 
-    let isCorrect: boolean | null = null;
+    const { subAnswers } = renderProblem(
+      {
+        kind: assignment.problem_templates.kind,
+        problem_template: assignment.problem_templates.problem_template,
+        subQuestions: assignment.problem_templates.sub_questions,
+        pairs: assignment.problem_templates.pairs,
+      },
+      attempt.resolved_variables as Record<string, number>,
+    );
+
+    if (input.answers.some(a => !a.trim())) {
+      return { ok: false, error: 'すべての解答欄を入力してください' };
+    }
+
+    let score: number | null = null;
+    let subResults: { label: string; points: number; earnedPoints: number; submittedAnswer: string; correct: boolean }[] | null = null;
+
     if (assignment.grading_mode === 'auto_exact') {
-      const { answerTexts } = renderProblem(
-        assignment.problem_templates.problem_template,
-        assignment.problem_templates.answer_templates,
-        attempt.resolved_variables as Record<string, number>,
-      );
-      isCorrect = isAnswerCorrect(finalAnswer, answerTexts);
+      let totalPoints = 0;
+      let earnedTotal = 0;
+      subResults = subAnswers.map((sa, i) => {
+        const submittedAnswer = input.answers[i] ?? '';
+        const correct = isAnswerCorrect(submittedAnswer, sa.answerTexts);
+        totalPoints += sa.points;
+        const earnedPoints = correct ? sa.points : 0;
+        earnedTotal += earnedPoints;
+        return { label: sa.label, points: sa.points, earnedPoints, submittedAnswer, correct };
+      });
+      score = totalPoints > 0 ? (earnedTotal / totalPoints) * 100 : 0;
     }
 
     const now = new Date().toISOString();
     const { error } = await supabase.from('problem_attempts').update({
       submitted_work: input.work,
-      submitted_final_answer: finalAnswer,
+      submitted_answers: input.answers,
       status: assignment.grading_mode === 'auto_exact' ? 'graded' : 'submitted',
-      is_correct: isCorrect,
+      sub_results: subResults,
+      score,
       submitted_at: now,
       graded_at: assignment.grading_mode === 'auto_exact' ? now : null,
     }).eq('id', input.attemptId);

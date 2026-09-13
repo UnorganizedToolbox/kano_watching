@@ -8,6 +8,7 @@ import type { ProblemTemplateDef } from './types';
 // 多数回実行しても常に制約を満たした値が生成されることを確認する。
 const template: ProblemTemplateDef = {
   title: '2次式の因数分解',
+  kind: 'variable',
   variables: [
     { name: 'A', type: 'integer', min: '1', max: '9' },
     { name: 'B', type: 'integer', min: '-inf', max: 'A+5' },
@@ -15,7 +16,7 @@ const template: ProblemTemplateDef = {
   ],
   constraints: ['A*A != B'],
   problem_template: '次の二次式を展開しなさい。 $ x^2 - {{A+B}} x + {{A*B}} $',
-  answer_templates: ['(x - {{A}})(x - {{B}})', '(x - {{B}})(x - {{A}})'],
+  subQuestions: [{ label: '', points: 1, answerTemplates: ['(x - {{A}})(x - {{B}})', '(x - {{B}})(x - {{A}})'] }],
 };
 
 describe('CBT engine integration (real randomness)', () => {
@@ -39,7 +40,8 @@ describe('CBT engine integration (real randomness)', () => {
       expect(C).toBeLessThanOrEqual(10);
       expect(A * A).not.toBe(B); // 制約 A*A != B
 
-      const { problemText, answerTexts } = renderProblem(template.problem_template, template.answer_templates, result.values);
+      const { problemText, subAnswers } = renderProblem(template, result.values);
+      const answerTexts = subAnswers[0].answerTexts;
       expect(problemText).toContain(String(A + B < 0 ? `(${A + B})` : A + B));
       expect(answerTexts[0]).toContain(`x - ${A}`);
 
@@ -59,6 +61,7 @@ describe('CBT engine integration (real randomness)', () => {
   // validateTemplateが安定して成功することを確認する。
   it('does not spuriously fail validation for a simple "A < B" template (regression)', () => {
     const simpleTemplate = {
+      kind: 'variable' as const,
       variables: [
         { name: 'A', type: 'integer' as const, min: '0', max: '100' },
         { name: 'B', type: 'integer' as const, min: '0', max: '100' },

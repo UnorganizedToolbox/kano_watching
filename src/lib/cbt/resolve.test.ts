@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveVariables } from './resolve';
+import { resolveVariables, resolvePairChoice } from './resolve';
 import type { VariableDef } from './types';
 
 const v = (name: string, min: string, max: string, type: VariableDef['type'] = 'integer'): VariableDef => ({ name, type, min, max });
@@ -165,5 +165,24 @@ describe('resolveVariables', () => {
       expect(result.values.B).toBeGreaterThan(result.values.A);
       expect(result.values.B).toBeLessThanOrEqual(10);
     }
+  });
+});
+
+describe('resolvePairChoice', () => {
+  it('picks the pair at the index implied by the random draw', () => {
+    const pairs = [
+      { question: '今、始めよう', answer: 'begin now' },
+      { question: '俺の隊にはいれよ', answer: 'join my squad' },
+    ];
+    const result = resolvePairChoice(pairs, sequenceRandom([pick(1, 2)]));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.values.pairIndex).toBe(1);
+    }
+  });
+
+  it('fails when no pairs are registered', () => {
+    const result = resolvePairChoice([]);
+    expect(result.ok).toBe(false);
   });
 });

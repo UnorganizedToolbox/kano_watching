@@ -1,9 +1,13 @@
 // テンプレート文字列内の {{式}} を、解決済みの変数値で評価した結果に置換する。
 // 実装イメージ文書 3.4.1(負の数は括弧補完) / 3.4.2(既約分数化) を参照。
+//
+// kind === 'pair_choice' の場合は変数展開ではなく、抽選済みの組(pair)の
+// question/answer をそのまま使う(3.6節: 単問形式/ペア丸暗記型)。
 
 import { parseExpr } from './expression';
 import { formatEvaluatedExpr } from './fraction';
-import type { ResolvedVariables } from './types';
+import type { ProblemTemplateDef, ResolvedVariables } from './types';
+import { PAIR_INDEX_KEY } from './types';
 
 const PLACEHOLDER_RE = /\{\{([^{}]+)\}\}/g;
 
@@ -15,20 +19,44 @@ export function renderTemplate(template: string, values: ResolvedVariables): str
   });
 }
 
-export interface RenderedProblem {
-  problemText: string;
-  // 正答は複数登録できる(表記違いの別解・積分の別解等を許容するため)。
+export interface RenderedSubAnswer {
+  label: string;
+  points: number;
   answerTexts: string[];
 }
 
+export interface RenderedProblem {
+  problemText: string;
+  subAnswers: RenderedSubAnswer[];
+}
+
 export function renderProblem(
-  problemTemplate: string,
-  answerTemplates: string[],
+  template: Pick<ProblemTemplateDef, 'kind' | 'problem_template' | 'subQuestions' | 'pairs'>,
   values: ResolvedVariables,
 ): RenderedProblem {
+  if (template.kind === 'pair_choice') {
+    const pairs = template.pairs ?? [];
+    const idx = values[PAIR_INDEX_KEY];
+    const pair = pairs[idx];
+    if (!pair) throw new Error(`抽選された組(index=${idx})が見つかりません`);
+
+    const wrapper = template.problem_template.trim();
+    const problemText = wrapper.includes('{{q}}') ? wrapper.replace(/\{\{q\}\}/g, pair.question) : pair.question;
+    const points = template.subQuestions[0]?.points ?? 1;
+
+    return {
+      problemText,
+      subAnswers: [{ label: '', points, answerTexts: [pair.answer] }],
+    };
+  }
+
   return {
-    problemText: renderTemplate(problemTemplate, values),
-    answerTexts: answerTemplates.map(t => renderTemplate(t, values)),
+    problemText: renderTemplate(template.problem_template, values),
+    subAnswers: template.subQuestions.map(sq => ({
+      label: sq.label,
+      points: sq.points,
+      answerTexts: sq.answerTemplates.map(t => renderTemplate(t, values)),
+    })),
   };
 }
 

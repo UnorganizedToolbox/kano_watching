@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import ProblemTemplateForm from "../../ProblemTemplateForm";
-import type { VariableDef } from "@/lib/cbt/types";
+import type { VariableDef, TemplateKind, SubQuestionDef, PairItem } from "@/lib/cbt/types";
 
 export default async function EditProblemTemplatePage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;
@@ -49,10 +49,12 @@ export default async function EditProblemTemplatePage(props: { params: Promise<{
       <ProblemTemplateForm
         templateId={template.id}
         initialTitle={template.title}
+        initialKind={(template.kind as TemplateKind) || 'variable'}
         initialVariables={(template.variables as VariableDef[]) || []}
         initialConstraints={(template.constraints as string[]) || []}
         initialProblemTemplate={template.problem_template}
-        initialAnswerTemplates={(template.answer_templates as string[]) || ['']}
+        initialSubQuestions={(template.sub_questions as SubQuestionDef[]) || [{ label: '', points: 1, answerTemplates: [''] }]}
+        initialPairs={(template.pairs as PairItem[]) || [{ question: '', answer: '' }]}
         initialOrganizationId={template.organization_id}
         organizations={organizations || []}
         isAdmin={isAdmin}

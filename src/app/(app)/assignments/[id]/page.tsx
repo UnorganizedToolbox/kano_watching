@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { renderProblem } from "@/lib/cbt/render";
 import { renderTypstToSvg } from "@/lib/typst";
+import type { TemplateKind, SubQuestionDef, PairItem } from "@/lib/cbt/types";
 import StartAttemptButton from "../StartAttemptButton";
 import AttemptClient from "../AttemptClient";
 
@@ -20,7 +21,7 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
 
   const { data: assignment, error } = await supabase
     .from('problem_assignments')
-    .select('id, delivery_mode, due_at, grading_mode, problem_templates:template_id (title, problem_template, answer_templates)')
+    .select('id, delivery_mode, due_at, grading_mode, problem_templates:template_id (title, kind, problem_template, sub_questions, pairs)')
     .eq('id', id)
     .single();
 
@@ -35,13 +36,15 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
 
   const template = assignment.problem_templates as unknown as {
     title: string;
+    kind: TemplateKind;
     problem_template: string;
-    answer_templates: string[];
+    sub_questions: SubQuestionDef[];
+    pairs: PairItem[];
   };
 
   const { data: attempts } = await supabase
     .from('problem_attempts')
-    .select('id, resolved_variables, submitted_work, submitted_final_answer, status, is_correct')
+    .select('id, resolved_variables, submitted_work, submitted_answers, status, sub_results, score')
     .eq('assignment_id', id)
     .eq('student_id', user.id)
     .order('attempt_number', { ascending: false })
@@ -55,13 +58,22 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
 
   let svgDataUri: string | null = null;
   let svgError: string | null = null;
+  let subQuestionMeta: { label: string; points: number }[] = [];
+
   if (attempt) {
     try {
-      const { problemText } = renderProblem(
-        template.problem_template,
-        template.answer_templates,
+      const { problemText, subAnswers } = renderProblem(
+        {
+          kind: template.kind,
+          problem_template: template.problem_template,
+          subQuestions: template.sub_questions,
+          pairs: template.pairs,
+        },
         attempt.resolved_variables as Record<string, number>,
       );
+      // 正答(answerTexts)はクライアントに渡さない。ラベル・配点のみ渡す。
+      subQuestionMeta = subAnswers.map(sa => ({ label: sa.label, points: sa.points }));
+
       const result = renderTypstToSvg(buildProblemTypstSource(problemText));
       if (result.ok) {
         svgDataUri = `data:image/svg+xml;base64,${Buffer.from(result.svg).toString('base64')}`;
@@ -94,9 +106,11 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
             id: attempt.id,
             status: attempt.status,
             submittedWork: attempt.submitted_work,
-            submittedFinalAnswer: attempt.submitted_final_answer,
-            isCorrect: attempt.is_correct,
+            submittedAnswers: (attempt.submitted_answers as string[] | null) ?? [],
+            subResults: attempt.sub_results as { label: string; points: number; earnedPoints: number; submittedAnswer: string; correct: boolean }[] | null,
+            score: attempt.score,
           }}
+          subQuestions={subQuestionMeta}
           svgDataUri={svgDataUri}
           svgError={svgError}
           canRetry={!isOverdue}

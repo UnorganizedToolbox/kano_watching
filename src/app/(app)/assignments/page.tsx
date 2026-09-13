@@ -34,14 +34,14 @@ export default async function StudentAssignmentsPage() {
 
   const { data: attempts } = await supabase
     .from('problem_attempts')
-    .select('assignment_id, attempt_number, status, is_correct')
+    .select('assignment_id, attempt_number, status, score')
     .eq('student_id', user.id)
     .order('attempt_number', { ascending: false });
 
-  const latestByAssignment = new Map<string, { status: string; is_correct: boolean | null }>();
+  const latestByAssignment = new Map<string, { status: string; score: number | null }>();
   for (const a of attempts || []) {
     if (!latestByAssignment.has(a.assignment_id)) {
-      latestByAssignment.set(a.assignment_id, { status: a.status, is_correct: a.is_correct });
+      latestByAssignment.set(a.assignment_id, { status: a.status, score: a.score });
     }
   }
 
@@ -49,10 +49,11 @@ export default async function StudentAssignmentsPage() {
     const latest = latestByAssignment.get(a.id);
     if (!latest) return { text: '未着手', className: 'bg-slate-100 dark:bg-slate-800 text-slate-500' };
     if (latest.status === 'in_progress') return { text: '挑戦中', className: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' };
-    if (a.grading_mode === 'auto_exact' && latest.is_correct !== null) {
-      return latest.is_correct
-        ? { text: '正解', className: 'bg-brand-100 dark:bg-brand-900/30 text-brand-600' }
-        : { text: '不正解', className: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600' };
+    if (a.grading_mode === 'auto_exact' && latest.score !== null) {
+      const rounded = Math.round(latest.score);
+      return rounded >= 100
+        ? { text: `${rounded}%`, className: 'bg-brand-100 dark:bg-brand-900/30 text-brand-600' }
+        : { text: `${rounded}%`, className: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600' };
     }
     return { text: '提出済み', className: 'bg-slate-100 dark:bg-slate-800 text-slate-500' };
   };

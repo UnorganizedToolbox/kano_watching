@@ -4,23 +4,34 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { submitAttempt, retryAttempt } from './actions';
 
+interface SubResult {
+  label: string;
+  points: number;
+  earnedPoints: number;
+  submittedAnswer: string;
+  correct: boolean;
+}
+
 interface AttemptView {
   id: string;
   status: 'in_progress' | 'submitted' | 'graded';
   submittedWork: string | null;
-  submittedFinalAnswer: string | null;
-  isCorrect: boolean | null;
+  submittedAnswers: string[];
+  subResults: SubResult[] | null;
+  score: number | null;
 }
 
 export default function AttemptClient({
   assignmentId,
   attempt,
+  subQuestions,
   svgDataUri,
   svgError,
   canRetry,
 }: {
   assignmentId: string;
   attempt: AttemptView;
+  subQuestions: { label: string; points: number }[];
   svgDataUri: string | null;
   svgError: string | null;
   canRetry: boolean;
@@ -28,15 +39,21 @@ export default function AttemptClient({
   const router = useRouter();
   const isLocked = attempt.status !== 'in_progress';
   const [work, setWork] = useState(attempt.submittedWork ?? '');
-  const [finalAnswer, setFinalAnswer] = useState(attempt.submittedFinalAnswer ?? '');
+  const [answers, setAnswers] = useState<string[]>(
+    subQuestions.map((_, i) => attempt.submittedAnswers[i] ?? ''),
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, startSubmitTransition] = useTransition();
   const [isRetrying, startRetryTransition] = useTransition();
 
+  const updateAnswer = (idx: number, value: string) => {
+    setAnswers(prev => prev.map((a, i) => (i === idx ? value : a)));
+  };
+
   const handleSubmit = () => {
     setError(null);
     startSubmitTransition(async () => {
-      const result = await submitAttempt({ attemptId: attempt.id, assignmentId, work, finalAnswer });
+      const result = await submitAttempt({ attemptId: attempt.id, assignmentId, work, answers });
       if (result.ok) {
         router.refresh();
       } else {
@@ -84,19 +101,37 @@ export default function AttemptClient({
             className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 outline-none resize-none disabled:opacity-60"
           />
         </div>
-        <div>
-          <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-1">最終解答</label>
-          <input
-            value={finalAnswer}
-            onChange={e => setFinalAnswer(e.target.value)}
-            disabled={isLocked}
-            className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 outline-none font-mono disabled:opacity-60"
-          />
+
+        <div className="flex flex-col gap-3">
+          {subQuestions.map((sq, idx) => {
+            const result = attempt.subResults?.[idx];
+            return (
+              <div key={idx}>
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-1">
+                  {sq.label ? `${sq.label} ` : '最終解答'}
+                  <span className="text-[10px] text-slate-400 font-normal ml-1">({sq.points}点)</span>
+                </label>
+                <input
+                  value={answers[idx] ?? ''}
+                  onChange={e => updateAnswer(idx, e.target.value)}
+                  disabled={isLocked}
+                  className={`w-full px-3 py-2 text-sm border rounded-xl bg-slate-50 dark:bg-slate-900 outline-none font-mono disabled:opacity-60 ${
+                    result ? (result.correct ? 'border-brand-400' : 'border-rose-400') : 'border-slate-200 dark:border-slate-700'
+                  }`}
+                />
+                {result && (
+                  <p className={`text-[11px] font-bold mt-1 ${result.correct ? 'text-brand-600' : 'text-rose-500'}`}>
+                    {result.correct ? `正解 (+${result.earnedPoints}点)` : '不正解 (0点)'}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {attempt.status === 'graded' && (
-          <p className={`text-sm font-bold ${attempt.isCorrect ? 'text-brand-600' : 'text-rose-500'}`}>
-            {attempt.isCorrect ? '正解です!' : '不正解です'}
+        {attempt.status === 'graded' && attempt.score !== null && (
+          <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+            スコア: <span className="text-brand-600">{Math.round(attempt.score)}%</span>
           </p>
         )}
         {attempt.status === 'submitted' && (

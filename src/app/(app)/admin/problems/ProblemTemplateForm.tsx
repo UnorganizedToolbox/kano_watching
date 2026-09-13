@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveTemplate, previewTemplate, deleteTemplate, type TemplateInput } from './actions';
-import type { VariableDef, VarType } from '@/lib/cbt/types';
+import type { VariableDef, VarType, TemplateKind, SubQuestionDef, PairItem } from '@/lib/cbt/types';
 import { Trash2, Plus, RotateCcw } from 'lucide-react';
 
 interface ToolbarSnippet {
@@ -50,36 +50,50 @@ const VAR_TYPE_OPTIONS: { value: VarType; label: string }[] = [
   { value: 'real', label: '実数' },
 ];
 
+const KIND_OPTIONS: { value: TemplateKind; label: string; description: string }[] = [
+  { value: 'variable', label: '変数抽選', description: '変数の範囲・制約を定義し、数値をランダムに抽選して出題する通常のCBT問題' },
+  { value: 'pair_choice', label: '単問形式(丸暗記)', description: 'question/answerの組を登録し、毎回1組だけランダムに出題する完答型(英単語対応など)' },
+];
+
 const EMPTY_VARIABLE: VariableDef = { name: '', type: 'integer', min: '', max: '' };
+const EMPTY_SUB_QUESTION: SubQuestionDef = { label: '', points: 1, answerTemplates: [''] };
+const EMPTY_PAIR: PairItem = { question: '', answer: '' };
 
 export default function ProblemTemplateForm({
   templateId,
   initialTitle = '',
+  initialKind = 'variable',
   initialVariables = [EMPTY_VARIABLE],
   initialConstraints = [],
   initialProblemTemplate = '',
-  initialAnswerTemplates = [''],
+  initialSubQuestions = [EMPTY_SUB_QUESTION],
+  initialPairs = [EMPTY_PAIR],
   organizations,
   isAdmin,
   initialOrganizationId,
 }: {
   templateId?: string;
   initialTitle?: string;
+  initialKind?: TemplateKind;
   initialVariables?: VariableDef[];
   initialConstraints?: string[];
   initialProblemTemplate?: string;
-  initialAnswerTemplates?: string[];
+  initialSubQuestions?: SubQuestionDef[];
+  initialPairs?: PairItem[];
   organizations: { id: string; name: string }[];
   isAdmin: boolean;
   initialOrganizationId?: string | null;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
+  const [kind, setKind] = useState<TemplateKind>(initialKind);
   const [organizationId, setOrganizationId] = useState(initialOrganizationId || organizations[0]?.id || '');
   const [variables, setVariables] = useState<VariableDef[]>(initialVariables);
   const [constraints, setConstraints] = useState<string[]>(initialConstraints);
   const [problemTemplate, setProblemTemplate] = useState(initialProblemTemplate);
-  const [answerTemplates, setAnswerTemplates] = useState<string[]>(initialAnswerTemplates.length > 0 ? initialAnswerTemplates : ['']);
+  const [subQuestions, setSubQuestions] = useState<SubQuestionDef[]>(initialSubQuestions.length > 0 ? initialSubQuestions : [EMPTY_SUB_QUESTION]);
+  const [pairs, setPairs] = useState<PairItem[]>(initialPairs.length > 0 ? initialPairs : [EMPTY_PAIR]);
+  const [pairPoints, setPairPoints] = useState<number>(initialSubQuestions[0]?.points ?? 1);
 
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState(false);
@@ -107,34 +121,58 @@ export default function ProblemTemplateForm({
   const addConstraint = () => setConstraints(prev => [...prev, '']);
   const removeConstraint = (idx: number) => setConstraints(prev => prev.filter((_, i) => i !== idx));
 
-  const updateAnswerTemplate = (idx: number, value: string) => {
-    setAnswerTemplates(prev => prev.map((a, i) => (i === idx ? value : a)));
+  const updateSubQuestion = (idx: number, field: 'label' | 'points', value: string) => {
+    setSubQuestions(prev => prev.map((sq, i) => (i === idx ? { ...sq, [field]: field === 'points' ? Number(value) || 0 : value } : sq)));
   };
-  const addAnswerTemplate = () => setAnswerTemplates(prev => [...prev, '']);
-  const removeAnswerTemplate = (idx: number) => setAnswerTemplates(prev => prev.filter((_, i) => i !== idx));
+  const addSubQuestion = () => setSubQuestions(prev => [...prev, { ...EMPTY_SUB_QUESTION }]);
+  const removeSubQuestion = (idx: number) => setSubQuestions(prev => prev.filter((_, i) => i !== idx));
+
+  const updateAnswerTemplate = (sqIdx: number, aIdx: number, value: string) => {
+    setSubQuestions(prev => prev.map((sq, i) => (i === sqIdx
+      ? { ...sq, answerTemplates: sq.answerTemplates.map((a, j) => (j === aIdx ? value : a)) }
+      : sq)));
+  };
+  const addAnswerTemplate = (sqIdx: number) => {
+    setSubQuestions(prev => prev.map((sq, i) => (i === sqIdx ? { ...sq, answerTemplates: [...sq.answerTemplates, ''] } : sq)));
+  };
+  const removeAnswerTemplate = (sqIdx: number, aIdx: number) => {
+    setSubQuestions(prev => prev.map((sq, i) => (i === sqIdx ? { ...sq, answerTemplates: sq.answerTemplates.filter((_, j) => j !== aIdx) } : sq)));
+  };
+
+  const updatePair = (idx: number, field: keyof PairItem, value: string) => {
+    setPairs(prev => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)));
+  };
+  const addPair = () => setPairs(prev => [...prev, { ...EMPTY_PAIR }]);
+  const removePair = (idx: number) => setPairs(prev => prev.filter((_, i) => i !== idx));
 
   const buildInput = (): TemplateInput => ({
     id: templateId,
     organizationId: isAdmin ? organizationId : undefined,
     title,
+    kind,
     variables,
     constraints,
     problemTemplate,
-    answerTemplates,
+    subQuestions: kind === 'variable' ? subQuestions : [{ label: '', points: pairPoints, answerTemplates: [] }],
+    pairs,
   });
 
   const handleSave = () => {
     setSaveError(null);
     setSaveOk(false);
     startSaveTransition(async () => {
-      const result = await saveTemplate(buildInput());
-      if (result.ok) {
-        setSaveOk(true);
-        if (!templateId && result.id) {
-          router.push(`/admin/problems/${result.id}/edit`);
+      try {
+        const result = await saveTemplate(buildInput());
+        if (result.ok) {
+          setSaveOk(true);
+          if (!templateId && result.id) {
+            router.push(`/admin/problems/${result.id}/edit`);
+          }
+        } else {
+          setSaveError(result.error || '保存に失敗しました');
         }
-      } else {
-        setSaveError(result.error || '保存に失敗しました');
+      } catch (e) {
+        setSaveError(e instanceof Error ? e.message : '保存に失敗しました');
       }
     });
   };
@@ -142,15 +180,21 @@ export default function ProblemTemplateForm({
   const handlePreview = () => {
     setPreviewError(null);
     startPreviewTransition(async () => {
-      const result = await previewTemplate({ variables, constraints, problemTemplate, answerTemplates });
-      if (result.ok) {
-        const blob = new Blob([result.svg], { type: 'image/svg+xml' });
-        setPreviewImgUrl(URL.createObjectURL(blob));
-        setPreviewValues(result.values);
-      } else {
+      try {
+        const result = await previewTemplate(buildInput());
+        if (result.ok) {
+          const blob = new Blob([result.svg], { type: 'image/svg+xml' });
+          setPreviewImgUrl(URL.createObjectURL(blob));
+          setPreviewValues(result.values);
+        } else {
+          setPreviewImgUrl(null);
+          setPreviewValues(null);
+          setPreviewError(result.error);
+        }
+      } catch (e) {
         setPreviewImgUrl(null);
         setPreviewValues(null);
-        setPreviewError(result.error);
+        setPreviewError(e instanceof Error ? e.message : 'プレビューに失敗しました');
       }
     });
   };
@@ -183,6 +227,23 @@ export default function ProblemTemplateForm({
             />
           </div>
 
+          <div>
+            <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">出題種別</label>
+            <div className="flex flex-col gap-2">
+              {KIND_OPTIONS.map(opt => (
+                <label key={opt.value} className={`flex items-start gap-2 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+                  kind === opt.value ? 'border-brand-400 bg-brand-50 dark:bg-brand-900/20' : 'border-slate-200 dark:border-slate-700'
+                }`}>
+                  <input type="radio" className="mt-1" checked={kind === opt.value} onChange={() => setKind(opt.value)} />
+                  <div>
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{opt.label}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">{opt.description}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
           {isAdmin && (
             <div>
               <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-1">団体</label>
@@ -199,94 +260,149 @@ export default function ProblemTemplateForm({
           )}
         </div>
 
-        <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-          <h3 className="font-bold text-slate-800 dark:text-white mb-1">① 変数と範囲</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">最小値・最大値には数式(他の変数を含む式)や <code>inf</code> / <code>-inf</code> を指定できます。変数名は英字のみ。</p>
+        {kind === 'variable' && (
+          <>
+            <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+              <h3 className="font-bold text-slate-800 dark:text-white mb-1">① 変数と範囲</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">最小値・最大値には数式(他の変数を含む式)や <code>inf</code> / <code>-inf</code> を指定できます。変数名は英字のみ。</p>
 
-          <div className="space-y-2">
-            {variables.map((v, idx) => (
-              <div key={idx} className="grid grid-cols-[3rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-center">
-                <input
-                  value={v.name}
-                  onChange={e => updateVariable(idx, 'name', e.target.value)}
-                  placeholder="A"
-                  className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
-                />
-                <select
-                  value={v.type}
-                  onChange={e => updateVariable(idx, 'type', e.target.value)}
-                  className="w-full min-w-0 px-1 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none"
-                >
-                  {VAR_TYPE_OPTIONS.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-                <input
-                  value={v.min}
-                  onChange={e => updateVariable(idx, 'min', e.target.value)}
-                  placeholder="最小値"
-                  className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
-                />
-                <input
-                  value={v.max}
-                  onChange={e => updateVariable(idx, 'max', e.target.value)}
-                  placeholder="最大値"
-                  className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
-                />
-                <button onClick={() => removeVariable(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors shrink-0">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              <div className="space-y-2">
+                {variables.map((v, idx) => (
+                  <div key={idx} className="grid grid-cols-[3rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-center">
+                    <input
+                      value={v.name}
+                      onChange={e => updateVariable(idx, 'name', e.target.value)}
+                      placeholder="A"
+                      className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
+                    />
+                    <select
+                      value={v.type}
+                      onChange={e => updateVariable(idx, 'type', e.target.value)}
+                      className="w-full min-w-0 px-1 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none"
+                    >
+                      {VAR_TYPE_OPTIONS.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                    <input
+                      value={v.min}
+                      onChange={e => updateVariable(idx, 'min', e.target.value)}
+                      placeholder="最小値"
+                      className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
+                    />
+                    <input
+                      value={v.max}
+                      onChange={e => updateVariable(idx, 'max', e.target.value)}
+                      placeholder="最大値"
+                      className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
+                    />
+                    <button onClick={() => removeVariable(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors shrink-0">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <button onClick={addVariable} className="mt-3 flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
-            <Plus className="w-3.5 h-3.5" /> 変数を追加
-          </button>
-        </div>
+              <button onClick={addVariable} className="mt-3 flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
+                <Plus className="w-3.5 h-3.5" /> 変数を追加
+              </button>
+            </div>
 
-        <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-          <h3 className="font-bold text-slate-800 dark:text-white mb-1">② 制約条件</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">四則演算を含む比較式。例: <code>A != B</code>、<code>A/B != 1/2</code>、<code>forall(A) A*A != B</code></p>
+            <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+              <h3 className="font-bold text-slate-800 dark:text-white mb-1">② 制約条件</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">四則演算を含む比較式。例: <code>A != B</code>、<code>A/B != 1/2</code>、<code>forall(A) A*A != B</code></p>
 
-          <div className="space-y-2">
-            {constraints.map((c, idx) => (
-              <div key={idx} className="flex gap-2">
-                <input
-                  value={c}
-                  onChange={e => updateConstraint(idx, e.target.value)}
-                  placeholder="A < B"
-                  className="flex-1 px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
-                />
-                <button onClick={() => removeConstraint(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              <div className="space-y-2">
+                {constraints.map((c, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input
+                      value={c}
+                      onChange={e => updateConstraint(idx, e.target.value)}
+                      placeholder="A < B"
+                      className="flex-1 px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
+                    />
+                    <button onClick={() => removeConstraint(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+              <button onClick={addConstraint} className="mt-3 flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
+                <Plus className="w-3.5 h-3.5" /> 制約を追加
+              </button>
+            </div>
+          </>
+        )}
+
+        {kind === 'pair_choice' && (
+          <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 dark:text-white mb-1">question / answer の組</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">出題のたびにこの中から1組だけランダムに選ばれ、questionが提示されanswerが完答判定の正答になります。</p>
+
+            <div className="space-y-2">
+              {pairs.map((p, idx) => (
+                <div key={idx} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+                  <input
+                    value={p.question}
+                    onChange={e => updatePair(idx, 'question', e.target.value)}
+                    placeholder="今、始めよう"
+                    className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none"
+                  />
+                  <input
+                    value={p.answer}
+                    onChange={e => updatePair(idx, 'answer', e.target.value)}
+                    placeholder="begin now"
+                    className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
+                  />
+                  <button onClick={() => removePair(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button onClick={addPair} className="mt-3 flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
+              <Plus className="w-3.5 h-3.5" /> 組を追加
+            </button>
+
+            <div className="mt-4">
+              <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-1">配点</label>
+              <input
+                type="number"
+                min={1}
+                value={pairPoints}
+                onChange={e => setPairPoints(Number(e.target.value) || 1)}
+                className="w-32 px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 outline-none"
+              />
+            </div>
           </div>
-          <button onClick={addConstraint} className="mt-3 flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
-            <Plus className="w-3.5 h-3.5" /> 制約を追加
-          </button>
-        </div>
+        )}
       </div>
 
       {/* 右パネル */}
       <div className="flex flex-col gap-6">
         <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-          <h3 className="font-bold text-slate-800 dark:text-white mb-1">③ 問題文エディタ (Typst構文)</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2"><code>{'{{変数名}}'}</code> または <code>{'{{式}}'}</code>(例: <code>{'{{A+B}}'}</code>)で値を埋め込みます。</p>
+          <h3 className="font-bold text-slate-800 dark:text-white mb-1">
+            {kind === 'variable' ? '③ 問題文エディタ (Typst構文)' : '問題文テンプレート'}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+            {kind === 'variable'
+              ? <><code>{'{{変数名}}'}</code> または <code>{'{{式}}'}</code>(例: <code>{'{{A+B}}'}</code>)で値を埋め込みます。</>
+              : <><code>{'{{q}}'}</code> の部分に抽選されたquestionが埋め込まれます(空欄ならquestionをそのまま表示)。例: <code>次の日本語を英語にしなさい: {'{{q}}'}</code></>}
+          </p>
 
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {TOOLBAR_SNIPPETS.map(s => (
-              <button
-                key={s.label}
-                type="button"
-                onClick={() => insertAtCursor(problemTextareaRef.current, problemTemplate, s, setProblemTemplate)}
-                className="px-2.5 py-1 text-xs font-mono border border-slate-200 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+          {kind === 'variable' && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {TOOLBAR_SNIPPETS.map(s => (
+                <button
+                  key={s.label}
+                  type="button"
+                  onClick={() => insertAtCursor(problemTextareaRef.current, problemTemplate, s, setProblemTemplate)}
+                  className="px-2.5 py-1 text-xs font-mono border border-slate-200 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           <textarea
             ref={problemTextareaRef}
@@ -294,39 +410,74 @@ export default function ProblemTemplateForm({
             onChange={e => setProblemTemplate(e.target.value)}
             rows={6}
             spellCheck={false}
-            placeholder={'次の二次式を展開しなさい。\n$ x^2 - {{A+B}} x + {{A*B}} $'}
+            placeholder={kind === 'variable' ? '次の二次式を展開しなさい。\n$ x^2 - {{A+B}} x + {{A*B}} $' : '次の日本語を英語にしなさい: {{q}}'}
             className="w-full px-3 py-2 text-sm font-mono border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 outline-none resize-none"
           />
 
-          <div className="flex items-center justify-between mt-4 mb-1">
-            <label className="text-sm font-bold text-slate-700 dark:text-slate-200">正答テンプレート</label>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">表記違いの別解(例: <code>(x-1)(x-2)</code> と <code>(x-2)(x-1)</code>)は行を追加して複数登録できます。採点時は空白を無視して比較します。</p>
-          <div className="space-y-2">
-            {answerTemplates.map((a, idx) => (
-              <div key={idx} className="flex gap-2">
-                <input
-                  value={a}
-                  onChange={e => updateAnswerTemplate(idx, e.target.value)}
-                  placeholder="(x - {{A}})(x - {{B}})"
-                  className="flex-1 min-w-0 px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
-                />
-                {answerTemplates.length > 1 && (
-                  <button onClick={() => removeAnswerTemplate(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors shrink-0">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+          {kind === 'variable' && (
+            <>
+              <div className="flex items-center justify-between mt-4 mb-1">
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">小問(正答・配点)</label>
               </div>
-            ))}
-          </div>
-          <button onClick={addAnswerTemplate} className="mt-2 flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
-            <Plus className="w-3.5 h-3.5" /> 別解を追加
-          </button>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">小問を複数追加すると大問になります。それぞれの小問に配点と正答(別解可)を設定してください。</p>
+
+              <div className="space-y-3">
+                {subQuestions.map((sq, sqIdx) => (
+                  <div key={sqIdx} className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-slate-50 dark:bg-slate-900/50">
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        value={sq.label}
+                        onChange={e => updateSubQuestion(sqIdx, 'label', e.target.value)}
+                        placeholder="(1) など(単問なら空欄でよい)"
+                        className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 outline-none"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        value={sq.points}
+                        onChange={e => updateSubQuestion(sqIdx, 'points', e.target.value)}
+                        className="w-20 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 outline-none"
+                        title="配点"
+                      />
+                      {subQuestions.length > 1 && (
+                        <button onClick={() => removeSubQuestion(sqIdx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      {sq.answerTemplates.map((a, aIdx) => (
+                        <div key={aIdx} className="flex gap-2">
+                          <input
+                            value={a}
+                            onChange={e => updateAnswerTemplate(sqIdx, aIdx, e.target.value)}
+                            placeholder="(x - {{A}})(x - {{B}})"
+                            className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 outline-none font-mono"
+                          />
+                          {sq.answerTemplates.length > 1 && (
+                            <button onClick={() => removeAnswerTemplate(sqIdx, aIdx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors shrink-0">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={() => addAnswerTemplate(sqIdx)} className="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-brand-600 dark:text-brand-400">
+                      <Plus className="w-3 h-3" /> 別解を追加
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button onClick={addSubQuestion} className="mt-2 flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-900/20 px-3 py-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors">
+                <Plus className="w-3.5 h-3.5" /> 小問を追加(大問にする)
+              </button>
+            </>
+          )}
         </div>
 
         <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-3">
           <div className="flex justify-between items-center">
-            <h3 className="font-bold text-slate-800 dark:text-white">④ プレビュー(サンプル生成 × 1)</h3>
+            <h3 className="font-bold text-slate-800 dark:text-white">プレビュー(サンプル生成 × 1)</h3>
             <button
               onClick={handlePreview}
               disabled={isPreviewing}

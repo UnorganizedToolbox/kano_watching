@@ -6,7 +6,7 @@
 // 少なめ(既定5回)にして、無駄な計算量の掛け算(外側 x 内側restart x 変数ごとの
 // 再抽選)を避けている。
 
-import { resolveVariables } from './resolve';
+import { resolveVariables, resolvePairChoice } from './resolve';
 import type { ProblemTemplateDef } from './types';
 
 export interface ValidateResult {
@@ -16,9 +16,14 @@ export interface ValidateResult {
 }
 
 export function validateTemplate(
-  template: Pick<ProblemTemplateDef, 'variables' | 'constraints'>,
+  template: Pick<ProblemTemplateDef, 'kind' | 'variables' | 'constraints' | 'pairs'>,
   tries = 5,
 ): ValidateResult {
+  if (template.kind === 'pair_choice') {
+    const result = resolvePairChoice(template.pairs ?? []);
+    return result.ok ? { ok: true, triesRun: 1 } : { ok: false, error: result.error, triesRun: 1 };
+  }
+
   for (let i = 0; i < tries; i++) {
     const result = resolveVariables(template);
     if (!result.ok) {
