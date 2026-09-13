@@ -39,47 +39,54 @@ export interface CreateAssignmentResult {
 }
 
 export async function createAssignment(input: AssignmentInput): Promise<CreateAssignmentResult> {
-  const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
+  try {
+    const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
 
-  const { data: template } = await supabase
-    .from('problem_templates')
-    .select('id, organization_id')
-    .eq('id', input.templateId)
-    .single();
+    const { data: template } = await supabase
+      .from('problem_templates')
+      .select('id, organization_id')
+      .eq('id', input.templateId)
+      .single();
 
-  if (!template) return { ok: false, error: 'テンプレートが見つかりません' };
+    if (!template) return { ok: false, error: 'テンプレートが見つかりません' };
 
-  if (callerRole === 'teacher') {
-    if (!callerOrgId || template.organization_id !== callerOrgId) {
-      return { ok: false, error: '自分の団体のテンプレートのみ配信できます' };
+    if (callerRole === 'teacher') {
+      if (!callerOrgId || template.organization_id !== callerOrgId) {
+        return { ok: false, error: '自分の団体のテンプレートのみ配信できます' };
+      }
     }
-  }
 
-  if (input.targetType === 'students' && input.targetStudentIds.length === 0) {
-    return { ok: false, error: '配信先の生徒を1人以上選択してください' };
-  }
-  if (input.deliveryMode === 'deadline' && !input.dueAt) {
-    return { ok: false, error: '締切日時を入力してください' };
-  }
+    if (input.targetType === 'students' && input.targetStudentIds.length === 0) {
+      return { ok: false, error: '配信先の生徒を1人以上選択してください' };
+    }
+    if (input.deliveryMode === 'deadline' && !input.dueAt) {
+      return { ok: false, error: '締切日時を入力してください' };
+    }
 
-  const { data, error } = await supabase.from('problem_assignments').insert({
-    template_id: input.templateId,
-    teacher_id: (await supabase.auth.getUser()).data.user?.id,
-    organization_id: template.organization_id,
-    target_type: input.targetType,
-    target_student_ids: input.targetType === 'students' ? input.targetStudentIds : [],
-    delivery_mode: input.deliveryMode,
-    due_at: input.deliveryMode === 'deadline' ? input.dueAt : null,
-    grading_mode: input.gradingMode,
-  }).select('id').single();
+    const { data: { user } } = await supabase.auth.getUser();
 
-  if (error) {
-    console.error('Failed to create assignment', error);
-    return { ok: false, error: `配信の作成に失敗しました: ${error.message}` };
+    const { data, error } = await supabase.from('problem_assignments').insert({
+      template_id: input.templateId,
+      teacher_id: user?.id,
+      organization_id: template.organization_id,
+      target_type: input.targetType,
+      target_student_ids: input.targetType === 'students' ? input.targetStudentIds : [],
+      delivery_mode: input.deliveryMode,
+      due_at: input.deliveryMode === 'deadline' ? input.dueAt : null,
+      grading_mode: input.gradingMode,
+    }).select('id').single();
+
+    if (error) {
+      console.error('Failed to create assignment', error);
+      return { ok: false, error: `配信の作成に失敗しました: ${error.message}` };
+    }
+
+    revalidatePath('/admin/assignments');
+    return { ok: true, id: data.id };
+  } catch (e) {
+    console.error('Unexpected error in createAssignment', e);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
-
-  revalidatePath('/admin/assignments');
-  return { ok: true, id: data.id };
 }
 
 export async function deleteAssignment(id: string) {

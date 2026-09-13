@@ -33,18 +33,22 @@ export default function DeliveryForm({
   const handleSubmit = () => {
     setError(null);
     startTransition(async () => {
-      const result = await createAssignment({
-        templateId,
-        targetType,
-        targetStudentIds: [...selectedStudents],
-        deliveryMode,
-        dueAt: dueAt ? new Date(dueAt).toISOString() : null,
-        gradingMode,
-      });
-      if (result.ok) {
-        router.push('/admin/assignments');
-      } else {
-        setError(result.error || '配信に失敗しました');
+      try {
+        const result = await createAssignment({
+          templateId,
+          targetType,
+          targetStudentIds: [...selectedStudents],
+          deliveryMode,
+          dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+          gradingMode,
+        });
+        if (result.ok) {
+          router.push('/admin/assignments');
+        } else {
+          setError(result.error || '配信に失敗しました');
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '配信に失敗しました');
       }
     });
   };
