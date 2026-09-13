@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { submitAttempt, retryAttempt, type SubResultRow } from './actions';
+import { useNavLock } from '../components/NavLockContext';
 
 export interface QuestionView {
   svgDataUri: string | null;
@@ -38,6 +39,15 @@ export default function AttemptClient({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, startSubmitTransition] = useTransition();
   const [isRetrying, startRetryTransition] = useTransition();
+
+  // 問題に取り組み中(未提出)は、他の画面へ移動されると困るのでナビゲーションを封じる
+  const { lock: lockNav, unlock: unlockNav } = useNavLock();
+  useEffect(() => {
+    if (status === 'in_progress') {
+      lockNav();
+      return () => unlockNav();
+    }
+  }, [status, lockNav, unlockNav]);
 
   const updateAnswer = (qIdx: number, sIdx: number, value: string) => {
     setAnswers(prev => prev.map((qa, i) => (i === qIdx ? qa.map((a, j) => (j === sIdx ? value : a)) : qa)));

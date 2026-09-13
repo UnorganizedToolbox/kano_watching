@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { PartyPopper, Lock } from 'lucide-react';
 import { getSoundPref, getBgmPref, renderAlarmBlobUrl, renderNoiseBlobUrl, type SoundType, type BgmType, type NoiseType } from '@/lib/pomodoroAudio';
 import { getSubjectOptions, OTHER_SUBJECT, type GradeLevel } from '@/lib/subjects';
+import { useNavLock } from '../../components/NavLockContext';
 
 type TimerMode = 'WORK' | 'BREAK' | 'LONG_BREAK';
 
@@ -98,6 +99,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [awaitingDecision, setAwaitingDecision] = useState(false);
   const hasHydratedRef = useRef(false);
+  const { lock, unlock } = useNavLock();
 
   const bgmAudioElRef = useRef<HTMLAudioElement | null>(null);
   const alarmAudioElRef = useRef<HTMLAudioElement | null>(null);
@@ -322,6 +324,15 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
       if (workerRef.current) workerRef.current.onmessage = null;
     };
   }, [isRunning, targetEndTime, mode, handleTimerComplete]);
+
+  // タイマー実行中は他の画面へ移動されると集中が途切れるため、サイドバー等の
+  // ナビゲーションを封じる(設定・不具合報告は例外)。
+  useEffect(() => {
+    if (isRunning) {
+      lock();
+      return () => unlock();
+    }
+  }, [isRunning, lock, unlock]);
 
 
   const handleRatingSubmit = (rating: number) => {

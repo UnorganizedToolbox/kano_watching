@@ -7,6 +7,7 @@ import Sidebar from "./components/Sidebar";
 import HeaderDropdown from "./components/HeaderDropdown";
 import ThemeEnforcer from "./components/ThemeEnforcer";
 import { MobileNavProvider } from "./components/MobileNavContext";
+import { NavLockProvider } from "./components/NavLockContext";
 import MobileMenuButton from "./components/MobileMenuButton";
 import MobileSidebarDrawer from "./components/MobileSidebarDrawer";
 
@@ -55,6 +56,7 @@ export default async function AppLayout({
   const pinnedTheme = resolveEffectivePinnedTheme(orgRules, profile?.rule_overrides as RuleMap);
 
   return (
+    <NavLockProvider>
     <MobileNavProvider>
       <ThemeEnforcer pinnedTheme={pinnedTheme} />
       <header className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
@@ -93,5 +95,6 @@ export default async function AppLayout({
         </main>
       </div>
     </MobileNavProvider>
+    </NavLockProvider>
   );
 }

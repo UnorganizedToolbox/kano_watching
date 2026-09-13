@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal, Gamepad2, ShieldCheck, Mail, Send, ClipboardList, Layers } from "lucide-react";
 import { useMobileNav } from "./MobileNavContext";
+import { useNavLock } from "./NavLockContext";
 
 interface SidebarProps {
   role: string;
@@ -13,9 +14,28 @@ interface SidebarProps {
   gamificationDisabled?: boolean;
 }
 
+// タイマー実行中・問題挑戦中はナビゲーションを封じる(設定・不具合報告を除く)。
+// ロック時はLinkではなくbuttonにして遷移そのものを起こさせない。
+function NavItem({ href, className, children, locked }: { href: string; className: string; children: React.ReactNode; locked: boolean }) {
+  if (locked) {
+    return (
+      <button
+        type="button"
+        disabled
+        title="タイマー実行中・問題に取り組み中は他の画面へ移動できません"
+        className={`${className} opacity-40 cursor-not-allowed`}
+      >
+        {children}
+      </button>
+    );
+  }
+  return <Link href={href} className={className}>{children}</Link>;
+}
+
 export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled = false }: SidebarProps) {
   const pathname = usePathname();
   const { close } = useMobileNav();
+  const { isLocked } = useNavLock();
 
   // モバイルではリンクをタップして画面遷移したらドロワーを閉じる
   useEffect(() => {
@@ -25,8 +45,8 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
   const getLinkClass = (href: string) => {
     const isActive = pathname === href || (href !== '/' && pathname.startsWith(href));
     return `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 ${
-      isActive 
-        ? 'bg-slate-100 dark:bg-slate-800 text-brand-600 dark:text-brand-400' 
+      isActive
+        ? 'bg-slate-100 dark:bg-slate-800 text-brand-600 dark:text-brand-400'
         : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
     }`;
   };
@@ -41,7 +61,7 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
         {role === 'student' ? (
           <>
             {!gamificationDisabled && (
-              <Link href="/game" className="mb-4 block">
+              <NavItem href="/game" className="mb-4 block" locked={isLocked}>
                 <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer group relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
@@ -57,70 +77,74 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
                     </div>
                   </div>
                 </div>
-              </Link>
+              </NavItem>
             )}
 
-            <Link href="/" className={getLinkClass('/')}>
+            <NavItem href="/" className={getLinkClass('/')} locked={isLocked}>
               <LayoutDashboard className="w-5 h-5" />
               <span>Dashboard</span>
-            </Link>
-            <Link href="/timer" className={getLinkClass('/timer')}>
+            </NavItem>
+            <NavItem href="/timer" className={getLinkClass('/timer')} locked={isLocked}>
               <Clock className="w-5 h-5" />
               <span>Timer & Q&A</span>
-            </Link>
-            <Link href="/timeline" className={getLinkClass('/timeline')}>
+            </NavItem>
+            <NavItem href="/timeline" className={getLinkClass('/timeline')} locked={isLocked}>
               <i className="fa-solid fa-calendar-week w-5 text-center text-lg"></i>
               <span>Log / Timeline</span>
-            </Link>
-            <Link href="/progress" className={getLinkClass('/progress')}>
+            </NavItem>
+            <NavItem href="/progress" className={getLinkClass('/progress')} locked={isLocked}>
               <i className="fa-solid fa-chart-pie w-5 text-center text-lg"></i>
               <span>Progress</span>
-            </Link>
-            <Link href="/assignments" className={getLinkClass('/assignments')}>
+            </NavItem>
+            <NavItem href="/assignments" className={getLinkClass('/assignments')} locked={isLocked}>
               <ClipboardList className="w-5 h-5" />
               <span>課題</span>
-            </Link>
+            </NavItem>
           </>
         ) : (
           <>
-            <Link href="/admin" className={getLinkClass('/admin')}>
+            <NavItem href="/admin" className={getLinkClass('/admin')} locked={isLocked}>
               <Users className="w-5 h-5" />
               <span>生徒一覧・管理</span>
-            </Link>
+            </NavItem>
             {role === 'teacher' && (
-              <Link href="/timer" className={getLinkClass('/timer')}>
+              <NavItem href="/timer" className={getLinkClass('/timer')} locked={isLocked}>
                 <Clock className="w-5 h-5" />
                 <span>ポモドーロタイマー</span>
-              </Link>
+              </NavItem>
             )}
-            <Link href="/admin/rules" className={getLinkClass('/admin/rules')}>
+            <NavItem href="/admin/rules" className={getLinkClass('/admin/rules')} locked={isLocked}>
               <ShieldCheck className="w-5 h-5" />
               <span>一括・個別管理</span>
-            </Link>
-            <Link href="/admin/inquiries" className={getLinkClass('/admin/inquiries')}>
+            </NavItem>
+            <NavItem href="/admin/inquiries" className={getLinkClass('/admin/inquiries')} locked={isLocked}>
               <Mail className="w-5 h-5" />
               <span>{role === 'teacher' ? '問い合わせ' : '問い合わせ管理'}</span>
-            </Link>
-            <Link href="/admin/problems" className={getLinkClass('/admin/problems')}>
+            </NavItem>
+            <NavItem href="/admin/problems" className={getLinkClass('/admin/problems')} locked={isLocked}>
               <i className="fa-solid fa-plus-minus text-lg w-5 text-center"></i>
               <span>CBT問題作成</span>
-            </Link>
-            <Link href="/admin/decks" className={getLinkClass('/admin/decks')}>
+            </NavItem>
+            <NavItem href="/admin/decks" className={getLinkClass('/admin/decks')} locked={isLocked}>
               <Layers className="w-5 h-5" />
               <span>デッキ管理</span>
-            </Link>
-            <Link href="/admin/assignments" className={getLinkClass('/admin/assignments')}>
+            </NavItem>
+            <NavItem href="/admin/assignments" className={getLinkClass('/admin/assignments')} locked={isLocked}>
               <Send className="w-5 h-5" />
               <span>配信済み一覧</span>
-            </Link>
+            </NavItem>
             {role === 'admin' && (
-              <Link href="/admin/playground" className={getLinkClass('/admin/playground')}>
+              <NavItem href="/admin/playground" className={getLinkClass('/admin/playground')} locked={isLocked}>
                 <i className="fa-solid fa-flask text-lg w-5 text-center"></i>
                 <span>Typst Playground</span>
                 <span className="ml-auto text-[8px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold">検証用</span>
-              </Link>
+              </NavItem>
             )}
-            <button onClick={() => alert('未実装です')} className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20">
+            <button
+              onClick={() => alert('未実装です')}
+              disabled={isLocked}
+              className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <i className="fa-solid fa-terminal text-lg w-5 text-center"></i>
               <span>管理者デバッグパネル</span>
               <span className="ml-auto text-[8px] bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded font-bold">未実装</span>
@@ -140,9 +164,9 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
           <TriangleAlert className="w-4 h-4" />
           <span>不具合を報告</span>
         </a>
-        
+
         <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.32.1</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.33.0</span>
         </div>
       </div>
     </div>
