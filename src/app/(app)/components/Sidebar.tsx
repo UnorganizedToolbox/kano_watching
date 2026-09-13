@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal, Gamepad2, ShieldCheck, Mail } from "lucide-react";
+import { useMobileNav } from "./MobileNavContext";
 
 interface SidebarProps {
   role: string;
@@ -13,6 +15,12 @@ interface SidebarProps {
 
 export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled = false }: SidebarProps) {
   const pathname = usePathname();
+  const { close } = useMobileNav();
+
+  // モバイルではリンクをタップして画面遷移したらドロワーを閉じる
+  useEffect(() => {
+    close();
+  }, [pathname, close]);
 
   const getLinkClass = (href: string) => {
     const isActive = pathname === href || (href !== '/' && pathname.startsWith(href));
@@ -116,7 +124,7 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
         </a>
         
         <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.23.1</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.23.2</span>
         </div>
       </div>
     </div>

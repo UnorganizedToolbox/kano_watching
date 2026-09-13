@@ -386,7 +386,7 @@ function SettingsContent() {
                   <p className="text-[10px] text-slate-400 mt-2">ポモドーロで選べる学習科目の候補を、学年に応じて絞り込みます。</p>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
+                <div className="md:col-span-2 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
                   <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-4">目標設定</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -411,13 +411,6 @@ function SettingsContent() {
                   </div>
                 </div>
 
-                <div className="flex justify-end items-center gap-4">
-                  {saveMessage && <span className="text-brand-600 text-sm font-bold">{saveMessage}</span>}
-                  <button onClick={handleSaveProfile} disabled={isSaving} className="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl disabled:opacity-50">
-                    {isSaving ? '保存中...' : '変更を保存'}
-                  </button>
-                </div>
-
                 <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800 p-6">
                   <label className="text-sm font-bold text-slate-700 dark:text-slate-200 block mb-2">称号 (実績から選択)</label>
                   <select className="w-full px-4 py-3 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-darkbg-secondary focus:ring-2 focus:ring-brand-500 outline-none font-bold text-brand-700 dark:text-brand-400">
@@ -431,9 +424,10 @@ function SettingsContent() {
                 </div>
               </div>
               
-              <div className="flex justify-end">
-                <button className="px-8 py-4 bg-slate-800 hover:bg-slate-900 dark:bg-slate-200 dark:hover:bg-white text-white dark:text-slate-900 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg flex items-center gap-2">
-                  <i className="fa-solid fa-check"></i> 変更を保存
+              <div className="flex justify-end items-center gap-4">
+                {saveMessage && <span className="text-brand-600 text-sm font-bold">{saveMessage}</span>}
+                <button onClick={handleSaveProfile} disabled={isSaving} className="px-8 py-4 bg-slate-800 hover:bg-slate-900 dark:bg-slate-200 dark:hover:bg-white text-white dark:text-slate-900 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg flex items-center gap-2 disabled:opacity-50">
+                  <i className="fa-solid fa-check"></i> {isSaving ? '保存中...' : '変更を保存'}
                 </button>
               </div>
 

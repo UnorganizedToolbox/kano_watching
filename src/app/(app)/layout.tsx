@@ -6,6 +6,9 @@ import { resolveEffectiveRules, resolveEffectivePinnedTheme, type RuleMap, type 
 import Sidebar from "./components/Sidebar";
 import HeaderDropdown from "./components/HeaderDropdown";
 import ThemeEnforcer from "./components/ThemeEnforcer";
+import { MobileNavProvider } from "./components/MobileNavContext";
+import MobileMenuButton from "./components/MobileMenuButton";
+import MobileSidebarDrawer from "./components/MobileSidebarDrawer";
 
 export default async function AppLayout({
   children,
@@ -52,30 +55,31 @@ export default async function AppLayout({
   const pinnedTheme = resolveEffectivePinnedTheme(orgRules, profile?.rule_overrides as RuleMap);
 
   return (
-    <>
+    <MobileNavProvider>
       <ThemeEnforcer pinnedTheme={pinnedTheme} />
-      <header className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 shrink-0 z-20">
-        <div className="flex items-center gap-4">
-          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/30">
+      <header className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
+        <div className="flex items-center gap-3 md:gap-4 min-w-0">
+          <MobileMenuButton />
+          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/30 shrink-0">
             L
           </div>
-          <h1 className="text-xl font-black tracking-tight font-title text-slate-800 dark:text-white">
+          <h1 className="text-xl font-black tracking-tight font-title text-slate-800 dark:text-white truncate">
             Learn<span className="text-brand-600 dark:text-brand-400">Flow</span>
             {isAdmin && <span className="ml-2 text-xs bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">Admin</span>}
           </h1>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           <HeaderDropdown name={name} role={role} initialAvatarSeed={avatarSeed} />
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden relative z-10">
-        <aside className="w-64 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
+        <MobileSidebarDrawer>
           <Sidebar role={role} level={level} exp={exp} gamificationDisabled={effectiveRules.disable_gamification} />
-        </aside>
+        </MobileSidebarDrawer>
 
-        <main className="flex-1 overflow-y-auto px-20 py-4 h-[calc(100vh-4rem)] flex flex-col pb-16" id="main-content-scroll">
+        <main className="flex-1 overflow-y-auto px-4 sm:px-8 md:px-20 py-4 h-[calc(100vh-4rem)] flex flex-col pb-16" id="main-content-scroll">
           {children}
 
           <footer className="mt-auto pt-16 pb-8 text-center text-xs text-slate-500 dark:text-slate-400">
@@ -88,6 +92,6 @@ export default async function AppLayout({
           </footer>
         </main>
       </div>
-    </>
+    </MobileNavProvider>
   );
 }
