@@ -81,26 +81,42 @@ describe('flattenDeck', () => {
 });
 
 describe('drawDeckTemplateIds', () => {
-  function sequenceRandom(values: number[]): () => number {
-    let i = 0;
-    return () => values[i++ % values.length];
-  }
+  // weightは確率ではなく確定した出題数を表す。ユーザーからの明確なフィードバック:
+  // 「同じテンプレートから複数選択できるようにしたのは確率を上げるためではない。
+  // デッキに入れた数だけ出題してほしい」(1問だけだと正答率が100%/0%にしかならない)。
 
-  it('draws templates proportionally to their weight using the injected random source', () => {
-    const leaves = [
-      { templateId: 'a', weight: 30 },
-      { templateId: 'b', weight: 70 },
-    ];
-    // total=100。r=29.9 -> a(0..30), r=30.1 -> b(30..100)
-    const drawn = drawDeckTemplateIds(leaves, 2, sequenceRandom([0.299, 0.301]));
-    expect(drawn).toEqual(['a', 'b']);
+  it('deterministically produces exactly weight instances for a single leaf (not just an expected value)', () => {
+    const leaves = [{ templateId: 'a', weight: 5 }];
+    const drawn = drawDeckTemplateIds(leaves, 5, () => 0.999);
+    expect(drawn).toHaveLength(5);
+    expect(drawn.every(id => id === 'a')).toBe(true);
   });
 
-  it('draws the requested number of instances', () => {
-    const leaves = [{ templateId: 'only', weight: 1 }];
-    const drawn = drawDeckTemplateIds(leaves, 5, () => 0.5);
-    expect(drawn).toHaveLength(5);
-    expect(drawn.every(id => id === 'only')).toBe(true);
+  it('splits exactly according to each leaf\'s integer weight when weights are whole numbers', () => {
+    const leaves = [
+      { templateId: 'a', weight: 3 },
+      { templateId: 'b', weight: 7 },
+    ];
+    const drawn = drawDeckTemplateIds(leaves, 10, () => 0); // random source must not affect counts, only order
+    expect(drawn.filter(id => id === 'a')).toHaveLength(3);
+    expect(drawn.filter(id => id === 'b')).toHaveLength(7);
+    expect(drawn).toHaveLength(10);
+  });
+
+  it('apportions fractional (nested-deck-normalized) weights via largest remainder, matching the exact total', () => {
+    const leaves = [
+      { templateId: 'a', weight: 6.923076923076923 }, // 45*10/65
+      { templateId: 'b', weight: 3.4615384615384617 }, // 45*5/65
+      { templateId: 'c', weight: 34.61538461538461 }, // 45*50/65
+    ];
+    const drawn = drawDeckTemplateIds(leaves, 45, () => 0);
+    expect(drawn).toHaveLength(45);
+    // 端数を丸めても合計は必ずoutputCountと厳密に一致する
+    const counts = { a: 0, b: 0, c: 0 };
+    for (const id of drawn) counts[id as 'a' | 'b' | 'c']++;
+    expect(counts.a + counts.b + counts.c).toBe(45);
+    expect(counts.a).toBeGreaterThanOrEqual(6);
+    expect(counts.c).toBeGreaterThanOrEqual(34);
   });
 
   it('throws when the deck has no weight at all', () => {

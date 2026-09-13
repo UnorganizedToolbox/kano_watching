@@ -28,7 +28,14 @@ type PersistedState = {
   sessionId: string | null;
   pomoCount: number;
   awaitingDecision: boolean;
+  dateKey: string;
 };
+
+// ローカル日付(YYYY-MM-DD)。「今日の回数」表示・pomoCountの繰り越し判定に使う。
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function loadPersistedState(): PersistedState | null {
   try {
@@ -194,16 +201,25 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   // 初回マウント時: リロード等で失われたタイマー状態を localStorage から復元する。
   // Start したまま ABANDON_THRESHOLD_MS 以上経過している場合は「タブを閉じた」とみなし、
   // ABANDONED イベントを記録して破棄する(復元しない)。
+  //
+  // 重要なバグ修正: dateKey(保存時のローカル日付)を見ずに pomoCount 等をそのまま
+  // 復元していたため、前日以前に保存された古い状態(タブを閉じ忘れた・
+  // 「終了する」を押さずに離脱した等)がいつまでも残り続け、日をまたいでも
+  // 「今日: N 回」のバッジや進行中モードが前日の値のまま表示され続けていた。
+  // 日付が変わっていたら、実行中セッションは記録だけ残して破棄し、
+  // pomoCount・mode・awaitingDecision 等は今日の初期値(0/WORK/false)に戻す。
   useEffect(() => {
     const saved = loadPersistedState();
     if (saved) {
+      const isStale = saved.dateKey !== todayKey();
+
       if (saved.isRunning && saved.targetEndTime) {
         const overdueMs = Date.now() - saved.targetEndTime;
-        if (overdueMs > ABANDON_THRESHOLD_MS) {
+        if (overdueMs > ABANDON_THRESHOLD_MS || isStale) {
           if (saved.sessionId) {
             void logPomodoroEvent(saved.sessionId, saved.mode, 'ABANDONED', { overdue_seconds: Math.round(overdueMs / 1000) });
           }
-          setPomoCount(saved.pomoCount);
+          setPomoCount(isStale ? 0 : saved.pomoCount);
           clearPersistedState();
         } else {
           setMode(saved.mode);
@@ -213,12 +229,14 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
           setTimeLeft(Math.max(0, Math.round((saved.targetEndTime - Date.now()) / 1000)));
           setIsRunning(true);
         }
-      } else {
+      } else if (!isStale) {
         setMode(saved.mode);
         setTimeLeft(saved.timeLeft);
         setSessionId(saved.sessionId);
         setPomoCount(saved.pomoCount);
         setAwaitingDecision(saved.awaitingDecision);
+      } else {
+        clearPersistedState();
       }
     }
     hasHydratedRef.current = true;
@@ -227,7 +245,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   // 現在のタイマー状態を localStorage に保存し、リロード後も復元できるようにする
   useEffect(() => {
     if (!hasHydratedRef.current) return;
-    savePersistedState({ mode, targetEndTime, isRunning, timeLeft, sessionId, pomoCount, awaitingDecision });
+    savePersistedState({ mode, targetEndTime, isRunning, timeLeft, sessionId, pomoCount, awaitingDecision, dateKey: todayKey() });
   }, [mode, targetEndTime, isRunning, timeLeft, sessionId, pomoCount, awaitingDecision]);
 
 

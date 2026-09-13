@@ -130,11 +130,11 @@ export default function DeckForm({
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-bold text-slate-800 dark:text-white">構成(サブデッキ・問題テンプレート)</h3>
           <span className={`text-xs font-bold ${overCap ? 'text-rose-500' : 'text-slate-400'}`}>
-            重み合計 {weightSum} / {DECK_MAX_QUESTIONS}
+            出題数 {weightSum} / {DECK_MAX_QUESTIONS}
           </span>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-          サブデッキを追加すると、そのデッキの内部比率を保ったまま指定した重みに正規化して展開されます。重み合計がそのままこのデッキを使ったときの出題数になります。
+          各行の数値は「そのテンプレート/サブデッキから何問出題するか」を表す確定した問題数です(抽選の確率ではありません)。サブデッキを追加した場合は、その内部比率を保ったまま指定した数に按分されます。数値の合計がそのままこのデッキを使ったときの出題数になります。
         </p>
 
         <div className="space-y-2">
@@ -166,7 +166,7 @@ export default function DeckForm({
                   value={item.weight}
                   onChange={e => updateItem(idx, 'weight', e.target.value)}
                   className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none"
-                  title="重み(問題数の目安)"
+                  title="出題数(確定した問題数)"
                 />
                 <button onClick={() => removeItem(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors shrink-0">
                   <Trash2 className="w-4 h-4" />
