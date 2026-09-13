@@ -97,11 +97,11 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
               <Mail className="w-5 h-5" />
               <span>{role === 'teacher' ? '問い合わせ' : '問い合わせ管理'}</span>
             </Link>
-            <button onClick={() => alert('未実装です')} className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/20">
+            <Link href="/admin/problems" className={getLinkClass('/admin/problems')}>
               <i className="fa-solid fa-plus-minus text-lg w-5 text-center"></i>
-              <span>CBT問題作成・配信</span>
-              <span className="ml-auto text-[8px] bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded font-bold">未実装</span>
-            </button>
+              <span>CBT問題作成</span>
+              <span className="ml-auto text-[8px] bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded font-bold">配信は今後実装</span>
+            </Link>
             {role === 'admin' && (
               <Link href="/admin/playground" className={getLinkClass('/admin/playground')}>
                 <i className="fa-solid fa-flask text-lg w-5 text-center"></i>
@@ -131,7 +131,7 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
         </a>
         
         <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.25.0</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.26.0</span>
         </div>
       </div>
     </div>
