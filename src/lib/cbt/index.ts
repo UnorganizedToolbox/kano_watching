@@ -6,3 +6,4 @@ export * from './resolve';
 export * from './render';
 export * from './validate';
 export * from './fraction';
+export * from './deck';

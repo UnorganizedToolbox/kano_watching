@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal, Gamepad2, ShieldCheck, Mail, Send, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Clock, Users, TriangleAlert, SlidersHorizontal, Gamepad2, ShieldCheck, Mail, Send, ClipboardList, Layers } from "lucide-react";
 import { useMobileNav } from "./MobileNavContext";
 
 interface SidebarProps {
@@ -105,6 +105,10 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
               <i className="fa-solid fa-plus-minus text-lg w-5 text-center"></i>
               <span>CBT問題作成</span>
             </Link>
+            <Link href="/admin/decks" className={getLinkClass('/admin/decks')}>
+              <Layers className="w-5 h-5" />
+              <span>デッキ管理</span>
+            </Link>
             <Link href="/admin/assignments" className={getLinkClass('/admin/assignments')}>
               <Send className="w-5 h-5" />
               <span>配信済み一覧</span>
@@ -138,7 +142,7 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
         </a>
         
         <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.29.0</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.30.0</span>
         </div>
       </div>
     </div>
