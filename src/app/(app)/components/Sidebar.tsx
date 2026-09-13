@@ -102,6 +102,13 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
               <span>CBT問題作成・配信</span>
               <span className="ml-auto text-[8px] bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded font-bold">未実装</span>
             </button>
+            {role === 'admin' && (
+              <Link href="/admin/playground" className={getLinkClass('/admin/playground')}>
+                <i className="fa-solid fa-flask text-lg w-5 text-center"></i>
+                <span>Typst Playground</span>
+                <span className="ml-auto text-[8px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold">検証用</span>
+              </Link>
+            )}
             <button onClick={() => alert('未実装です')} className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20">
               <i className="fa-solid fa-terminal text-lg w-5 text-center"></i>
               <span>管理者デバッグパネル</span>
@@ -124,7 +131,7 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
         </a>
         
         <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.23.2</span>
+          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.24.0</span>
         </div>
       </div>
     </div>
