@@ -1,16 +1,22 @@
-import { NodeCompiler } from '@myriaddreamin/typst-ts-node-compiler';
-
 // CBT問題のTypstレンダリング用コンパイラ。実ファイルシステムには一切触れず、
 // addSource() で渡したソースをメモリ上でコンパイルするため、Vercelの
 // サーバーレス関数上でも(実ディレクトリが存在しなくても)問題なく動作する。
 // プロセス内で使い回すことで2回目以降のコンパイルは数ミリ秒で完了する。
+//
+// ネイティブアドオン(.node、約50MB)の読み込みに失敗した場合でもサーバー
+// アクション全体をクラッシュさせず、呼び出し元にエラーとして返せるよう、
+// 静的importではなく関数内で動的requireする。
+
 const WORKSPACE = '/typst-workspace';
 const ENTRY_PATH = `${WORKSPACE}/main.typ`;
 
-let compiler: NodeCompiler | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let compiler: any = null;
 
-function getCompiler(): NodeCompiler {
+function getCompiler() {
   if (!compiler) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { NodeCompiler } = require('@myriaddreamin/typst-ts-node-compiler');
     compiler = NodeCompiler.create({ workspace: WORKSPACE });
   }
   return compiler;
@@ -21,8 +27,8 @@ export type TypstRenderResult =
   | { ok: false; error: string };
 
 export function renderTypstToSvg(source: string): TypstRenderResult {
-  const c = getCompiler();
   try {
+    const c = getCompiler();
     c.addSource(ENTRY_PATH, source);
     const doc = c.compile({ mainFilePath: ENTRY_PATH });
 
@@ -38,6 +44,6 @@ export function renderTypstToSvg(source: string): TypstRenderResult {
     const svg = c.svg(doc.result);
     return { ok: true, svg };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return { ok: false, error: `Typstコンパイラの初期化/実行に失敗しました: ${e instanceof Error ? e.message : String(e)}` };
   }
 }

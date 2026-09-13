@@ -199,17 +199,17 @@ export default function ProblemTemplateForm({
 
           <div className="space-y-2">
             {variables.map((v, idx) => (
-              <div key={idx} className="grid grid-cols-[3rem_5rem_1fr_1fr_auto] gap-2 items-center">
+              <div key={idx} className="grid grid-cols-[3rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-center">
                 <input
                   value={v.name}
                   onChange={e => updateVariable(idx, 'name', e.target.value)}
                   placeholder="A"
-                  className="px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
+                  className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
                 />
                 <select
                   value={v.type}
                   onChange={e => updateVariable(idx, 'type', e.target.value)}
-                  className="px-1 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none"
+                  className="w-full min-w-0 px-1 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none"
                 >
                   {VAR_TYPE_OPTIONS.map(t => (
                     <option key={t.value} value={t.value}>{t.label}</option>
@@ -219,15 +219,15 @@ export default function ProblemTemplateForm({
                   value={v.min}
                   onChange={e => updateVariable(idx, 'min', e.target.value)}
                   placeholder="最小値"
-                  className="px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
+                  className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
                 />
                 <input
                   value={v.max}
                   onChange={e => updateVariable(idx, 'max', e.target.value)}
                   placeholder="最大値"
-                  className="px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
+                  className="w-full min-w-0 px-2 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900 outline-none font-mono"
                 />
-                <button onClick={() => removeVariable(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
+                <button onClick={() => removeVariable(idx)} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors shrink-0">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
