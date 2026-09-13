@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { logPomodoro, logPomodoroEvent } from '../actions';
+import { logPomodoro, logPomodoroEvent, getTodayPomoCount } from '../actions';
 import { cn } from '@/lib/utils';
 import { PartyPopper, Lock } from 'lucide-react';
 import { getSoundPref, getBgmPref, renderAlarmBlobUrl, renderNoiseBlobUrl, type SoundType, type BgmType, type NoiseType } from '@/lib/pomodoroAudio';
@@ -27,15 +27,25 @@ type PersistedState = {
   isRunning: boolean;
   timeLeft: number;
   sessionId: string | null;
-  pomoCount: number;
   awaitingDecision: boolean;
   dateKey: string;
 };
 
-// ローカル日付(YYYY-MM-DD)。「今日の回数」表示・pomoCountの繰り越し判定に使う。
+// ローカル日付(YYYY-MM-DD)。実行中セッション等の繰り越し判定に使う。
+// 「今日の回数」バッジ自体はlocalStorageに保存せず、常にDBから取得する
+// (重要なバグ修正: 以前はpomoCountもlocalStorageに保存していたため、
+// 日をまたいでも古い回数が残り続けたり、逆にこの日付判定を追加した際に
+// 「今日保存されたが日付情報を持たない古い形式のデータ」を一律「古い」と
+// 誤判定して今日の分まで0にリセットしてしまう問題があった)。
 function todayKey(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function startOfTodayISO(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
 }
 
 function loadPersistedState(): PersistedState | null {
@@ -200,16 +210,19 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     }
   }, [playAlarm, mode, sessionId]);
 
-  // 初回マウント時: リロード等で失われたタイマー状態を localStorage から復元する。
-  // Start したまま ABANDON_THRESHOLD_MS 以上経過している場合は「タブを閉じた」とみなし、
-  // ABANDONED イベントを記録して破棄する(復元しない)。
-  //
-  // 重要なバグ修正: dateKey(保存時のローカル日付)を見ずに pomoCount 等をそのまま
-  // 復元していたため、前日以前に保存された古い状態(タブを閉じ忘れた・
-  // 「終了する」を押さずに離脱した等)がいつまでも残り続け、日をまたいでも
-  // 「今日: N 回」のバッジや進行中モードが前日の値のまま表示され続けていた。
-  // 日付が変わっていたら、実行中セッションは記録だけ残して破棄し、
-  // pomoCount・mode・awaitingDecision 等は今日の初期値(0/WORK/false)に戻す。
+  // 「今日: N 回」バッジは常にDB(pomodoro_logs)から取得する。localStorageの
+  // pomoCountには一切依存しない(日をまたいでも古い回数が残ったり、逆に
+  // まだDBに書き込み中の今日の分まで誤って0にリセットする、といった問題を
+  // 構造的に避けるため)。
+  useEffect(() => {
+    void getTodayPomoCount(startOfTodayISO()).then(setPomoCount);
+  }, []);
+
+  // 初回マウント時: リロード等で失われたタイマー状態(実行中セッション・
+  // 休憩の開始待ち状態)を localStorage から復元する。Start したまま
+  // ABANDON_THRESHOLD_MS 以上経過している場合は「タブを閉じた」とみなし、
+  // ABANDONED イベントを記録して破棄する(復元しない)。保存時の日付
+  // (dateKey)が今日と違う場合も、前日以前の状態とみなして破棄する。
   useEffect(() => {
     const saved = loadPersistedState();
     if (saved) {
@@ -221,12 +234,10 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
           if (saved.sessionId) {
             void logPomodoroEvent(saved.sessionId, saved.mode, 'ABANDONED', { overdue_seconds: Math.round(overdueMs / 1000) });
           }
-          setPomoCount(isStale ? 0 : saved.pomoCount);
           clearPersistedState();
         } else {
           setMode(saved.mode);
           setSessionId(saved.sessionId);
-          setPomoCount(saved.pomoCount);
           setTargetEndTime(saved.targetEndTime);
           setTimeLeft(Math.max(0, Math.round((saved.targetEndTime - Date.now()) / 1000)));
           setIsRunning(true);
@@ -235,7 +246,6 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
         setMode(saved.mode);
         setTimeLeft(saved.timeLeft);
         setSessionId(saved.sessionId);
-        setPomoCount(saved.pomoCount);
         setAwaitingDecision(saved.awaitingDecision);
       } else {
         clearPersistedState();
@@ -245,10 +255,11 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   }, []);
 
   // 現在のタイマー状態を localStorage に保存し、リロード後も復元できるようにする
+  // (pomoCountは含めない。常にDBが正のため)
   useEffect(() => {
     if (!hasHydratedRef.current) return;
-    savePersistedState({ mode, targetEndTime, isRunning, timeLeft, sessionId, pomoCount, awaitingDecision, dateKey: todayKey() });
-  }, [mode, targetEndTime, isRunning, timeLeft, sessionId, pomoCount, awaitingDecision]);
+    savePersistedState({ mode, targetEndTime, isRunning, timeLeft, sessionId, awaitingDecision, dateKey: todayKey() });
+  }, [mode, targetEndTime, isRunning, timeLeft, sessionId, awaitingDecision]);
 
 
   // Setup Web Worker for accurate background timing (bypasses iOS Safari throttling)

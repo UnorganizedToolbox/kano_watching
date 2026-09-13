@@ -323,6 +323,25 @@ export async function logPomodoroEvent(
   if (error) console.error('Failed to log pomodoro event', error);
 }
 
+// 「今日の実施回数」バッジは常にDB(pomodoro_logs)を正とする。
+// startOfDayISOはクライアント側のローカル時刻の0時をISO文字列にしたもの
+// (サーバーのタイムゾーンに依存すると日本時間などとズレるため、必ず
+// クライアントから境界を渡してもらう)。
+export async function getTodayPomoCount(startOfDayISO: string): Promise<number> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  const { count } = await supabase
+    .from('pomodoro_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_uuid', user.id)
+    .eq('event_type', 'complete')
+    .gte('created_at', startOfDayISO);
+
+  return count ?? 0;
+}
+
 export async function logPomodoro(subject: string, minutes: number = 25, concentrationRating?: number, memo?: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
