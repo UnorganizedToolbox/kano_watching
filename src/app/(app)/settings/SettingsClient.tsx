@@ -154,26 +154,30 @@ function SettingsContent() {
   ];
 
   return (
-    <section className="flex-1 flex gap-6 max-w-[1200px] mx-auto w-full px-6 pt-4 pb-6 h-[calc(100vh-5rem)]">
-      
-      {/* Sidebar for vertical tabs */}
-      <div className="w-64 shrink-0 flex flex-col gap-2">
-        <h2 className="text-xl font-black font-title text-slate-800 dark:text-white mb-4 px-2">設定</h2>
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => handleTabChange(t.id as Tab)}
-            className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 text-left",
-              activeTab === t.id
-                ? "bg-brand-500 text-white shadow-md shadow-brand-500/20 translate-x-1"
-                : "bg-slate-100 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white hover:translate-x-1"
-            )}
-          >
-            {t.icon}
-            {t.label}
-          </button>
-        ))}
+    <section className="flex-1 flex flex-col lg:flex-row gap-6 max-w-[1200px] mx-auto w-full px-6 pt-4 pb-6 lg:h-[calc(100vh-5rem)]">
+
+      {/* Sidebar for vertical tabs(lg未満では横スクロールのタブ列になる。
+          縦のw-64固定だと、アプリ本体のサイドバーと合わせてiPad幅で
+          収まりきらずレイアウトが崩れていた) */}
+      <div className="lg:w-64 shrink-0 flex flex-col gap-2">
+        <h2 className="text-xl font-black font-title text-slate-800 dark:text-white mb-1 lg:mb-4 px-2">設定</h2>
+        <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible -mx-1 px-1 pb-1 lg:mx-0 lg:px-0 lg:pb-0">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => handleTabChange(t.id as Tab)}
+              className={cn(
+                "shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-4 py-2.5 lg:py-3 rounded-xl text-sm font-bold transition-all duration-200 text-left whitespace-nowrap",
+                activeTab === t.id
+                  ? "bg-brand-500 text-white shadow-md shadow-brand-500/20 lg:translate-x-1"
+                  : "bg-slate-100 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white lg:hover:translate-x-1"
+              )}
+            >
+              {t.icon}
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Main content area */}
