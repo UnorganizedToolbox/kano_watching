@@ -12,6 +12,7 @@ interface SidebarProps {
   level?: number;
   exp?: number;
   gamificationDisabled?: boolean;
+  iconOnly?: boolean;
 }
 
 // タイマー実行中・問題挑戦中はナビゲーションを封じる(設定・不具合報告を除く)。
@@ -32,7 +33,7 @@ function NavItem({ href, className, children, locked }: { href: string; classNam
   return <Link href={href} className={className}>{children}</Link>;
 }
 
-export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled = false }: SidebarProps) {
+export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled = false, iconOnly = false }: SidebarProps) {
   const pathname = usePathname();
   const { close } = useMobileNav();
   const { isLocked } = useNavLock();
@@ -44,7 +45,9 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
 
   const getLinkClass = (href: string) => {
     const isActive = pathname === href || (href !== '/' && pathname.startsWith(href));
-    return `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 ${
+    return `flex items-center gap-3 rounded-xl text-sm font-semibold transition-all duration-150 ${
+      iconOnly ? 'justify-center px-2 py-3' : 'px-4 py-3'
+    } ${
       isActive
         ? 'bg-slate-100 dark:bg-slate-800 text-brand-600 dark:text-brand-400'
         : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
@@ -57,10 +60,11 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
 
   return (
     <div className="flex-1 flex flex-col justify-between overflow-hidden">
-      <nav className="flex-1 flex flex-col gap-1 p-4 overflow-y-auto">
+      {/* iconOnly時はラベル・バッジ(span)をまとめて非表示にする */}
+      <nav className={`flex-1 flex flex-col gap-1 p-4 overflow-y-auto ${iconOnly ? '[&_span]:hidden' : ''}`}>
         {role === 'student' ? (
           <>
-            {!gamificationDisabled && (
+            {!gamificationDisabled && !iconOnly && (
               <NavItem href="/game" className="mb-4 block" locked={isLocked}>
                 <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800/50 rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer group relative overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
@@ -77,6 +81,11 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
                     </div>
                   </div>
                 </div>
+              </NavItem>
+            )}
+            {!gamificationDisabled && iconOnly && (
+              <NavItem href="/game" className={`${getLinkClass('/game')} mb-2`} locked={isLocked}>
+                <Gamepad2 className="w-5 h-5" />
               </NavItem>
             )}
 
@@ -143,7 +152,7 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
             <button
               onClick={() => alert('未実装です')}
               disabled={isLocked}
-              className="sidebar-tab-btn flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              className={`sidebar-tab-btn flex items-center gap-3 rounded-xl text-sm font-semibold transition-all duration-150 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 disabled:opacity-40 disabled:cursor-not-allowed ${iconOnly ? 'justify-center px-2 py-3' : 'px-4 py-3'}`}
             >
               <i className="fa-solid fa-terminal text-lg w-5 text-center"></i>
               <span>管理者デバッグパネル</span>
@@ -153,21 +162,23 @@ export default function Sidebar({ role, level = 1, exp = 0, gamificationDisabled
         )}
       </nav>
 
-      <div className="p-4 border-t border-slate-100 dark:border-slate-800 space-y-1 shrink-0">
-        <Link href="/settings?tab=general" className={`w-full text-left flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
+      <div className={`p-4 border-t border-slate-100 dark:border-slate-800 space-y-1 shrink-0 ${iconOnly ? '[&_span]:hidden' : ''}`}>
+        <Link href="/settings?tab=general" className={`w-full text-left flex items-center gap-2 py-2 text-xs font-medium rounded-lg transition-colors ${iconOnly ? 'justify-center px-2' : 'px-4'} ${
           pathname === '/settings' ? 'bg-slate-100 dark:bg-slate-800 text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
         }`}>
           <SlidersHorizontal className="w-4 h-4" />
           <span>設定 (Settings)</span>
         </Link>
-        <a href="mailto:support@learnflow.example.com?subject=不具合報告&body=【発生した画面】%0D%0A【不具合の内容】%0D%0A" className="w-full text-left flex items-center gap-2 px-4 py-2 text-xs text-rose-400 dark:text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 font-medium transition-colors rounded-lg">
+        <a href="mailto:support@learnflow.example.com?subject=不具合報告&body=【発生した画面】%0D%0A【不具合の内容】%0D%0A" className={`w-full text-left flex items-center gap-2 py-2 text-xs text-rose-400 dark:text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 font-medium transition-colors rounded-lg ${iconOnly ? 'justify-center px-2' : 'px-4'}`}>
           <TriangleAlert className="w-4 h-4" />
           <span>不具合を報告</span>
         </a>
 
-        <div className="px-4 py-1 text-right">
-          <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.34.0</span>
-        </div>
+        {!iconOnly && (
+          <div className="px-4 py-1 text-right">
+            <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono font-bold">v0.0.35.0</span>
+          </div>
+        )}
       </div>
     </div>
   );

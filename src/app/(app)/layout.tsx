@@ -3,7 +3,6 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { calc_Lv_from_EXP } from '@/lib/gamification/level';
 import { resolveEffectiveRules, resolveEffectivePinnedTheme, type RuleMap, type OrgRuleMap } from '@/lib/rules';
-import Sidebar from "./components/Sidebar";
 import HeaderDropdown from "./components/HeaderDropdown";
 import ThemeEnforcer from "./components/ThemeEnforcer";
 import { MobileNavProvider } from "./components/MobileNavContext";
@@ -77,9 +76,7 @@ export default async function AppLayout({
       </header>
 
       <div className="flex flex-1 overflow-hidden relative z-10">
-        <MobileSidebarDrawer>
-          <Sidebar role={role} level={level} exp={exp} gamificationDisabled={effectiveRules.disable_gamification} />
-        </MobileSidebarDrawer>
+        <MobileSidebarDrawer role={role} level={level} exp={exp} gamificationDisabled={effectiveRules.disable_gamification} />
 
         <main className="flex-1 overflow-y-auto px-4 sm:px-8 md:px-20 py-4 h-[calc(100vh-4rem)] flex flex-col pb-16" id="main-content-scroll">
           {children}

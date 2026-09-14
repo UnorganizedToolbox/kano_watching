@@ -3,37 +3,41 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 type MobileNavContextValue = {
+  // モバイル(md未満)のオーバーレイ式ドロワーの開閉
   isOpen: boolean;
   toggle: () => void;
   close: () => void;
-  // PC(md以上)でのサイドバー折り畳み。モバイルのドロワー開閉(isOpen)とは
-  // 別概念として扱う(デバイスをまたいで意味が変わらないよう分離)。
-  isDesktopCollapsed: boolean;
-  toggleDesktopCollapsed: () => void;
+  // PC(md以上)のアイコンのみレール: ボタンで押して固定展開("ピン留め")
+  pinned: boolean;
+  togglePinned: () => void;
+  // PC: マウスを近づけている間だけ一時的に展開する(ピン留めとは独立)
+  hovering: boolean;
+  setHovering: (v: boolean) => void;
 };
 
 const MobileNavContext = createContext<MobileNavContextValue | null>(null);
 
-const DESKTOP_COLLAPSE_KEY = 'learnflow_sidebar_collapsed_v1';
+const PINNED_KEY = 'learnflow_sidebar_pinned_v1';
 
 export function MobileNavProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+  const [pinned, setPinnedState] = useState(false);
+  const [hovering, setHovering] = useState(false);
 
-  // 折り畳み状態はPCでリロードしても保持されるようlocalStorageに保存する
+  // ピン留め状態はPCでリロードしても保持されるようlocalStorageに保存する
   useEffect(() => {
     try {
-      setIsDesktopCollapsed(window.localStorage.getItem(DESKTOP_COLLAPSE_KEY) === '1');
+      setPinnedState(window.localStorage.getItem(PINNED_KEY) === '1');
     } catch {
       // localStorageが使えない環境では無視する
     }
   }, []);
 
-  const toggleDesktopCollapsed = () => {
-    setIsDesktopCollapsed(v => {
+  const togglePinned = () => {
+    setPinnedState(v => {
       const next = !v;
       try {
-        window.localStorage.setItem(DESKTOP_COLLAPSE_KEY, next ? '1' : '0');
+        window.localStorage.setItem(PINNED_KEY, next ? '1' : '0');
       } catch {
         // ignore
       }
@@ -47,8 +51,10 @@ export function MobileNavProvider({ children }: { children: ReactNode }) {
         isOpen,
         toggle: () => setIsOpen(v => !v),
         close: () => setIsOpen(false),
-        isDesktopCollapsed,
-        toggleDesktopCollapsed,
+        pinned,
+        togglePinned,
+        hovering,
+        setHovering,
       }}
     >
       {children}
