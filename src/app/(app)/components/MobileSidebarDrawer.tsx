@@ -45,20 +45,24 @@ export default function MobileSidebarDrawer({ role, level, exp, gamificationDisa
           内部に固定幅レイアウトを持つページ(設定画面など)がその急な幅変化に
           追従できず、枠はそのままで文字やボタンだけ動くという崩れ方をして
           いた。常にオーバーレイにすることでmain側は一切レイアウトが変わらず
-          その種の崩れが起きなくなる。 */}
+          その種の崩れが起きなくなる。
+          中身は<aside>タグにする(<div>ではなく)。テーマのガラス風背景/
+          ブラーは`header, aside, .card-glass`をセレクタにしているため、
+          <div>のままだとテーマ適用時にタブだけ透明感のない不透明な板に
+          見えてしまっていた。 */}
       <div
-        className="hidden md:block relative shrink-0 w-16 border-r border-slate-200 dark:border-slate-800"
+        className="hidden md:block relative shrink-0 w-16"
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
       >
-        <div className="w-16 h-full bg-white dark:bg-darkbg-primary flex flex-col">
+        <aside className="w-16 h-full bg-white dark:bg-darkbg-primary border-r border-slate-200 dark:border-slate-800 flex flex-col">
           <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={true} />
-        </div>
+        </aside>
 
         {expanded && (
-          <div className="absolute inset-y-0 left-0 w-64 bg-white dark:bg-darkbg-primary flex flex-col shadow-2xl z-40 border-r border-slate-200 dark:border-slate-800">
+          <aside className="absolute inset-y-0 left-0 w-64 bg-white dark:bg-darkbg-primary flex flex-col shadow-2xl z-40 border-r border-slate-200 dark:border-slate-800">
             <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={false} />
-          </div>
+          </aside>
         )}
       </div>
     </>
