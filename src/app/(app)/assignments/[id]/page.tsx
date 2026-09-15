@@ -5,13 +5,31 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { renderProblem } from "@/lib/cbt/render";
 import { renderTypstToSvg } from "@/lib/typst";
+import { computeScoreAdjustment, applyScoreAdjustment } from "@/lib/cbt/scoreAdjustment";
 import type { TemplateKind, SubQuestionDef, PairItem } from "@/lib/cbt/types";
 import type { QuestionInstance, SubResultRow } from "../actions";
 import StartAttemptButton from "../StartAttemptButton";
-import AttemptClient, { type QuestionView } from "../AttemptClient";
+import AttemptClient, { type QuestionView, type ScoreBreakdown } from "../AttemptClient";
 
 function buildProblemTypstSource(problemText: string): string {
   return `#set page(width: auto, height: auto, margin: 0.6em)\n#set text(size: 16pt)\n\n${problemText}\n`;
+}
+
+// 提出タイミングに応じたスコア倍率の内訳を組み立てる。問題自体の正答率
+// (problem_attempts.score)は書き換えず、表示用にここで導出するだけ。
+function buildScoreBreakdown(
+  assignment: { delivery_mode: 'deadline' | 'no_deadline' | 'permanent'; due_at: string | null; created_at: string },
+  rawScore: number | null,
+  submittedAt: string | null,
+): ScoreBreakdown | null {
+  if (rawScore === null || !submittedAt) return null;
+  const { tier, multiplier } = computeScoreAdjustment({
+    deliveryMode: assignment.delivery_mode,
+    createdAt: assignment.created_at,
+    dueAt: assignment.due_at,
+    submittedAt,
+  });
+  return { rawScore, tier, multiplier, adjustedScore: applyScoreAdjustment(rawScore, multiplier) };
 }
 
 interface TemplateRow {
@@ -30,7 +48,7 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
 
   const { data: assignment, error } = await supabase
     .from('problem_assignments')
-    .select('id, delivery_mode, due_at, grading_mode, problem_decks:deck_id (title)')
+    .select('id, delivery_mode, due_at, grading_mode, created_at, problem_decks:deck_id (title)')
     .eq('id', id)
     .single();
 
@@ -47,7 +65,7 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
 
   const { data: attempts } = await supabase
     .from('problem_attempts')
-    .select('id, questions, submitted_work, submitted_answers, status, sub_results, score')
+    .select('id, questions, submitted_work, submitted_answers, status, sub_results, score, submitted_at')
     .eq('assignment_id', id)
     .eq('student_id', user.id)
     .order('attempt_number', { ascending: false })
@@ -110,16 +128,16 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
       </div>
 
       {!attempt ? (
-        <StartAttemptButton assignmentId={id} disabled={isOverdue} />
+        <StartAttemptButton assignmentId={id} isOverdue={isOverdue} />
       ) : (
         <AttemptClient
           assignmentId={id}
           attemptId={attempt.id}
           status={attempt.status}
           submittedWork={attempt.submitted_work}
-          score={attempt.score}
+          scoreBreakdown={buildScoreBreakdown(assignment, attempt.score, attempt.submitted_at)}
           questions={questionViews}
-          canRetry={!isOverdue}
+          isOverdue={isOverdue}
         />
       )}
     </section>

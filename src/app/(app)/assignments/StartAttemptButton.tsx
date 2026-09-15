@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { startAttempt } from './actions';
 
-export default function StartAttemptButton({ assignmentId, disabled }: { assignmentId: string; disabled?: boolean }) {
+export default function StartAttemptButton({ assignmentId, isOverdue }: { assignmentId: string; isOverdue?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -27,12 +27,14 @@ export default function StartAttemptButton({ assignmentId, disabled }: { assignm
       {error && <p className="text-rose-500 text-xs font-bold">{error}</p>}
       <button
         onClick={handleStart}
-        disabled={disabled || isPending}
-        className="px-8 py-3 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors"
+        disabled={isPending}
+        className={`px-8 py-3 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors ${
+          isOverdue ? 'bg-slate-400 hover:bg-slate-500' : 'bg-brand-600 hover:bg-brand-700'
+        }`}
       >
         {isPending ? '生成中...' : '開始する'}
       </button>
-      {disabled && <p className="text-xs text-rose-500">締切を過ぎているため開始できません。</p>}
+      {isOverdue && <p className="text-xs text-rose-500">締切を過ぎています。開始できますが、スコアに超過ペナルティ(×0.8)が適用されます。</p>}
     </div>
   );
 }

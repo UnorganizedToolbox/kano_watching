@@ -101,9 +101,8 @@ export async function startAttempt(assignmentId: string): Promise<ActionResult> 
     const { supabase, userId } = await verifyStudent();
     const assignment = await loadAssignment(supabase, assignmentId);
 
-    if (assignment.delivery_mode === 'deadline' && assignment.due_at && new Date(assignment.due_at) < new Date()) {
-      return { ok: false, error: '締切を過ぎているため開始できません' };
-    }
+    // 締切後でも開始・解き直しは常に許可する(締切超過ペナルティは
+    // 提出タイミングに応じてスコアに反映される。開始自体をブロックしない)。
 
     const itemsByDeck = await loadDeckItemsRecursively(supabase, assignment.deck_id);
     let leaves;

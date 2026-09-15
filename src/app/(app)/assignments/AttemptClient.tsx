@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { submitAttempt, retryAttempt, type SubResultRow } from './actions';
 import { useNavLock } from '../components/NavLockContext';
+import type { ScoreAdjustmentTier } from '@/lib/cbt/scoreAdjustment';
 
 export interface QuestionView {
   svgDataUri: string | null;
@@ -13,22 +14,36 @@ export interface QuestionView {
   subResults: SubResultRow[] | null;
 }
 
+export interface ScoreBreakdown {
+  rawScore: number;
+  tier: ScoreAdjustmentTier;
+  multiplier: number;
+  adjustedScore: number;
+}
+
+const TIER_LABEL: Record<ScoreAdjustmentTier, string> = {
+  early: '早期提出ボーナス',
+  ontime: '',
+  late: '期限超過ペナルティ',
+  none: '',
+};
+
 export default function AttemptClient({
   assignmentId,
   attemptId,
   status,
   submittedWork,
-  score,
+  scoreBreakdown,
   questions,
-  canRetry,
+  isOverdue,
 }: {
   assignmentId: string;
   attemptId: string;
   status: 'in_progress' | 'submitted' | 'graded';
   submittedWork: string | null;
-  score: number | null;
+  scoreBreakdown: ScoreBreakdown | null;
   questions: QuestionView[];
-  canRetry: boolean;
+  isOverdue: boolean;
 }) {
   const router = useRouter();
   const isLocked = status !== 'in_progress';
@@ -134,10 +149,27 @@ export default function AttemptClient({
           />
         </div>
 
-        {status === 'graded' && score !== null && (
-          <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
-            スコア: <span className="text-brand-600">{Math.round(score)}%</span>
-          </p>
+        {status === 'graded' && scoreBreakdown && (
+          <div className="text-sm rounded-xl bg-slate-50 dark:bg-slate-900/50 p-4">
+            <div className="flex justify-between text-slate-500 dark:text-slate-400 py-0.5">
+              <span>正解</span>
+              <span>{Math.round(scoreBreakdown.rawScore)}%</span>
+            </div>
+            <div className="flex justify-between text-slate-500 dark:text-slate-400 py-0.5">
+              <span>誤り</span>
+              <span>{Math.round(100 - scoreBreakdown.rawScore)}%</span>
+            </div>
+            {TIER_LABEL[scoreBreakdown.tier] && (
+              <div className={`flex justify-between py-0.5 font-bold ${scoreBreakdown.tier === 'early' ? 'text-brand-600' : 'text-rose-500'}`}>
+                <span>{TIER_LABEL[scoreBreakdown.tier]}</span>
+                <span>{scoreBreakdown.tier === 'early' ? '+20%' : '-20%'}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-baseline font-bold text-slate-800 dark:text-white border-t border-slate-200 dark:border-slate-700 mt-2 pt-2">
+              <span>スコア</span>
+              <span className="text-lg text-brand-600">{Math.round(scoreBreakdown.adjustedScore)}%</span>
+            </div>
+          </div>
         )}
         {status === 'submitted' && (
           <p className="text-sm font-bold text-slate-500">提出済み(採点待ち)</p>
@@ -146,13 +178,17 @@ export default function AttemptClient({
         {error && <p className="text-rose-500 text-xs font-bold">{error}</p>}
 
         <div className="flex justify-end gap-3">
-          {isLocked && canRetry && (
+          {isLocked && (
             <button
               onClick={handleRetry}
               disabled={isRetrying}
-              className="px-4 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              className={`px-4 py-2.5 border text-sm font-bold rounded-xl disabled:opacity-50 transition-colors ${
+                isOverdue
+                  ? 'border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
             >
-              {isRetrying ? '生成中...' : '解き直す'}
+              {isRetrying ? '生成中...' : '再提出する'}
             </button>
           )}
           {!isLocked && (
