@@ -10,30 +10,32 @@ import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from "@/lib/rule
 export default async function TimerPage() {
   const supabase = await createClient();
 
-  // Fetch system config
-  const { data: configLogs } = await supabase
-    .from('student_activity_logs')
-    .select('metadata')
-    .eq('activity_type', 'SYSTEM_CONFIG')
-    .order('created_at', { ascending: false })
-    .limit(1);
-  
-  const globalQuestionsEnabled = !(configLogs && configLogs.length > 0 && configLogs[0].metadata && (configLogs[0].metadata as any).questions_enabled === false);
+  // configLogsはuser情報に依存しないので認証確認と並列に取得する
+  const [{ data: configLogs }, { data: { user } }] = await Promise.all([
+    supabase
+      .from('student_activity_logs')
+      .select('metadata')
+      .eq('activity_type', 'SYSTEM_CONFIG')
+      .order('created_at', { ascending: false })
+      .limit(1),
+    supabase.auth.getUser(),
+  ]);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const globalQuestionsEnabled = !(configLogs && configLogs.length > 0 && configLogs[0].metadata && (configLogs[0].metadata as any).questions_enabled === false);
 
   if (!user) {
     redirect('/login');
   }
 
-  const { data: profile } = await supabase.from('profiles').select('grade_level, role, organization_id, rule_overrides').eq('id', user.id).single();
+  // プロフィールと所属団体のルールを1回の問い合わせで取得する(直列2回→1回)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('grade_level, role, organization_id, rule_overrides, organizations:organization_id (rules)')
+    .eq('id', user.id)
+    .single();
   const isTeacher = profile?.role === 'teacher';
 
-  let orgRules: OrgRuleMap = {};
-  if (profile?.organization_id) {
-    const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
-    orgRules = (org?.rules as OrgRuleMap) || {};
-  }
+  const orgRules: OrgRuleMap = (profile?.organizations as unknown as { rules: OrgRuleMap } | null)?.rules || {};
   const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
   const questionsEnabled = globalQuestionsEnabled && !effectiveRules.disable_questions;
 

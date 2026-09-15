@@ -22,10 +22,13 @@ export default async function AppLayout({
     redirect('/login');
   }
 
-  // Fetch profile
+  // プロフィールと所属団体のルールを1回の問い合わせで取得する
+  // (以前はprofiles→organizationsと直列に2回問い合わせており、
+  // 毎回のタブ遷移のたびにこのlayout.tsxが再実行されるため、その分の
+  // 往復レイテンシがすべてのページ遷移に積み重なっていた)
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select('*, organizations:organization_id (rules)')
     .eq('id', user.id)
     .single();
 
@@ -46,11 +49,7 @@ export default async function AppLayout({
   const exp = profile?.exp || 0;
   const avatarSeed = profile?.avatar_seed || 'LearnFlowUser123';
 
-  let orgRules: OrgRuleMap = {};
-  if (profile?.organization_id) {
-    const { data: org } = await supabase.from('organizations').select('rules').eq('id', profile.organization_id).single();
-    orgRules = (org?.rules as OrgRuleMap) || {};
-  }
+  const orgRules: OrgRuleMap = (profile?.organizations as unknown as { rules: OrgRuleMap } | null)?.rules || {};
   const effectiveRules = resolveEffectiveRules(orgRules, profile?.rule_overrides as RuleMap);
   const pinnedTheme = resolveEffectivePinnedTheme(orgRules, profile?.rule_overrides as RuleMap);
 

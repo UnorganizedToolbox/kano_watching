@@ -12,27 +12,21 @@ export default async function AdminDashboard() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user?.id).single();
+  // profile/students/allQuestionsは互いに独立したデータなので並列に取得する
+  // (adminでない場合はredirectするため無駄になることもあるが、大半を占める
+  // admin/teacherアクセスでは直列3回→並列1回分のレイテンシに短縮できる)
+  const [{ data: profile }, { data: students }, { data: allQuestions }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user?.id).single(),
+    supabase.from('profiles').select('*').eq('role', 'student').order('created_at', { ascending: false }),
+    supabase.from('questions').select(`
+      *,
+      profiles:student_uuid (name, student_id)
+    `).order('created_at', { ascending: false }).limit(300),
+  ]);
+
   if (profile?.role !== 'admin' && profile?.role !== 'teacher') {
     redirect('/');
   }
-
-  // Fetch all students
-  const { data: students } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('role', 'student')
-    .order('created_at', { ascending: false });
-
-  // Fetch questions (all statuses, for the Q&A management view)
-  const { data: allQuestions } = await supabase
-    .from('questions')
-    .select(`
-      *,
-      profiles:student_uuid (name, student_id)
-    `)
-    .order('created_at', { ascending: false })
-    .limit(300);
 
   const openCount = allQuestions?.filter(q => q.status === 'open').length || 0;
 

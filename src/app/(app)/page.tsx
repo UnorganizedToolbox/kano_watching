@@ -12,19 +12,23 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  // Fetch real data
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  // 以下はすべてuser.idだけに依存し互いに独立しているため並列に取得する
+  // (以前は直列に4回問い合わせており、その分のレイテンシが積み重なっていた)
+  const [
+    { data: profile },
+    { linked: googleLinked, events: calendarEvents },
+    { data: pomodoros },
+    { data: diagnostics },
+  ] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    getGoogleCalendarEvents(supabase, user.id),
+    supabase.from('pomodoro_logs').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false }),
+    supabase.from('diagnostic_results').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false }),
+  ]);
 
   if (profile?.role === 'admin' || profile?.role === 'teacher') {
     redirect('/admin');
   }
-
-  
-  const { linked: googleLinked, events: calendarEvents } = await getGoogleCalendarEvents(supabase, user.id);
-
-  const { data: pomodoros } = await supabase.from('pomodoro_logs').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false });
-
-  const { data: diagnostics } = await supabase.from('diagnostic_results').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false });
 
   const latestDiagnostic = diagnostics && diagnostics.length > 0 ? diagnostics[0] : null;
   const totalPomodoros = pomodoros?.length || 0;

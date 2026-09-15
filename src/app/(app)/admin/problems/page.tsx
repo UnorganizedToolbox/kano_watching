@@ -8,13 +8,14 @@ export default async function ProblemTemplatesPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single();
+  const [{ data: profile }, { data: templates }] = await Promise.all([
+    supabase.from('profiles').select('role').eq('id', user?.id).single(),
+    supabase
+      .from('problem_templates')
+      .select('id, title, created_at, organizations:organization_id (name)')
+      .order('created_at', { ascending: false }),
+  ]);
   if (profile?.role !== 'admin' && profile?.role !== 'teacher') redirect('/');
-
-  const { data: templates } = await supabase
-    .from('problem_templates')
-    .select('id, title, created_at, organizations:organization_id (name)')
-    .order('created_at', { ascending: false });
 
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[900px] mx-auto w-full px-6 pt-2 pb-6">

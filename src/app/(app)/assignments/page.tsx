@@ -24,19 +24,20 @@ export default async function StudentAssignmentsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  // profile/assignments/attemptsは互いに独立したデータなので並列に取得する
+  const [{ data: profile }, { data: assignments }, { data: attempts }] = await Promise.all([
+    supabase.from('profiles').select('role').eq('id', user.id).single(),
+    supabase
+      .from('problem_assignments')
+      .select('id, delivery_mode, due_at, grading_mode, problem_decks:deck_id (title)')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('problem_attempts')
+      .select('assignment_id, attempt_number, status, score')
+      .eq('student_id', user.id)
+      .order('attempt_number', { ascending: false }),
+  ]);
   if (profile?.role !== 'student') redirect('/');
-
-  const { data: assignments } = await supabase
-    .from('problem_assignments')
-    .select('id, delivery_mode, due_at, grading_mode, problem_decks:deck_id (title)')
-    .order('created_at', { ascending: false });
-
-  const { data: attempts } = await supabase
-    .from('problem_attempts')
-    .select('assignment_id, attempt_number, status, score')
-    .eq('student_id', user.id)
-    .order('attempt_number', { ascending: false });
 
   const latestByAssignment = new Map<string, { status: string; score: number | null }>();
   for (const a of attempts || []) {
