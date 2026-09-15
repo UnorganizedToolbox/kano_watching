@@ -12,9 +12,7 @@ interface Props {
 
 // モバイルとPCで完全に別のDOM領域として出し分ける(CSSのmd:のみで制御し、
 // 同じ要素をfixed/staticで出し分けようとして環境によって崩れる、という
-// 問題を避ける)。Sidebarをここで直接レンダリングする(childrenを関数として
-// 受け取る形は、layout.tsxがサーバーコンポーネントのためRSCの境界を越えて
-// 関数を渡すことになり不可なので採らない)。
+// 問題を避ける)。
 export default function MobileSidebarDrawer({ role, level, exp, gamificationDisabled }: Props) {
   const { isOpen, close, pinned, hovering, setHovering } = useMobileNav();
   const expanded = pinned || hovering;
@@ -29,46 +27,35 @@ export default function MobileSidebarDrawer({ role, level, exp, gamificationDisa
         />
       )}
 
-      {/* モバイル: オーバーレイ式ドロワー */}
+      {/* モバイル: オーバーレイ式ドロワー(常にフル表示) */}
       <aside
         className={`fixed md:hidden inset-y-0 left-0 z-40 w-64 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 bg-white dark:bg-darkbg-primary shadow-2xl transition-transform duration-200 ease-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={false} />
+        <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} expanded />
       </aside>
 
-      {/* PC: 常に幅64pxのアイコンレール(実レイアウトの幅は常に一定で、mainの
-          サイズには一切影響しない)。展開時(ピン留め、またはマウスを
-          近づけている間)は絶対配置のオーバーレイとして重ねて表示するだけ。
-          重要: 以前はピン留め時に実際に幅を広げてmainを押し出していたが、
-          内部に固定幅レイアウトを持つページ(設定画面など)がその急な幅変化に
-          追従できず、枠はそのままで文字やボタンだけ動くという崩れ方をして
-          いた。常にオーバーレイにすることでmain側は一切レイアウトが変わらず
-          その種の崩れが起きなくなる。
-          中身は<aside>タグにする(<div>ではなく)。テーマのガラス風背景/
-          ブラーは`header, aside, .card-glass`をセレクタにしているため、
-          <div>のままだとテーマ適用時にタブだけ透明感のない不透明な板に
-          見えてしまっていた。 */}
+      {/* PC: 1つの<aside>だけがアイコンレール(w-16)⇔フル幅(w-64)の間を
+          widthアニメーションで行き来する(Perplexity.aiのような、アイコンは
+          その場に留まりラベルだけが横から現れるイメージ)。ピン留め、または
+          マウスを近づけている間はフル幅になる。以前は「アイコンのみレール」
+          と「展開オーバーレイ」を別々の要素として同時に描画していたが、
+          テーマの半透明背景が重なって二重に見える・要素が2つあること自体が
+          分かりにくいという指摘を受け、1要素のアニメーションに統一した。
+          幅が変化してもmain側のレイアウトには影響しない(常にabsolute)。 */}
       <div
         className="hidden md:block relative shrink-0 w-16"
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
       >
-        {/* 展開中(ピン留め or ホバー中)はオーバーレイが完全に覆うはずだが、
-            テーマ(ガラス風など)は半透明+ブラー背景のため、このアイコンレールを
-            表示したままにするとオーバーレイ越しに透けて二重に見えてしまう。
-            展開中はinvisibleにして描画自体を消す(マウス追跡用の外側divの
-            レイアウトは維持したまま)。 */}
-        <aside className={`w-16 h-full bg-white dark:bg-darkbg-primary border-r border-slate-200 dark:border-slate-800 flex flex-col ${expanded ? 'invisible' : ''}`}>
-          <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={true} />
+        <aside
+          className={`absolute inset-y-0 left-0 bg-white dark:bg-darkbg-primary border-r border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+            expanded ? 'w-64 shadow-2xl z-40' : 'w-16'
+          }`}
+        >
+          <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} expanded={expanded} />
         </aside>
-
-        {expanded && (
-          <aside className="absolute inset-y-0 left-0 w-64 bg-white dark:bg-darkbg-primary flex flex-col shadow-2xl z-40 border-r border-slate-200 dark:border-slate-800">
-            <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={false} />
-          </aside>
-        )}
       </div>
     </>
   );
