@@ -38,23 +38,28 @@ export default function MobileSidebarDrawer({ role, level, exp, gamificationDisa
         <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={false} />
       </aside>
 
-      {/* PC: アイコンのみの常設レール。ピン留め、またはマウスを近づけている間
-          だけフル幅に展開する。展開時はabsoluteでオーバーレイし、mainの
-          レイアウトを揺らさない(ピン留め時のみ実際に幅を取って押し出す) */}
+      {/* PC: 常に幅64pxのアイコンレール(実レイアウトの幅は常に一定で、mainの
+          サイズには一切影響しない)。展開時(ピン留め、またはマウスを
+          近づけている間)は絶対配置のオーバーレイとして重ねて表示するだけ。
+          重要: 以前はピン留め時に実際に幅を広げてmainを押し出していたが、
+          内部に固定幅レイアウトを持つページ(設定画面など)がその急な幅変化に
+          追従できず、枠はそのままで文字やボタンだけ動くという崩れ方をして
+          いた。常にオーバーレイにすることでmain側は一切レイアウトが変わらず
+          その種の崩れが起きなくなる。 */}
       <div
-        className={`hidden md:block relative shrink-0 border-r border-slate-200 dark:border-slate-800 transition-[width] duration-150 ease-out ${pinned ? 'w-64' : 'w-16'}`}
-        onMouseEnter={() => !pinned && setHovering(true)}
+        className="hidden md:block relative shrink-0 w-16 border-r border-slate-200 dark:border-slate-800"
+        onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
       >
-        <div
-          className={`h-full bg-white dark:bg-darkbg-primary flex flex-col ${
-            !pinned && hovering
-              ? 'absolute inset-y-0 left-0 w-64 shadow-2xl z-40 border-r border-slate-200 dark:border-slate-800'
-              : 'w-full'
-          }`}
-        >
-          <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={!expanded} />
+        <div className="w-16 h-full bg-white dark:bg-darkbg-primary flex flex-col">
+          <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={true} />
         </div>
+
+        {expanded && (
+          <div className="absolute inset-y-0 left-0 w-64 bg-white dark:bg-darkbg-primary flex flex-col shadow-2xl z-40 border-r border-slate-200 dark:border-slate-800">
+            <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={false} />
+          </div>
+        )}
       </div>
     </>
   );

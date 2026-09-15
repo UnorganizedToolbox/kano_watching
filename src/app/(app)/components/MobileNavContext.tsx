@@ -43,6 +43,11 @@ export function MobileNavProvider({ children }: { children: ReactNode }) {
       }
       return next;
     });
+    // 重要なバグ修正: hoveringをクリアせずにいると、トグルボタンの真下は
+    // レール領域と隣接しているためマウスがそこに乗ったままhovering=trueで
+    // 固まり、ピン留めを解除してもexpanded(=pinned||hovering)がhoveringの
+    // せいでtrueのままになり「押しても展開されっぱなし」に見えていた。
+    setHovering(false);
   };
 
   return (
