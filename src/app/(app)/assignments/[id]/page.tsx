@@ -65,7 +65,7 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
 
   const { data: attempts } = await supabase
     .from('problem_attempts')
-    .select('id, questions, submitted_work, submitted_answers, status, sub_results, score, submitted_at')
+    .select('id, questions, submitted_work, submitted_answers, status, sub_results, score, submitted_at, started_at')
     .eq('assignment_id', id)
     .eq('student_id', user.id)
     .order('attempt_number', { ascending: false })
@@ -136,6 +136,7 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
           status={attempt.status}
           submittedWork={attempt.submitted_work}
           scoreBreakdown={buildScoreBreakdown(assignment, attempt.score, attempt.submitted_at)}
+          durationSeconds={attempt.submitted_at ? Math.max(0, Math.round((new Date(attempt.submitted_at).getTime() - new Date(attempt.started_at).getTime()) / 1000)) : null}
           questions={questionViews}
           isOverdue={isOverdue}
         />

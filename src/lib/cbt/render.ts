@@ -12,10 +12,15 @@ import { PAIR_INDEX_KEY } from './types';
 const PLACEHOLDER_RE = /\{\{([^{}]+)\}\}/g;
 
 export function renderTemplate(template: string, values: ResolvedVariables): string {
-  return template.replace(PLACEHOLDER_RE, (_match, inner: string) => {
+  return template.replace(PLACEHOLDER_RE, (_match, inner: string, offset: number) => {
     const expr = parseExpr(inner.trim());
     const formatted = formatEvaluatedExpr(expr, values);
-    return formatted.isNegative ? `(-${formatted.text})` : formatted.text;
+    if (!formatted.isNegative) return formatted.text;
+    // 文字列の先頭にある埋め込みは、前に何も無いため"x - -5"のような曖昧さが
+    // 生じない。括弧を付けず素の "-5" にする(バグ修正: 正答テンプレートが
+    // {{式}} だけで構成される場合、常に括弧補完すると生徒が自然に入力する
+    // "-7" のような解答と一致しなくなり、正しい解答が不正解判定されていた)。
+    return offset === 0 ? `-${formatted.text}` : `(-${formatted.text})`;
   });
 }
 

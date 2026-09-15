@@ -11,13 +11,25 @@ describe('renderTemplate', () => {
     expect(renderTemplate('$ x^2 - {{A+B}} x + {{A*B}} $', { A: 5, B: 6 })).toBe('$ x^2 - 11 x + 30 $');
   });
 
-  it('wraps negative substituted values in parentheses', () => {
+  it('wraps negative substituted values in parentheses when not at the start of the string', () => {
     expect(renderTemplate('x - {{B}}', { B: -5 })).toBe('x - (-5)');
+  });
+
+  it('does not wrap a negative value in parentheses when the placeholder starts the template (regression: broke matching a plain negative answer)', () => {
+    // 正答テンプレートが {{式}} だけで構成される場合(単純な数値解答)、括弧補完
+    // すると生徒が自然に入力する "-7" のような解答と一致しなくなり、正しい
+    // 解答が不正解判定されるバグがあった。先頭の埋め込みは括弧を付けない。
+    expect(renderTemplate('{{A}}', { A: -7 })).toBe('-7');
+    expect(renderTemplate('{{A+B}}', { A: -3, B: -4 })).toBe('-7');
+  });
+
+  it('still wraps a negative value that starts the string if something precedes the placeholder logically (later placeholder)', () => {
+    expect(renderTemplate('{{A}} - {{B}}', { A: -5, B: -3 })).toBe('-5 - (-3)');
   });
 
   it('reduces a single {{A/B}} expression to a fraction', () => {
     expect(renderTemplate('{{A/B}}', { A: 3, B: 6 })).toBe('1/2');
-    expect(renderTemplate('{{A/B}}', { A: -3, B: 6 })).toBe('(-1/2)');
+    expect(renderTemplate('{{A/B}}', { A: -3, B: 6 })).toBe('-1/2');
   });
 
   it('does not fraction-reduce two separate embeds joined by a literal slash', () => {

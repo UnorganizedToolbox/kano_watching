@@ -167,6 +167,9 @@ export default function ProblemTemplateForm({
           setSaveOk(true);
           if (!templateId && result.id) {
             router.push(`/admin/problems/${result.id}/edit`);
+          } else if (templateId) {
+            // 既存テンプレートの編集を保存したら一覧に戻る
+            router.push('/admin/problems');
           }
         } else {
           setSaveError(result.error || '保存に失敗しました');

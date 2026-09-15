@@ -2,23 +2,34 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { createAssignment, type TargetType, type DeliveryMode, type GradingMode } from './actions';
+import { createAssignment, updateAssignment, type TargetType, type DeliveryMode, type GradingMode } from './actions';
+
+export interface ExistingAssignment {
+  id: string;
+  targetType: TargetType;
+  targetStudentIds: string[];
+  deliveryMode: DeliveryMode;
+  dueAt: string | null; // datetime-local用のローカル文字列("YYYY-MM-DDTHH:mm")
+  gradingMode: GradingMode;
+}
 
 export default function DeliveryForm({
   target,
   students,
   isAdmin,
+  existing,
 }: {
   target: { kind: 'template' | 'deck'; id: string };
   students: { id: string; name: string; student_id: string }[];
   isAdmin: boolean;
+  existing?: ExistingAssignment;
 }) {
   const router = useRouter();
-  const [targetType, setTargetType] = useState<TargetType>('organization');
-  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
-  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('deadline');
-  const [dueAt, setDueAt] = useState('');
-  const [gradingMode, setGradingMode] = useState<GradingMode>('auto_exact');
+  const [targetType, setTargetType] = useState<TargetType>(existing?.targetType ?? 'organization');
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set(existing?.targetStudentIds ?? []));
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>(existing?.deliveryMode ?? 'deadline');
+  const [dueAt, setDueAt] = useState(existing?.dueAt ?? '');
+  const [gradingMode, setGradingMode] = useState<GradingMode>(existing?.gradingMode ?? 'auto_exact');
 
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -36,15 +47,23 @@ export default function DeliveryForm({
     setError(null);
     startTransition(async () => {
       try {
-        const result = await createAssignment({
-          templateId: target.kind === 'template' ? target.id : undefined,
-          deckId: target.kind === 'deck' ? target.id : undefined,
-          targetType,
-          targetStudentIds: [...selectedStudents],
-          deliveryMode,
-          dueAt: dueAt ? new Date(dueAt).toISOString() : null,
-          gradingMode,
-        });
+        const result = existing
+          ? await updateAssignment(existing.id, {
+              targetType,
+              targetStudentIds: [...selectedStudents],
+              deliveryMode,
+              dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+              gradingMode,
+            })
+          : await createAssignment({
+              templateId: target.kind === 'template' ? target.id : undefined,
+              deckId: target.kind === 'deck' ? target.id : undefined,
+              targetType,
+              targetStudentIds: [...selectedStudents],
+              deliveryMode,
+              dueAt: dueAt ? new Date(dueAt).toISOString() : null,
+              gradingMode,
+            });
         if (result.ok) {
           router.push('/admin/assignments');
         } else {
@@ -161,7 +180,7 @@ export default function DeliveryForm({
           disabled={isPending}
           className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors"
         >
-          {isPending ? '配信中...' : '配信する'}
+          {isPending ? (existing ? '更新中...' : '配信中...') : (existing ? '更新する' : '配信する')}
         </button>
       </div>
     </div>

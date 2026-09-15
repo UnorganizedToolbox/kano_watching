@@ -130,6 +130,61 @@ export async function createAssignment(input: AssignmentInput): Promise<CreateAs
   }
 }
 
+export interface UpdateAssignmentInput {
+  targetType: TargetType;
+  targetStudentIds: string[];
+  deliveryMode: DeliveryMode;
+  dueAt: string | null;
+  gradingMode: GradingMode;
+}
+
+// 配信中の課題の対象・期限・採点方法を変更する(配信先のデッキ/テンプレート
+// 自体は変更しない)。
+export async function updateAssignment(assignmentId: string, input: UpdateAssignmentInput): Promise<CreateAssignmentResult> {
+  try {
+    const { supabase, callerRole, callerOrgId } = await verifyAdminOrTeacher();
+
+    const { data: assignment } = await supabase
+      .from('problem_assignments')
+      .select('id, organization_id')
+      .eq('id', assignmentId)
+      .single();
+    if (!assignment) return { ok: false, error: '配信が見つかりません' };
+    if (callerRole === 'teacher' && (!callerOrgId || assignment.organization_id !== callerOrgId)) {
+      return { ok: false, error: '自分の団体の配信のみ編集できます' };
+    }
+
+    if (input.targetType === 'students' && input.targetStudentIds.length === 0) {
+      return { ok: false, error: '配信先の生徒を1人以上選択してください' };
+    }
+    if (input.targetType === 'all' && callerRole !== 'admin') {
+      return { ok: false, error: '団体を問わず全員への配信は管理者のみ選択できます' };
+    }
+    if (input.deliveryMode === 'deadline' && !input.dueAt) {
+      return { ok: false, error: '締切日時を入力してください' };
+    }
+
+    const { error } = await supabase.from('problem_assignments').update({
+      target_type: input.targetType,
+      target_student_ids: input.targetType === 'students' ? input.targetStudentIds : [],
+      delivery_mode: input.deliveryMode,
+      due_at: input.deliveryMode === 'deadline' ? input.dueAt : null,
+      grading_mode: input.gradingMode,
+    }).eq('id', assignmentId);
+
+    if (error) {
+      console.error('Failed to update assignment', error);
+      return { ok: false, error: `配信の更新に失敗しました: ${error.message}` };
+    }
+
+    revalidatePath('/admin/assignments');
+    return { ok: true, id: assignmentId };
+  } catch (e) {
+    console.error('Unexpected error in updateAssignment', e);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function deleteAssignment(id: string) {
   const { supabase } = await verifyAdminOrTeacher();
 

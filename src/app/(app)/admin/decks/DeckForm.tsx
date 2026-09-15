@@ -74,6 +74,9 @@ export default function DeckForm({
           setSaveOk(true);
           if (!deckId && result.id) {
             router.push(`/admin/decks/${result.id}/edit`);
+          } else if (deckId) {
+            // 既存デッキの編集を保存したら一覧に戻る
+            router.push('/admin/decks');
           }
         } else {
           setSaveError(result.error || '保存に失敗しました');

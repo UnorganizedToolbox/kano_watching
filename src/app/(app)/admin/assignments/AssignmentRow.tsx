@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react';
-import { Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { Pencil, Trash2 } from 'lucide-react';
 import { deleteAssignment } from '../problems/[id]/deliver/actions';
 
 const DELIVERY_MODE_LABEL: Record<string, string> = {
@@ -59,13 +60,21 @@ export default function AssignmentRow({
         </p>
         {error && <p className="text-rose-500 text-xs font-bold mt-1">{error}</p>}
       </div>
-      <button
-        onClick={handleDelete}
-        disabled={isDeleting}
-        className="p-2 text-slate-400 hover:text-rose-500 transition-colors shrink-0 disabled:opacity-50"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      <div className="flex items-center gap-1 shrink-0">
+        <Link
+          href={`/admin/assignments/${id}/edit`}
+          className="p-2 text-slate-400 hover:text-brand-600 transition-colors"
+        >
+          <Pencil className="w-4 h-4" />
+        </Link>
+        <button
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="p-2 text-slate-400 hover:text-rose-500 transition-colors disabled:opacity-50"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }

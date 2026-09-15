@@ -28,12 +28,19 @@ const TIER_LABEL: Record<ScoreAdjustmentTier, string> = {
   none: '',
 };
 
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}分${s}秒` : `${s}秒`;
+}
+
 export default function AttemptClient({
   assignmentId,
   attemptId,
   status,
   submittedWork,
   scoreBreakdown,
+  durationSeconds,
   questions,
   isOverdue,
 }: {
@@ -42,6 +49,7 @@ export default function AttemptClient({
   status: 'in_progress' | 'submitted' | 'graded';
   submittedWork: string | null;
   scoreBreakdown: ScoreBreakdown | null;
+  durationSeconds: number | null;
   questions: QuestionView[];
   isOverdue: boolean;
 }) {
@@ -73,7 +81,7 @@ export default function AttemptClient({
     startSubmitTransition(async () => {
       const result = await submitAttempt({ attemptId, assignmentId, work, answers });
       if (result.ok) {
-        router.refresh();
+        router.push('/assignments');
       } else {
         setError(result.error || '提出に失敗しました');
       }
@@ -173,6 +181,9 @@ export default function AttemptClient({
         )}
         {status === 'submitted' && (
           <p className="text-sm font-bold text-slate-500">提出済み(採点待ち)</p>
+        )}
+        {isLocked && durationSeconds !== null && (
+          <p className="text-xs text-slate-400">所要時間: {formatDuration(durationSeconds)}</p>
         )}
 
         {error && <p className="text-rose-500 text-xs font-bold">{error}</p>}

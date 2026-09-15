@@ -55,7 +55,12 @@ export default function MobileSidebarDrawer({ role, level, exp, gamificationDisa
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
       >
-        <aside className="w-16 h-full bg-white dark:bg-darkbg-primary border-r border-slate-200 dark:border-slate-800 flex flex-col">
+        {/* 展開中(ピン留め or ホバー中)はオーバーレイが完全に覆うはずだが、
+            テーマ(ガラス風など)は半透明+ブラー背景のため、このアイコンレールを
+            表示したままにするとオーバーレイ越しに透けて二重に見えてしまう。
+            展開中はinvisibleにして描画自体を消す(マウス追跡用の外側divの
+            レイアウトは維持したまま)。 */}
+        <aside className={`w-16 h-full bg-white dark:bg-darkbg-primary border-r border-slate-200 dark:border-slate-800 flex flex-col ${expanded ? 'invisible' : ''}`}>
           <Sidebar role={role} level={level} exp={exp} gamificationDisabled={gamificationDisabled} iconOnly={true} />
         </aside>
 
