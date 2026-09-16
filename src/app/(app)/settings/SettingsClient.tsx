@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useTransition, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ProceduralAvatar from '../components/ProceduralAvatar';
@@ -41,6 +41,8 @@ function SettingsContent() {
   const [gradeLevel, setGradeLevel] = useState<GradeLevel | ''>('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [isLinkingGoogle, startGoogleLinkTransition] = useTransition();
+  const [googleLinkError, setGoogleLinkError] = useState<string | null>(null);
   const [effectiveRules, setEffectiveRules] = useState<Record<RuleKey, boolean>>({} as Record<RuleKey, boolean>);
 
   const handleSaveProfile = async () => {
@@ -62,6 +64,21 @@ function SettingsContent() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleLinkGoogle = () => {
+    setGoogleLinkError(null);
+    startGoogleLinkTransition(async () => {
+      try {
+        const result = await linkGoogleAccount();
+        // 成功時はサーバー側でredirect()されるためここには通常到達しない
+        if (!result.ok) {
+          setGoogleLinkError(result.error || 'Googleカレンダーとの連携に失敗しました。');
+        }
+      } catch (e) {
+        setGoogleLinkError(e instanceof Error ? e.message : 'Googleカレンダーとの連携に失敗しました。');
+      }
+    });
   };
 
   // Load from Supabase on mount
@@ -521,15 +538,18 @@ function SettingsContent() {
                   <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
                     Googleカレンダーと連携することで、スケジュールの読み取りが可能になります。（※学習成果などのデータがカレンダーに自動で書き込まれることはありません）
                   </p>
-                  <form action={linkGoogleAccount}>
-                    <button 
-                      type="submit"
-                      className="w-full flex items-center justify-center gap-3 py-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl font-bold shadow-sm transition-all active:scale-95"
-                    >
-                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-                      Googleアカウントと同期する
-                    </button>
-                  </form>
+                  <button
+                    type="button"
+                    onClick={handleLinkGoogle}
+                    disabled={isLinkingGoogle}
+                    className="w-full flex items-center justify-center gap-3 py-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl font-bold shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                    {isLinkingGoogle ? '連携中...' : 'Googleアカウントと同期する'}
+                  </button>
+                  {googleLinkError && (
+                    <p className="mt-3 text-sm text-rose-500 font-bold">{googleLinkError}</p>
+                  )}
                 </div>
               </div>
             </div>

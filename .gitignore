@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 ForUser/
+
+# local-only notes (CLAUDE.md参照)
+CLAUDE.local.md

@@ -45,30 +45,39 @@ export async function getGoogleCalendarEvents(
     return { linked: false, events: [] };
   }
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
+  // 重要: fetch()自体がネットワーク障害(DNS失敗・タイムアウト等)で例外を投げることが
+  // あり、以前はここが無防備だったためダッシュボードページ全体がクラッシュしていた
+  // (Promise.all内で呼ばれているため、この関数の未捕捉例外がページ全体を落とす)。
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
-  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfDay.toISOString()}&timeMax=${endOfDay.toISOString()}&singleEvents=true&orderBy=startTime`;
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfDay.toISOString()}&timeMax=${endOfDay.toISOString()}&singleEvents=true&orderBy=startTime`;
 
-  let accessToken = profile.google_token as string;
-  let response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    let accessToken = profile.google_token as string;
+    let response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
 
-  if (response.status === 401 && profile.google_refresh_token) {
-    const newAccessToken = await refreshGoogleAccessToken(profile.google_refresh_token);
-    if (!newAccessToken) {
+    if (response.status === 401 && profile.google_refresh_token) {
+      const newAccessToken = await refreshGoogleAccessToken(profile.google_refresh_token);
+      if (!newAccessToken) {
+        return { linked: true, events: [] };
+      }
+      accessToken = newAccessToken;
+      await supabase.from('profiles').update({ google_token: newAccessToken }).eq('id', userId);
+      response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    }
+
+    if (!response.ok) {
+      console.error('Google Calendar API error:', response.status, await response.text());
       return { linked: true, events: [] };
     }
-    accessToken = newAccessToken;
-    await supabase.from('profiles').update({ google_token: newAccessToken }).eq('id', userId);
-    response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-  }
 
-  if (!response.ok) {
+    const data = await response.json();
+    return { linked: true, events: data.items || [] };
+  } catch (e) {
+    console.error('Unexpected error fetching Google Calendar events', e);
     return { linked: true, events: [] };
   }
-
-  const data = await response.json();
-  return { linked: true, events: data.items || [] };
 }
