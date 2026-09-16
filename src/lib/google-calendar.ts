@@ -1,5 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+export interface GoogleCalendarEvent {
+  id?: string;
+  summary?: string;
+  start?: { date?: string; dateTime?: string };
+  end?: { date?: string; dateTime?: string };
+}
+
 // Google のアクセストークンは約1時間で失効する。refresh_token を使って
 // oauth2.googleapis.com から新しいアクセストークンを取得し直す。
 async function refreshGoogleAccessToken(refreshToken: string): Promise<string | null> {
@@ -31,10 +38,14 @@ async function refreshGoogleAccessToken(refreshToken: string): Promise<string | 
   return data.access_token as string;
 }
 
-export async function getGoogleCalendarEvents(
+// 指定した期間([timeMinISO, timeMaxISO))のGoogleカレンダーの予定を取得する。
+// Timeline(週表示)とDashboard(当日のみ)の両方から使われる共通の実装。
+export async function getGoogleCalendarEventsInRange(
   supabase: SupabaseClient,
-  userId: string
-): Promise<{ linked: boolean; events: any[] }> {
+  userId: string,
+  timeMinISO: string,
+  timeMaxISO: string
+): Promise<{ linked: boolean; events: GoogleCalendarEvent[] }> {
   const { data: profile } = await supabase
     .from('profiles')
     .select('google_token, google_refresh_token')
@@ -49,12 +60,7 @@ export async function getGoogleCalendarEvents(
   // あり、以前はここが無防備だったためダッシュボードページ全体がクラッシュしていた
   // (Promise.all内で呼ばれているため、この関数の未捕捉例外がページ全体を落とす)。
   try {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfDay.toISOString()}&timeMax=${endOfDay.toISOString()}&singleEvents=true&orderBy=startTime`;
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMinISO)}&timeMax=${encodeURIComponent(timeMaxISO)}&singleEvents=true&orderBy=startTime`;
 
     let accessToken = profile.google_token as string;
     let response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
@@ -80,4 +86,16 @@ export async function getGoogleCalendarEvents(
     console.error('Unexpected error fetching Google Calendar events', e);
     return { linked: true, events: [] };
   }
+}
+
+export async function getGoogleCalendarEvents(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{ linked: boolean; events: GoogleCalendarEvent[] }> {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999);
+
+  return getGoogleCalendarEventsInRange(supabase, userId, startOfDay.toISOString(), endOfDay.toISOString());
 }
