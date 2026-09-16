@@ -43,6 +43,7 @@ function SettingsContent() {
   const [saveMessage, setSaveMessage] = useState('');
   const [isLinkingGoogle, startGoogleLinkTransition] = useTransition();
   const [googleLinkError, setGoogleLinkError] = useState<string | null>(null);
+  const [googleLinked, setGoogleLinked] = useState(false);
   const [effectiveRules, setEffectiveRules] = useState<Record<RuleKey, boolean>>({} as Record<RuleKey, boolean>);
 
   const handleSaveProfile = async () => {
@@ -87,8 +88,9 @@ function SettingsContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
-        const { data: profile } = await supabase.from('profiles').select('avatar_seed, saved_avatars, name, target_date, target_title, nickname_locked, grade_level, organization_id, rule_overrides').eq('id', user.id).single();
+        const { data: profile } = await supabase.from('profiles').select('avatar_seed, saved_avatars, name, target_date, target_title, nickname_locked, grade_level, organization_id, rule_overrides, google_token').eq('id', user.id).single();
         if (profile) {
+          setGoogleLinked(!!profile.google_token);
           if (profile.name) setName(profile.name);
           setNicknameLocked(!!profile.nickname_locked);
           if (profile.target_title) setTargetTitle(profile.target_title);
@@ -538,6 +540,11 @@ function SettingsContent() {
                   <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
                     Googleカレンダーと連携することで、スケジュールの読み取りが可能になります。（※学習成果などのデータがカレンダーに自動で書き込まれることはありません）
                   </p>
+                  {googleLinked && (
+                    <p className="mb-3 text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <i className="fa-solid fa-circle-check"></i> 連携済みです
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={handleLinkGoogle}
@@ -545,7 +552,7 @@ function SettingsContent() {
                     className="w-full flex items-center justify-center gap-3 py-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white rounded-xl font-bold shadow-sm transition-all active:scale-95 disabled:opacity-50"
                   >
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-                    {isLinkingGoogle ? '連携中...' : 'Googleアカウントと同期する'}
+                    {isLinkingGoogle ? '連携中...' : (googleLinked ? '再連携する' : 'Googleアカウントと同期する')}
                   </button>
                   {googleLinkError && (
                     <p className="mt-3 text-sm text-rose-500 font-bold">{googleLinkError}</p>
