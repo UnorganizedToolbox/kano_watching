@@ -19,6 +19,7 @@ export interface ScoreBreakdown {
   tier: ScoreAdjustmentTier;
   multiplier: number;
   adjustedScore: number;
+  expAwarded: number | null;
 }
 
 const TIER_LABEL: Record<ScoreAdjustmentTier, string> = {
@@ -177,6 +178,12 @@ export default function AttemptClient({
               <span>スコア</span>
               <span className="text-lg text-brand-600">{Math.round(scoreBreakdown.adjustedScore)}%</span>
             </div>
+            {scoreBreakdown.expAwarded !== null && (
+              <div className="flex justify-between items-baseline font-bold text-amber-600 dark:text-amber-400 mt-1">
+                <span>獲得EXP</span>
+                <span>+{Math.round(scoreBreakdown.expAwarded * 10) / 10}</span>
+              </div>
+            )}
           </div>
         )}
         {status === 'submitted' && (

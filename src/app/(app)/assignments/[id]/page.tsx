@@ -21,6 +21,7 @@ function buildScoreBreakdown(
   assignment: { delivery_mode: 'deadline' | 'no_deadline' | 'permanent'; due_at: string | null; created_at: string },
   rawScore: number | null,
   submittedAt: string | null,
+  expAwarded: number | null,
 ): ScoreBreakdown | null {
   if (rawScore === null || !submittedAt) return null;
   const { tier, multiplier } = computeScoreAdjustment({
@@ -29,7 +30,7 @@ function buildScoreBreakdown(
     dueAt: assignment.due_at,
     submittedAt,
   });
-  return { rawScore, tier, multiplier, adjustedScore: applyScoreAdjustment(rawScore, multiplier) };
+  return { rawScore, tier, multiplier, adjustedScore: applyScoreAdjustment(rawScore, multiplier), expAwarded };
 }
 
 interface TemplateRow {
@@ -65,7 +66,7 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
 
   const { data: attempts } = await supabase
     .from('problem_attempts')
-    .select('id, questions, submitted_work, submitted_answers, status, sub_results, score, submitted_at, started_at')
+    .select('id, questions, submitted_work, submitted_answers, status, sub_results, score, exp_awarded, submitted_at, started_at')
     .eq('assignment_id', id)
     .eq('student_id', user.id)
     .order('attempt_number', { ascending: false })
@@ -135,7 +136,7 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
           attemptId={attempt.id}
           status={attempt.status}
           submittedWork={attempt.submitted_work}
-          scoreBreakdown={buildScoreBreakdown(assignment, attempt.score, attempt.submitted_at)}
+          scoreBreakdown={buildScoreBreakdown(assignment, attempt.score, attempt.submitted_at, attempt.exp_awarded)}
           durationSeconds={attempt.submitted_at ? Math.max(0, Math.round((new Date(attempt.submitted_at).getTime() - new Date(attempt.started_at).getTime()) / 1000)) : null}
           questions={questionViews}
           isOverdue={isOverdue}

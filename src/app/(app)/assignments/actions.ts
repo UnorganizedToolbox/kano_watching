@@ -5,6 +5,17 @@ import { revalidatePath } from "next/cache";
 import { resolveTemplate } from "@/lib/cbt/resolve";
 import { renderProblem, isAnswerCorrect } from "@/lib/cbt/render";
 import { flattenDeck, totalDeckWeight, drawDeckTemplateIds, type DeckItemInput, type DeckChildKind } from "@/lib/cbt/deck";
+import { computeScoreAdjustment } from "@/lib/cbt/scoreAdjustment";
+import {
+  computeDeadlineExp,
+  computeNoDeadlineExp,
+  computePermanentExp,
+  computeStreakDays,
+  toJstDateStr,
+  DEFAULT_EXP_RATES,
+  type ExpRatesConfig,
+} from "@/lib/cbt/expReward";
+import { calc_Lv_from_EXP } from "@/lib/gamification/level";
 import type { TemplateKind, SubQuestionDef, PairItem, VariableDef, ResolvedVariables } from "@/lib/cbt/types";
 
 async function verifyStudent() {
@@ -22,16 +33,49 @@ interface AssignmentRow {
   delivery_mode: 'deadline' | 'no_deadline' | 'permanent';
   due_at: string | null;
   grading_mode: 'manual' | 'auto_exact';
+  created_at: string;
 }
 
 async function loadAssignment(supabase: SupabaseClient, assignmentId: string): Promise<AssignmentRow> {
   const { data, error } = await supabase
     .from('problem_assignments')
-    .select('id, deck_id, delivery_mode, due_at, grading_mode')
+    .select('id, deck_id, delivery_mode, due_at, grading_mode, created_at')
     .eq('id', assignmentId)
     .single();
   if (error || !data) throw new Error('配信が見つかりません');
   return data as AssignmentRow;
+}
+
+// exp_rates(管理者が調整可能なEXP係数テーブル)を読み込む。行が無いキーは
+// 実装イメージ文書(v4) 8.2節の既定値にフォールバックする。
+async function loadExpRates(supabase: SupabaseClient): Promise<ExpRatesConfig> {
+  const { data } = await supabase.from('exp_rates').select('key, value');
+  const byKey = new Map((data ?? []).map(r => [r.key as string, Number(r.value)]));
+  return {
+    singleBaseExp: byKey.get('single.base_exp') ?? DEFAULT_EXP_RATES.singleBaseExp,
+    singleStreakBonusPerDay: byKey.get('single.streak_bonus_per_day') ?? DEFAULT_EXP_RATES.singleStreakBonusPerDay,
+    singleStreakBonusCapDays: byKey.get('single.streak_bonus_cap_days') ?? DEFAULT_EXP_RATES.singleStreakBonusCapDays,
+    assignmentBaseExp: byKey.get('assignment.base_exp') ?? DEFAULT_EXP_RATES.assignmentBaseExp,
+  };
+}
+
+// EXP獲得を生徒のprofilesに反映する。レベルアップ時は無償石を付与する
+// (src/lib/gamification/engine.tsの既存ロジックと同じ計算式)。
+async function grantExp(supabase: SupabaseClient, userId: string, expGained: number): Promise<void> {
+  if (expGained <= 0) return;
+  const { data: profile } = await supabase.from('profiles').select('exp, free_stones').eq('id', userId).single();
+  if (!profile) return;
+
+  const oldLevelData = calc_Lv_from_EXP(profile.exp || 0);
+  const newTotalExp = (profile.exp || 0) + expGained;
+  const newLevelData = calc_Lv_from_EXP(newTotalExp);
+
+  let stones = profile.free_stones || 0;
+  if (newLevelData.level > oldLevelData.level) {
+    stones += (newLevelData.level - oldLevelData.level) * 50;
+  }
+
+  await supabase.from('profiles').update({ exp: newTotalExp, free_stones: stones }).eq('id', userId);
 }
 
 // デッキのツリーを、配信対象のデッキを起点にBFSで必要な分だけ読み込む
@@ -208,6 +252,8 @@ export async function submitAttempt(input: SubmitAttemptInput): Promise<ActionRe
 
     let score: number | null = null;
     let subResults: SubResultRow[][] | null = null;
+    let expAwarded: number | null = null;
+    const now = new Date().toISOString();
 
     if (assignment.grading_mode === 'auto_exact') {
       let totalPoints = 0;
@@ -232,15 +278,49 @@ export async function submitAttempt(input: SubmitAttemptInput): Promise<ActionRe
         });
       });
       score = totalPoints > 0 ? (earnedTotal / totalPoints) * 100 : 0;
+
+      // EXP付与(フェーズ4)。配信区分ごとに計算式が異なる(実装イメージ文書v4 8.1節)。
+      // 手動採点(grading_mode='manual')は現状このブランチに到達しないため対象外
+      // (教師の採点UI実装時にあらためて別途フックする必要がある)。
+      const rates = await loadExpRates(supabase);
+      if (assignment.delivery_mode === 'deadline') {
+        const { multiplier } = computeScoreAdjustment({
+          deliveryMode: assignment.delivery_mode,
+          createdAt: assignment.created_at,
+          dueAt: assignment.due_at,
+          submittedAt: now,
+        });
+        expAwarded = computeDeadlineExp(score, multiplier, rates.assignmentBaseExp);
+      } else if (assignment.delivery_mode === 'no_deadline') {
+        const { data: priorAttempts } = await supabase
+          .from('problem_attempts')
+          .select('score')
+          .eq('assignment_id', input.assignmentId)
+          .eq('student_id', userId)
+          .eq('status', 'graded');
+        const previousBest = (priorAttempts ?? []).reduce((max, a) => Math.max(max, (a.score as number | null) ?? 0), 0);
+        expAwarded = computeNoDeadlineExp(score, previousBest, rates.assignmentBaseExp);
+      } else {
+        const { data: priorAttempts } = await supabase
+          .from('problem_attempts')
+          .select('submitted_at')
+          .eq('assignment_id', input.assignmentId)
+          .eq('student_id', userId)
+          .eq('status', 'graded')
+          .not('submitted_at', 'is', null);
+        const pastDates = (priorAttempts ?? []).map(a => toJstDateStr(a.submitted_at as string));
+        const streakDays = computeStreakDays(pastDates, toJstDateStr(now));
+        expAwarded = computePermanentExp(streakDays, rates);
+      }
     }
 
-    const now = new Date().toISOString();
     const { error } = await supabase.from('problem_attempts').update({
       submitted_work: input.work,
       submitted_answers: input.answers,
       status: assignment.grading_mode === 'auto_exact' ? 'graded' : 'submitted',
       sub_results: subResults,
       score,
+      exp_awarded: expAwarded,
       submitted_at: now,
       graded_at: assignment.grading_mode === 'auto_exact' ? now : null,
     }).eq('id', input.attemptId);
@@ -248,6 +328,10 @@ export async function submitAttempt(input: SubmitAttemptInput): Promise<ActionRe
     if (error) {
       console.error('Failed to submit attempt', error);
       return { ok: false, error: `提出に失敗しました: ${error.message}` };
+    }
+
+    if (expAwarded !== null) {
+      await grantExp(supabase, userId, expAwarded);
     }
 
     revalidatePath(`/assignments/${input.assignmentId}`);
