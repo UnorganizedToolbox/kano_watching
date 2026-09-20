@@ -9,12 +9,9 @@ import { getSubjectOptions, OTHER_SUBJECT, type GradeLevel } from '@/lib/subject
 import { useNavLock } from '../../components/NavLockContext';
 import {
   advanceCycle,
-  isInterrupted,
   readCycleState,
   resolveCycleState,
-  touchCycleActivity,
   writeCycleState,
-  INTERRUPTION_THRESHOLD_MS,
 } from '@/lib/pomodoroCycle';
 
 type TimerMode = 'WORK' | 'BREAK' | 'LONG_BREAK';
@@ -22,10 +19,10 @@ type TimerMode = 'WORK' | 'BREAK' | 'LONG_BREAK';
 const WORK_TIME = 25 * 60;
 const BREAK_TIME = 5 * 60;
 const LONG_BREAK_TIME = 15 * 60;
-// Startしたまま放置(実行中はタイマー終了予定時刻からの超過、決定待ち画面は最後の操作からの経過)で
-// 「タブを閉じた/中断した」とみなすしきい値。大休憩の判定サイクルもこれと同じ基準でリセットする
-// (詳細は pomodoroCycle.ts)。
-const ABANDON_THRESHOLD_MS = INTERRUPTION_THRESHOLD_MS;
+// 実行中のタイマーがStartしたまま終了予定時刻をこれだけ超過して放置された場合、
+// 「タブを閉じた/中断した」とみなす。大休憩の判定サイクル(pomodoroCycle.ts)は
+// これとは別に、Cookie自体の有効期限(モードの所要時間+25分)で中断を判定する。
+const ABANDON_THRESHOLD_MS = 20 * 60 * 1000;
 const STORAGE_KEY = 'learnflow_pomodoro_state_v1';
 
 function durationFor(mode: TimerMode) {
@@ -123,19 +120,20 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   const hasHydratedRef = useRef(false);
   const { lock, unlock } = useNavLock();
 
-  // 一時停止・中止・終了などの「今まさに操作した」タイミングで呼ぶ。放置検出(pomodoroCycle.ts)の
-  // 基準時刻を更新するだけで、大休憩までのカウント自体は変えない(中断済みなら自動で0に戻る)。
-  const touchActivity = useCallback(() => {
-    const now = new Date();
-    writeCycleState(touchCycleActivity(readCycleState(), now.getTime()), now);
+  // 開始・一時停止・決定待ち画面に入る等、「今まさに操作した」タイミングで呼ぶ。
+  // sinceLongBreakのカウント自体は変えず、Cookieの有効期限だけを
+  // 「(このあと過ごすことになる)モードの所要時間+25分」で延長し直す
+  // (Cookie自体が失効していれば中断とみなして0から数え直す。pomodoroCycle.ts参照)。
+  const touchActivity = useCallback((relevantModeDurationSec: number) => {
+    writeCycleState(resolveCycleState(readCycleState()), relevantModeDurationSec * 1000);
   }, []);
 
   // 作業を1回完了した時点で、次が大休憩かどうかをCookie上のサイクルから判定し、
-  // Cookieを更新したうえで結果だけを返す(中断していれば0から数え直す)。
+  // 次に迎える休憩の所要時間を基準にCookieの有効期限を設定したうえで結果だけを返す
+  // (Cookieが失効していれば0から数え直す)。
   const advanceCycleForCompletion = useCallback((): boolean => {
-    const now = new Date();
-    const { next, isLongBreak } = advanceCycle(readCycleState(), now.getTime());
-    writeCycleState(next, now);
+    const { next, isLongBreak } = advanceCycle(readCycleState());
+    writeCycleState(next, (isLongBreak ? LONG_BREAK_TIME : BREAK_TIME) * 1000);
     return isLongBreak;
   }, []);
 
@@ -235,9 +233,9 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
       setTimeLeft(WORK_TIME);
       setTargetEndTime(null);
       setAwaitingDecision(true);
-      // 「次の学習を始める」決定待ち画面に入った瞬間を活動時刻として記録しておく。
-      // ここから長時間放置されたら、次に開いた時に中断とみなす(マウント時の復元処理を参照)。
-      touchActivity();
+      // 「次の学習を始める」決定待ち画面に入った瞬間。次はWORKなので、その所要時間+25分を
+      // 有効期限としてCookieを延長しておく(マウント時の復元処理を参照)。
+      touchActivity(WORK_TIME);
     }
   }, [playAlarm, mode, sessionId, touchActivity]);
 
@@ -258,11 +256,10 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   //   経過していれば「タブを閉じた」とみなし、ABANDONED イベントを記録して破棄する。
   // ②決定待ち画面(休憩を始める/次の学習を始める、のボタン待ち)や一時停止のまま
   //   だった場合: 従来は放置検出が一切なかった(いつまでも同じ画面が復元され続けた)。
-  //   ここでは Cookie(pomodoroCycle.ts)に記録している「最後に操作した時刻」を見て、
-  //   同じしきい値を超えていれば中断とみなし、新しい学習開始画面から始め直させる。
-  // どちらの場合も、大休憩までのサイクル(Cookie)は中断を検知した時点で0にリセットされる
-  // (pomodoroCycle.ts の resolveCycleState/touchCycleActivity)ため、「中断明けの1回目で
-  // また大休憩になる」という違和感は起きない。
+  //   ここでは大休憩サイクル用のCookie(pomodoroCycle.ts)が生きているかどうかを見る。
+  //   Cookieの有効期限は「そのときのモードの所要時間+25分」で設定されているため、
+  //   その期間を過ぎて放置されていれば読めなくなっており、中断とみなして新しい学習開始画面
+  //   から始め直させる(自然に0から数え直しになる)。
   useEffect(() => {
     const saved = loadPersistedState();
     const now = Date.now();
@@ -285,11 +282,13 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
           setTimeLeft(Math.max(0, Math.round((saved.targetEndTime - now) / 1000)));
           setIsRunning(true);
         }
-      } else if (!isStale && !isInterrupted(readCycleState(), now)) {
+      } else if (!isStale && readCycleState() !== null) {
         setMode(saved.mode);
         setTimeLeft(saved.timeLeft);
         setSessionId(saved.sessionId);
         setAwaitingDecision(saved.awaitingDecision);
+        // 無事に復元できた=まだ操作中とみなし、このモードを基準に有効期限を延長し直す
+        touchActivity(durationFor(saved.mode));
       } else {
         if (!isStale && saved.sessionId) {
           void logPomodoroEvent(saved.sessionId, saved.mode, 'QUIT', { declined_mode: saved.mode, auto: true });
@@ -299,12 +298,8 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
       }
     }
 
-    // サイクル(次が大休憩かどうかの判定用カウント)も同じ基準で中断チェックしておく。
-    // タイマーを一切操作しなくても、日付が変わればCookie自体が失効して自然にリセットされる。
-    writeCycleState(resolveCycleState(readCycleState(), now), new Date(now));
-
     hasHydratedRef.current = true;
-  }, []);
+  }, [touchActivity]);
 
   // 現在のタイマー状態を localStorage に保存し、リロード後も復元できるようにする
   // (pomoCountは含めない。常にDBが正のため)
@@ -438,7 +433,9 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
       workerRef.current?.postMessage('stop');
       stopSessionAudio();
       if (sessionId) void logPomodoroEvent(sessionId, mode, 'PAUSE');
-      touchActivity(); // 一時停止した瞬間を活動時刻として記録(この画面で放置されたら中断とみなす)
+      // 一時停止した瞬間、今のモードの所要時間+25分を基準にCookieの有効期限を延長し直す
+      // (この画面で放置されたら、その期間を過ぎた時点で中断とみなす)。
+      touchActivity(durationFor(mode));
     }
   };
 
@@ -450,7 +447,6 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     setTimeLeft(durationFor(mode));
     setAwaitingDecision(false);
     setSessionId(null);
-    touchActivity();
   };
 
   const handleQuit = () => {
@@ -462,7 +458,6 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     setIsRunning(false);
     setSessionId(null);
     clearPersistedState();
-    touchActivity();
   };
 
   const minutes = Math.floor(timeLeft / 60);
@@ -603,7 +598,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
               {isRunning ? <><i className="fa-solid fa-pause mr-2"></i> 一時停止</> : <><i className="fa-solid fa-play mr-2"></i> 開始</>}
             </button>
 
-            {isRunning && (
+            {(isRunning || sessionId) && (
               <button
                 onClick={handleStop}
                 className="flex-none px-6 py-4 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl font-bold shadow-md transition-all active:scale-95"
