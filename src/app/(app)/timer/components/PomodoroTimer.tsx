@@ -449,8 +449,11 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     setSessionId(null);
   };
 
-  const handleQuit = () => {
-    if (sessionId) void logPomodoroEvent(sessionId, mode, 'QUIT', { declined_mode: mode });
+  // 決定待ち画面・一時停止画面を、手動("終了する"ボタン)または自動(放置検出)で終える共通処理。
+  const endCurrentSession = useCallback((auto: boolean) => {
+    if (sessionId) {
+      void logPomodoroEvent(sessionId, mode, 'QUIT', auto ? { declined_mode: mode, auto: true } : { declined_mode: mode });
+    }
     setAwaitingDecision(false);
     setMode('WORK');
     setTimeLeft(WORK_TIME);
@@ -458,7 +461,23 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     setIsRunning(false);
     setSessionId(null);
     clearPersistedState();
-  };
+    if (auto) setAutoEndedNotice('長時間操作がなかったため、前回のセッションは自動的に終了しました。');
+  }, [sessionId, mode]);
+
+  const handleQuit = () => endCurrentSession(false);
+
+  // タブを開いたまま長時間放置された場合、リロードしなくても自動的に終了できるようにする。
+  // マウント時のチェック(上のuseEffect)だけだと、開いたままのタブでは何も起きないため、
+  // 決定待ち・一時停止の間だけ、大休憩サイクル用Cookie(pomodoroCycle.ts)の有効期限切れを
+  // 定期的に確認する(実行中はWeb Worker側のタイマーが別途面倒を見ているので対象外)。
+  useEffect(() => {
+    if (isRunning) return;
+    if (!sessionId && !awaitingDecision) return;
+    const interval = setInterval(() => {
+      if (readCycleState() === null) endCurrentSession(true);
+    }, 30 * 1000);
+    return () => clearInterval(interval);
+  }, [isRunning, sessionId, awaitingDecision, endCurrentSession]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
