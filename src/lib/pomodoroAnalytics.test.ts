@@ -351,6 +351,55 @@ describe('連続日数の傾向', () => {
   });
 });
 
+describe('実測学習時間(一時停止を除く)', () => {
+  it('一時停止していた実時間は学習時間から差し引く', () => {
+    const start = '2026-09-19T01:00:00Z';
+    const events: PomodoroEventRow[] = [
+      ev('p1', 'WORK', 'START', start),
+      ev('p1', 'WORK', 'PAUSE', at(start, 300)), // 5分作業して一時停止
+      ev('p1', 'WORK', 'START', at(start, 300 + 600)), // 10分休んでから再開
+      ev('p1', 'WORK', 'COMPLETE', at(start, 300 + 600 + 1500)), // さらに25分で完了
+    ];
+    const { trends } = analyzePomodoroEvents(events, { now: NOW });
+    // 壁時計では 5+10+25=40分だが、一時停止していた10分を除くと実際の学習時間は30分
+    expect(trends.cumulative.totalStudyMinutes).toBeCloseTo(30, 0);
+  });
+
+  it('複数回の一時停止も合算して差し引く', () => {
+    const start = '2026-09-19T01:00:00Z';
+    const events: PomodoroEventRow[] = [
+      ev('p1', 'WORK', 'START', start),
+      ev('p1', 'WORK', 'PAUSE', at(start, 300)),
+      ev('p1', 'WORK', 'START', at(start, 300 + 120)), // 2分休憩
+      ev('p1', 'WORK', 'PAUSE', at(start, 300 + 120 + 300)),
+      ev('p1', 'WORK', 'START', at(start, 300 + 120 + 300 + 180)), // 3分休憩
+      ev('p1', 'WORK', 'COMPLETE', at(start, 300 + 120 + 300 + 180 + 900)),
+    ];
+    const { trends } = analyzePomodoroEvents(events, { now: NOW });
+    // 実作業時間の合計: 5+5+15=25分(一時停止2+3=5分は除く)
+    expect(trends.cumulative.totalStudyMinutes).toBeCloseTo(25, 0);
+  });
+});
+
+describe('直近の完了一覧', () => {
+  it('新しい順に並び、科目と実測時間を持つ', () => {
+    const events = [
+      ...workSegment('old', '2026-09-18T01:00:00Z', { subject: '数学' }),
+      ...workSegment('new', '2026-09-19T01:00:00Z', { subject: '英語' }),
+    ];
+    const { recentCompletions } = analyzePomodoroEvents(events, { now: NOW });
+    expect(recentCompletions).toHaveLength(2);
+    expect(recentCompletions[0]).toMatchObject({ subject: '英語', durationMinutes: 25 });
+    expect(recentCompletions[1]).toMatchObject({ subject: '数学', durationMinutes: 25 });
+  });
+
+  it('件数の上限を超えた分は切り捨てる', () => {
+    const events = Array.from({ length: 25 }, (_, i) => workSegment(`s${i}`, `2026-0${1 + (i % 8)}-0${1 + (i % 9)}T01:00:00Z`)).flat();
+    const { recentCompletions } = analyzePomodoroEvents(events, { now: NOW });
+    expect(recentCompletions.length).toBeLessThanOrEqual(20);
+  });
+});
+
 describe('累計', () => {
   const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`);
 

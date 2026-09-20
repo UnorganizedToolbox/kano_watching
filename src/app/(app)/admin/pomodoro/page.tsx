@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Flame, Coffee, Moon } from "lucide-react";
+import { countCompletedWorkByStudent } from "@/lib/pomodoroAnalyticsLoader";
 
 const RUNNING_EVENTS = new Set(['START', 'CHECK_REMAINING_TIME']);
 
@@ -55,16 +56,7 @@ export default async function TeacherPomodoroPage() {
 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
-  const { data: todaysLogs } = await supabase
-    .from('pomodoro_logs')
-    .select('student_uuid')
-    .in('student_uuid', safeIds)
-    .gte('created_at', startOfDay.toISOString());
-
-  const todayCounts = new Map<string, number>();
-  for (const log of todaysLogs || []) {
-    todayCounts.set(log.student_uuid, (todayCounts.get(log.student_uuid) || 0) + 1);
-  }
+  const todayCounts = await countCompletedWorkByStudent(supabase, safeIds, startOfDay.toISOString());
 
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[900px] mx-auto w-full px-6 pt-2 pb-6">

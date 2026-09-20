@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { getGoogleCalendarEventsInRange } from '@/lib/google-calendar';
+import { loadCompletedWorkSegments } from '@/lib/pomodoroAnalyticsLoader';
 import { getWeekRange, toJstDayOffset, dateStringToDayIndex } from '@/lib/timelineWeek';
 
 // 表示する時間帯(6:00〜24:00)。この範囲外の予定・実績は上下にクリップされる。
@@ -61,25 +62,16 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
   const weekEndIso = new Date(week.weekEndUtcMs).toISOString();
   const weekMonday = week.days[0];
 
-  const [{ data: pomodoros }, { linked: googleLinked, events: calendarEvents }] = await Promise.all([
-    supabase
-      .from('pomodoro_logs')
-      .select('subject, duration_seconds, created_at')
-      .eq('student_uuid', user.id)
-      .eq('event_type', 'complete')
-      .gte('created_at', weekStartIso)
-      .lt('created_at', weekEndIso),
+  const [pomodoroSegments, { linked: googleLinked, events: calendarEvents }] = await Promise.all([
+    loadCompletedWorkSegments(supabase, user.id, { sinceISO: weekStartIso, untilISO: weekEndIso }),
     getGoogleCalendarEventsInRange(supabase, user.id, weekStartIso, weekEndIso),
   ]);
 
   const pomodoroBlocks: PositionedBlock[] = [];
-  for (const p of pomodoros ?? []) {
-    const endMs = new Date(p.created_at as string).getTime();
-    const durationSec = p.duration_seconds ?? 1500;
-    const startMs = endMs - durationSec * 1000;
-    const { dayIndex, minutesSinceMidnight } = toJstDayOffset(startMs, week.weekStartUtcMs);
+  for (const p of pomodoroSegments) {
+    const { dayIndex, minutesSinceMidnight } = toJstDayOffset(p.startedAt, week.weekStartUtcMs);
     if (dayIndex < 0 || dayIndex > 6) continue;
-    const clamped = clampToDisplayRange(minutesSinceMidnight, durationSec / 60);
+    const clamped = clampToDisplayRange(minutesSinceMidnight, p.durationMinutes);
     if (!clamped) continue;
     pomodoroBlocks.push({
       dayIndex,
@@ -87,7 +79,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
       heightPx: clamped.heightPx,
       title: p.subject ?? '学習',
       startLabel: formatHm(minutesSinceMidnight),
-      endLabel: formatHm(minutesSinceMidnight + durationSec / 60),
+      endLabel: formatHm(minutesSinceMidnight + p.durationMinutes),
     });
   }
 

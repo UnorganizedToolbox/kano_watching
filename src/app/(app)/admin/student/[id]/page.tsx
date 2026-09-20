@@ -43,13 +43,10 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
     studentOrgRules = (studentOrg?.rules as Record<string, unknown>) || {};
   }
 
-  // Fetch Pomodoro logs
-  const { data: pomodoros } = await supabase
-    .from('pomodoro_logs')
-    .select('*')
-    .eq('student_uuid', studentId)
-    .order('created_at', { ascending: false });
-
+  // ポモドーロの完了数・学習時間・最近の記録は、下部のPomodoroAnalyticsPanelと同じ
+  // pomodoro_events由来の集計(pomodoroAnalytics)から取る。かつては別途pomodoro_logsを
+  // 問い合わせていたが、2つのテーブルが別々のタイミングで書き込まれるため件数がずれる
+  // ことがあり、単一の集計結果に一本化した。
   const pomodoroAnalytics = student.role === 'student' ? await loadPomodoroAnalytics(supabase, studentId) : null;
 
   // Fetch Diagnostic Results
@@ -142,14 +139,18 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
               <Clock className="w-5 h-5 text-brand-500" />
               学習時間 (ポモドーロ)
             </h3>
-            <div className="text-4xl font-black text-slate-800 dark:text-white mb-2">{pomodoros?.length || 0} <span className="text-sm text-slate-500 font-normal">回完了</span></div>
-            <p className="text-xs text-slate-400 mb-4">推定学習時間: {((pomodoros?.length || 0) * 25) / 60} 時間</p>
-            
+            <div className="text-4xl font-black text-slate-800 dark:text-white mb-2">
+              {pomodoroAnalytics?.trends.cumulative.totalCompletedWork ?? 0} <span className="text-sm text-slate-500 font-normal">回完了</span>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">
+              学習時間(実測): {((pomodoroAnalytics?.trends.cumulative.totalStudyMinutes ?? 0) / 60).toFixed(1)} 時間(直近90日)
+            </p>
+
             <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
-              {pomodoros && pomodoros.map(log => (
-                <div key={log.id} className="text-xs flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <span className="text-slate-600 dark:text-slate-300">{log.subject}</span>
-                  <span className="text-slate-400">{new Date(log.created_at).toLocaleDateString()}</span>
+              {(pomodoroAnalytics?.recentCompletions ?? []).map(c => (
+                <div key={c.completedAt} className="text-xs flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <span className="text-slate-600 dark:text-slate-300">{c.subject ?? '学習'}</span>
+                  <span className="text-slate-400">{new Date(c.completedAt).toLocaleDateString()}</span>
                 </div>
               ))}
             </div>

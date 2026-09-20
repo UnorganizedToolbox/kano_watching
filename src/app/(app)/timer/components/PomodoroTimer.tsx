@@ -241,7 +241,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     }
   }, [playAlarm, mode, sessionId, touchActivity]);
 
-  // 「今日: N 回」バッジは常にDB(pomodoro_logs)から取得する。localStorageの
+  // 「今日: N 回」バッジは常にDB(pomodoro_events、完了した作業(WORK)の件数)から取得する。localStorageの
   // pomoCountには一切依存しない(日をまたいでも古い回数が残ったり、逆に
   // まだDBに書き込み中の今日の分まで誤って0にリセットする、といった問題を
   // 構造的に避けるため)。

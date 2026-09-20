@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/server";
 import { getGoogleCalendarEvents } from "@/lib/google-calendar";
+import { countCompletedWork, loadPomodoroAnalytics } from "@/lib/pomodoroAnalyticsLoader";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -17,12 +18,14 @@ export default async function DashboardPage() {
   const [
     { data: profile },
     { linked: googleLinked, events: calendarEvents },
-    { data: pomodoros },
+    totalPomodoros,
+    pomodoroAnalytics,
     { data: diagnostics },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     getGoogleCalendarEvents(supabase, user.id),
-    supabase.from('pomodoro_logs').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false }),
+    countCompletedWork(supabase, user.id), // 通算回数(全期間)は軽量なCOUNTクエリで取得
+    loadPomodoroAnalytics(supabase, user.id), // 「直近の学習フォーカス」用(直近90日で十分)
     supabase.from('diagnostic_results').select('*').eq('student_uuid', user.id).order('created_at', { ascending: false }),
   ]);
 
@@ -31,7 +34,7 @@ export default async function DashboardPage() {
   }
 
   const latestDiagnostic = diagnostics && diagnostics.length > 0 ? diagnostics[0] : null;
-  const totalPomodoros = pomodoros?.length || 0;
+  const latestPomodoroSubject = pomodoroAnalytics?.recentCompletions[0]?.subject ?? null;
 
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1400px] mx-auto w-full px-6 pt-2 pb-6">
@@ -97,7 +100,7 @@ export default async function DashboardPage() {
               </div>
               <div className="mt-1">
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                  {pomodoros && pomodoros.length > 0 ? pomodoros[0].subject : '学習記録なし'}
+                  {latestPomodoroSubject ?? '学習記録なし'}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 mt-1">ポモドーロタイマーの履歴より</p>

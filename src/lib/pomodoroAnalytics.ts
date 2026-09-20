@@ -23,6 +23,13 @@ export interface LatencyStats {
   noResumeCount: number; // 完了後、上限時間内に次の区間を始めなかった(または明示的に終了した)回数
 }
 
+export interface RecentCompletion {
+  subject: string | null;
+  startedAt: string; // ISO
+  completedAt: string; // ISO
+  durationMinutes: number; // 実測(一時停止時間を除く)
+}
+
 export interface SubjectStat {
   subject: string;
   segments: number;
@@ -89,6 +96,8 @@ export interface PomodoroAnalytics {
     avgRatingWithChecks: number | null;
   };
   bySubject: SubjectStat[];
+  // 直近の完了(履歴全体、最大90日)。新しい順。管理画面等の「最近の学習」一覧に使う。
+  recentCompletions: RecentCompletion[];
   // 週・月ごとの学習量の推移、連続日数の傾向、累計。windowDaysに縛られず取得できた
   // 履歴全体(最大HISTORY_DAYS日分)で集計する(短い直近ウィンドウでは傾向が見えないため)。
   trends: {
@@ -108,6 +117,7 @@ export interface PomodoroAnalytics {
 
 export const DEFAULT_WINDOW_DAYS = 28;
 export const HISTORY_DAYS = 90;
+export const RECENT_COMPLETIONS_LIMIT = 20;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -163,7 +173,7 @@ function rate(numerator: number, denominator: number): number | null {
   return denominator === 0 ? null : numerator / denominator;
 }
 
-interface ParsedEvent {
+export interface ParsedEvent {
   sessionId: string;
   mode: PomodoroMode;
   type: PomodoroEventType;
@@ -171,7 +181,7 @@ interface ParsedEvent {
   at: number;
 }
 
-function parseEvents(rows: PomodoroEventRow[]): ParsedEvent[] {
+export function parseEvents(rows: PomodoroEventRow[]): ParsedEvent[] {
   return rows
     .map((r, index) => ({ r, index, at: Date.parse(r.created_at) }))
     .filter(x => Number.isFinite(x.at))
@@ -187,7 +197,7 @@ function parseEvents(rows: PomodoroEventRow[]): ParsedEvent[] {
 
 type Outcome = 'completed' | 'stopped' | 'abandoned' | 'unfinished' | 'inProgress';
 
-interface Segment {
+export interface Segment {
   sessionId: string;
   mode: PomodoroMode;
   startedAt: number;
@@ -195,6 +205,7 @@ interface Segment {
   completedAt: number | null;
   subject: string | null;
   pauses: number;
+  pausedMs: number; // 一時停止していた実時間の合計(再開せず終了した分は含まない)
   timeChecks: number;
   rating: number | null;
   ratingSkipped: boolean;
@@ -204,25 +215,38 @@ interface Segment {
 
 // session_id ごとに1つの区間(作業 or 休憩)にまとめる。START のない区間(集計期間より前に
 // 始まったもの)は判定できないので除外する。
-function buildSegments(events: ParsedEvent[]): Segment[] {
+export function buildSegments(events: ParsedEvent[]): Segment[] {
   const bySession = new Map<string, Segment>();
+  const pausedSinceBySession = new Map<string, number>();
   for (const ev of events) {
     let seg = bySession.get(ev.sessionId);
     if (!seg) {
       if (ev.type !== 'START') continue;
       seg = {
         sessionId: ev.sessionId, mode: ev.mode, startedAt: ev.at, lastEventAt: ev.at,
-        completedAt: null, subject: null, pauses: 0, timeChecks: 0, rating: null, ratingSkipped: false,
+        completedAt: null, subject: null, pauses: 0, pausedMs: 0, timeChecks: 0, rating: null, ratingSkipped: false,
         stopped: false, abandoned: false,
       };
       bySession.set(ev.sessionId, seg);
     }
     seg.lastEventAt = ev.at;
     switch (ev.type) {
-      case 'START':
+      case 'START': {
         if (seg.subject === null && typeof ev.meta.subject === 'string' && ev.meta.subject) seg.subject = ev.meta.subject;
+        // 一時停止からの再開。実際に一時停止していた実時間だけを積算する(所要時間の
+        // 実測(completedAt - startedAt)から差し引くことで、一時停止を挟んだ区間でも
+        // 「実際に集中していた時間」だけを学習時間として数えられるようにする)。
+        const pausedSince = pausedSinceBySession.get(ev.sessionId);
+        if (pausedSince !== undefined) {
+          seg.pausedMs += ev.at - pausedSince;
+          pausedSinceBySession.delete(ev.sessionId);
+        }
         break;
-      case 'PAUSE': seg.pauses++; break;
+      }
+      case 'PAUSE':
+        seg.pauses++;
+        pausedSinceBySession.set(ev.sessionId, ev.at);
+        break;
       case 'CHECK_REMAINING_TIME': seg.timeChecks++; break;
       case 'COMPLETE': seg.completedAt ??= ev.at; break;
       case 'STOP': seg.stopped = true; break;
@@ -345,8 +369,10 @@ function computeStreakRuns(activeDays: Set<number>): number[] {
   return runs;
 }
 
+// 実際に集中していた時間(実測)。開始〜完了の実時間から、一時停止していた実時間を差し引く
+// (一時停止を挟んで再開したセッションでも、そのぶんを学習時間として水増ししないため)。
 function workDurationMinutes(s: Segment): number | null {
-  return s.completedAt === null ? null : (s.completedAt - s.startedAt) / 60000;
+  return s.completedAt === null ? null : (s.completedAt - s.startedAt - s.pausedMs) / 60000;
 }
 
 // 完了した作業(WORK)を、指定した日番号ごとにグルーピングするための共通の下ごしらえ。
@@ -516,6 +542,16 @@ export function analyzePomodoroEvents(
   const streakRuns = computeStreakRuns(allActiveDays);
   const totalStudyMinutes = completedWorkAll.reduce((sum, s) => sum + (workDurationMinutes(s) ?? 0), 0);
 
+  const recentCompletions: RecentCompletion[] = [...completedWorkAll]
+    .sort((a, b) => (b.completedAt as number) - (a.completedAt as number))
+    .slice(0, RECENT_COMPLETIONS_LIMIT)
+    .map(s => ({
+      subject: s.subject,
+      startedAt: new Date(s.startedAt).toISOString(),
+      completedAt: new Date(s.completedAt as number).toISOString(),
+      durationMinutes: Math.round(workDurationMinutes(s) ?? 0),
+    }));
+
   return {
     hasData: events.length > 0,
     windowDays,
@@ -562,6 +598,7 @@ export function analyzePomodoroEvents(
       avgRatingWithChecks: canCompareChecks ? mean(ratingsOf(withChecks)) : null,
     },
     bySubject,
+    recentCompletions,
     trends: {
       weekly: computeWeeklyTrend(completedWorkAll, today, HISTORY_DAYS),
       monthly: computeMonthlyTrend(completedWorkAll, today, HISTORY_DAYS),

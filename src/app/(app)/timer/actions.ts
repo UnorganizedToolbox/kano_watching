@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { evaluateAchievements } from "@/lib/gamification/engine";
 import { resolveEffectiveRules, type RuleMap, type OrgRuleMap } from "@/lib/rules";
 import { FAVORITE_QUESTION_LIMIT, RESOLVED_QUESTION_RETENTION_LIMIT, RESOLVED_QUESTION_RETENTION_DAYS } from "@/lib/qaLimits";
+import { countCompletedWork } from "@/lib/pomodoroAnalyticsLoader";
 
 // Supabase Storage の公開URLから "qa_images" バケット内のパスを逆算する。
 // 例: https://xxx.supabase.co/storage/v1/object/public/qa_images/questions/foo.png -> questions/foo.png
@@ -323,23 +324,19 @@ export async function logPomodoroEvent(
   if (error) console.error('Failed to log pomodoro event', error);
 }
 
-// 「今日の実施回数」バッジは常にDB(pomodoro_logs)を正とする。
+// 「今日の実施回数」バッジは常にDB(pomodoro_events、完了した作業(WORK)の件数)を正とする。
 // startOfDayISOはクライアント側のローカル時刻の0時をISO文字列にしたもの
 // (サーバーのタイムゾーンに依存すると日本時間などとズレるため、必ず
 // クライアントから境界を渡してもらう)。
+// 以前はpomodoro_logsという別テーブルの件数を見ていたが、「タイマーが0になった時点」
+// (pomodoro_events)と「集中度評価を送信した時点」(pomodoro_logs)という異なるタイミングで
+// 別々に記録しており、画面ごとに件数がずれる原因になっていたため、pomodoro_eventsに一本化した。
 export async function getTodayPomoCount(startOfDayISO: string): Promise<number> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return 0;
 
-  const { count } = await supabase
-    .from('pomodoro_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('student_uuid', user.id)
-    .eq('event_type', 'complete')
-    .gte('created_at', startOfDayISO);
-
-  return count ?? 0;
+  return countCompletedWork(supabase, user.id, startOfDayISO);
 }
 
 export async function logPomodoro(subject: string, minutes: number = 25, concentrationRating?: number, memo?: string) {
@@ -348,17 +345,8 @@ export async function logPomodoro(subject: string, minutes: number = 25, concent
 
   if (!user) throw new Error('ログインしていません');
 
-  // 1. pomodoro_logs に記録（既存の機能）
-  // ただしスキーマエラーを避けるため、今回は student_activity_logs を主とする
-  const { error: pomoError } = await supabase.from('pomodoro_logs').insert({
-    student_uuid: user.id,
-    subject,
-    duration_seconds: minutes * 60,
-    event_type: 'complete'
-  });
-  if (pomoError) throw new Error('pomodoro_logs insert error: ' + pomoError.message);
-
-  // 2. student_activity_logs に記録（新機能用）
+  // 完了そのものの記録はpomodoro_events(logPomodoroEvent経由のCOMPLETE)が正なので、
+  // ここでは重複して記録しない。student_activity_logsは実績評価・EXP・科目別集計専用に残す。
   const metadata: Record<string, string | number> = { minutes, subject };
   if (concentrationRating) metadata.concentrationRating = concentrationRating;
   if (memo) metadata.memo = memo;
@@ -370,7 +358,7 @@ export async function logPomodoro(subject: string, minutes: number = 25, concent
   });
   if (actErr) throw new Error('activity logs insert error: ' + actErr.message);
 
-  // 3. profiles の total_study_minutes を更新
+  // profiles の total_study_minutes を更新
   const { data: profile } = await supabase.from('profiles').select('total_study_minutes').eq('id', user.id).single();
   if (profile) {
     const { error: profErr } = await supabase.from('profiles').update({
@@ -379,7 +367,7 @@ export async function logPomodoro(subject: string, minutes: number = 25, concent
   if (profErr) throw new Error('profile update error: ' + profErr.message);
   }
 
-  // 4. 実績とレベルアップの自動評価
+  // 実績とレベルアップの自動評価
   const evaluationResult = await evaluateAchievements(user.id);
 
   revalidatePath('/');
