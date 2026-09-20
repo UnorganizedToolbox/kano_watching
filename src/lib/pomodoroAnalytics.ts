@@ -2,6 +2,16 @@
 // 集計する純粋関数群。DBやReactには依存しない。
 // 日付・時間帯の区切りは、連続日数判定(cbt/expReward.ts)と同じくJSTで行う。
 
+import {
+  computeSessionFocusScore,
+  durationWeightedMean,
+  effectiveFocusMinutes,
+  robustBaseline,
+  robustZ,
+  type Baseline,
+  type FocusOutcome,
+} from './focusScore';
+
 export type PomodoroMode = 'WORK' | 'BREAK' | 'LONG_BREAK';
 export type PomodoroEventType =
   | 'START' | 'PAUSE' | 'STOP' | 'COMPLETE'
@@ -28,6 +38,16 @@ export interface RecentCompletion {
   startedAt: string; // ISO
   completedAt: string; // ISO
   durationMinutes: number; // 実測(一時停止時間を除く)
+}
+
+export interface FocusSessionScore {
+  startedAt: string; // ISO
+  subject: string | null;
+  bgm: string | null; // 記録し始める(2026-09-20)より前のセッションはnull
+  runningMin: number; // 実際に集中していた時間。放置・終了記録なしのものは測れないので0
+  outcome: FocusOutcome;
+  score: number;
+  penalties: { check: number; pause: number; transition: number };
 }
 
 export interface SubjectStat {
@@ -98,6 +118,16 @@ export interface PomodoroAnalytics {
   bySubject: SubjectStat[];
   // 直近の完了(履歴全体、最大90日)。新しい順。管理画面等の「最近の学習」一覧に使う。
   recentCompletions: RecentCompletion[];
+  // セッション集中度スコア(暫定、focusScore.ts)。生徒への報酬には使わない指標。
+  focusScore: {
+    sessionCount: number; // 履歴全体でスコアを付けたセッション数
+    weightedAvg: number | null; // 直近windowDays日の、作業時間で重みを付けた平均
+    daily: { date: string; sessions: number; effectiveFocusMin: number; weightedAvg: number | null }[]; // 直近14日、古い→新しい
+    recentSessions: FocusSessionScore[]; // 新しい順、最大10件
+    baseline: Baseline | null; // 本人の直近の完走セッションの中央値・IQR(最新を除く。5件未満はnull)
+    latestRobustZ: number | null; // 最新の完走セッションの、本人のいつもとの比較(ロバストZ)
+    byBgm: { bgm: string; sessions: number; avgScore: number }[]; // 完走セッションをBGM別に
+  };
   // 週・月ごとの学習量の推移、連続日数の傾向、累計。windowDaysに縛られず取得できた
   // 履歴全体(最大HISTORY_DAYS日分)で集計する(短い直近ウィンドウでは傾向が見えないため)。
   trends: {
@@ -131,6 +161,10 @@ const STUDY_SESSION_GAP_MS = HOUR_MS;
 // グループ間比較(時間確認の有無別など)は、各グループがこの件数に満たなければ出さない
 const MIN_GROUP_SAMPLES = 3;
 const UNKNOWN_SUBJECT = '不明';
+// START時に予定時間を記録していない過去のログの作業は、当時の固定値(25分)とみなす
+const DEFAULT_WORK_SCHEDULED_SEC = 25 * 60;
+const FOCUS_DAILY_DAYS = 14;
+const RECENT_FOCUS_SESSIONS = 10;
 
 function jstDayNumber(ms: number): number {
   return Math.floor((ms + JST_OFFSET_MS) / DAY_MS);
@@ -204,8 +238,11 @@ export interface Segment {
   lastEventAt: number;
   completedAt: number | null;
   subject: string | null;
+  scheduledSec: number | null; // START時に記録した予定時間(2026-09-20以降のログのみ)
+  bgm: string | null; // START時に記録したBGMの種類(2026-09-20以降のログのみ)
   pauses: number;
   pausedMs: number; // 一時停止していた実時間の合計(再開せず終了した分は含まない)
+  stoppedRunningMs: number | null; // 中止した時点までの、実際に動かしていた時間(一時停止を除く)
   timeChecks: number;
   rating: number | null;
   ratingSkipped: boolean;
@@ -224,7 +261,7 @@ export function buildSegments(events: ParsedEvent[]): Segment[] {
       if (ev.type !== 'START') continue;
       seg = {
         sessionId: ev.sessionId, mode: ev.mode, startedAt: ev.at, lastEventAt: ev.at,
-        completedAt: null, subject: null, pauses: 0, pausedMs: 0, timeChecks: 0, rating: null, ratingSkipped: false,
+        completedAt: null, subject: null, scheduledSec: null, bgm: null, pauses: 0, pausedMs: 0, stoppedRunningMs: null, timeChecks: 0, rating: null, ratingSkipped: false,
         stopped: false, abandoned: false,
       };
       bySession.set(ev.sessionId, seg);
@@ -233,6 +270,9 @@ export function buildSegments(events: ParsedEvent[]): Segment[] {
     switch (ev.type) {
       case 'START': {
         if (seg.subject === null && typeof ev.meta.subject === 'string' && ev.meta.subject) seg.subject = ev.meta.subject;
+        // 予定時間・BGMは最初のSTARTの値を使う(再開のSTARTでは「残り」ではなく全体の予定時間が入るため)
+        if (seg.scheduledSec === null && typeof ev.meta.scheduled_seconds === 'number' && ev.meta.scheduled_seconds > 0) seg.scheduledSec = ev.meta.scheduled_seconds;
+        if (seg.bgm === null && typeof ev.meta.bgm === 'string') seg.bgm = ev.meta.bgm;
         // 一時停止からの再開。実際に一時停止していた実時間だけを積算する(所要時間の
         // 実測(completedAt - startedAt)から差し引くことで、一時停止を挟んだ区間でも
         // 「実際に集中していた時間」だけを学習時間として数えられるようにする)。
@@ -249,7 +289,13 @@ export function buildSegments(events: ParsedEvent[]): Segment[] {
         break;
       case 'CHECK_REMAINING_TIME': seg.timeChecks++; break;
       case 'COMPLETE': seg.completedAt ??= ev.at; break;
-      case 'STOP': seg.stopped = true; break;
+      case 'STOP': {
+        seg.stopped = true;
+        // 一時停止中に中止した場合、動かしていた時間は「一時停止した時点」まで
+        const runningUntil = pausedSinceBySession.get(ev.sessionId) ?? ev.at;
+        seg.stoppedRunningMs = runningUntil - seg.startedAt - seg.pausedMs;
+        break;
+      }
       case 'ABANDONED': seg.abandoned = true; break;
       case 'RATING_SUBMITTED':
         // 「スキップ(普通とする)」は rating=3 で記録されるため、本当の3と区別して平均から除く
@@ -438,6 +484,87 @@ function computeMonthlyTrend(completedWorkAll: Segment[], today: number, history
   return orderedKeys.map(key => toTrendBucket(key, buckets.get(key)));
 }
 
+function computeFocusScores(segments: Segment[], now: number, today: number, windowStartDay: number): PomodoroAnalytics['focusScore'] {
+  const sorted = [...segments].sort((a, b) => a.startedAt - b.startedAt);
+  const scored: (FocusSessionScore & { day: number })[] = [];
+
+  sorted.forEach((s, i) => {
+    if (s.mode !== 'WORK') return;
+    const outcome = outcomeOf(s, now);
+    if (outcome === 'inProgress') return;
+
+    const runningMs = s.completedAt !== null ? s.completedAt - s.startedAt - s.pausedMs : (s.stoppedRunningMs ?? 0);
+    const runningMin = Math.max(0, runningMs) / 60000;
+
+    // 直前の区間が「完了した休憩」で、そこから30分以内に始めた場合だけ遷移の遅れとして数える
+    // (それより空いたものは新しい学習の始まりであり、休憩後の再開の遅れではない)
+    const prev = i > 0 ? sorted[i - 1] : null;
+    const gapMs = prev && prev.mode !== 'WORK' && prev.completedAt !== null ? s.startedAt - prev.completedAt : null;
+    const transitionSec = gapMs !== null && gapMs >= 0 && gapMs <= RESUME_GAP_CAP_MS ? gapMs / 1000 : null;
+
+    const result = computeSessionFocusScore({
+      runningMin,
+      scheduledMin: (s.scheduledSec ?? DEFAULT_WORK_SCHEDULED_SEC) / 60,
+      checks: s.timeChecks,
+      pauses: s.pauses,
+      pausedMin: s.pausedMs / 60000,
+      transitionSec,
+      outcome,
+    });
+    scored.push({
+      startedAt: new Date(s.startedAt).toISOString(),
+      subject: s.subject,
+      bgm: s.bgm,
+      runningMin,
+      outcome,
+      score: result.score,
+      penalties: result.penalties,
+      day: jstDayNumber(s.startedAt),
+    });
+  });
+
+  const strip = (x: typeof scored[number]): FocusSessionScore => ({
+    startedAt: x.startedAt, subject: x.subject, bgm: x.bgm, runningMin: x.runningMin,
+    outcome: x.outcome, score: x.score, penalties: x.penalties,
+  });
+  const inWindow = scored.filter(x => x.day >= windowStartDay);
+
+  const daily = Array.from({ length: FOCUS_DAILY_DAYS }, (_, k) => {
+    const day = today - (FOCUS_DAILY_DAYS - 1 - k);
+    const items = scored.filter(x => x.day === day);
+    return {
+      date: jstDateLabel(day),
+      sessions: items.length,
+      effectiveFocusMin: items.reduce((sum, x) => sum + effectiveFocusMinutes(x.score, x.runningMin), 0),
+      weightedAvg: durationWeightedMean(items),
+    };
+  });
+
+  // 個人内ベースラインは「完走したセッション」だけで作る(中止・放置の係数で下がったスコアが
+  // 混ざると、その人の「いつもの集中度」が実態より低く出てしまうため)
+  const completed = scored.filter(x => x.outcome === 'completed');
+  const latest = completed.length > 0 ? completed[completed.length - 1] : null;
+  const baseline = robustBaseline(completed.slice(0, -1).map(x => x.score));
+
+  const bgmGroups = new Map<string, number[]>();
+  for (const x of completed) {
+    if (x.bgm === null) continue;
+    bgmGroups.set(x.bgm, [...(bgmGroups.get(x.bgm) ?? []), x.score]);
+  }
+
+  return {
+    sessionCount: scored.length,
+    weightedAvg: durationWeightedMean(inWindow),
+    daily,
+    recentSessions: scored.slice(-RECENT_FOCUS_SESSIONS).reverse().map(strip),
+    baseline,
+    latestRobustZ: latest && baseline ? robustZ(latest.score, baseline) : null,
+    byBgm: [...bgmGroups.entries()]
+      .map(([bgm, scores]) => ({ bgm, sessions: scores.length, avgScore: scores.reduce((a, b) => a + b, 0) / scores.length }))
+      .sort((a, b) => b.sessions - a.sessions),
+  };
+}
+
 export function analyzePomodoroEvents(
   rows: PomodoroEventRow[],
   options: { now?: Date; windowDays?: number } = {},
@@ -599,6 +726,7 @@ export function analyzePomodoroEvents(
     },
     bySubject,
     recentCompletions,
+    focusScore: computeFocusScores(segments, now, today, windowStartDay),
     trends: {
       weekly: computeWeeklyTrend(completedWorkAll, today, HISTORY_DAYS),
       monthly: computeMonthlyTrend(completedWorkAll, today, HISTORY_DAYS),

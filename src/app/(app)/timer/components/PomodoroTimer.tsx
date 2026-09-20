@@ -434,7 +434,14 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
       setIsRunning(true);
       setTargetEndTime(Date.now() + timeLeft * 1000);
       void startAudioForSession(); // ユーザー操作のタイミングで BGM・アラームを解錠する
-      void logPomodoroEvent(sid, mode, 'START', mode === 'WORK' ? { subject: effectiveSubject } : {});
+      // scheduled_seconds: 予定時間(集中度スコアを作業時間非依存にするため。将来、時間が可変になっても
+      // 比較できる)。bgm: このセッションで流したBGMの種類(BGMと集中度の関係を後から分析するため。
+      // 音量は固定値でユーザー設定ではないので記録しない)。
+      void logPomodoroEvent(sid, mode, 'START', {
+        scheduled_seconds: durationFor(mode),
+        bgm: bgmType,
+        ...(mode === 'WORK' ? { subject: effectiveSubject } : {}),
+      });
     } else {
       setIsRunning(false);
       setTargetEndTime(null);

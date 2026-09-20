@@ -178,7 +178,7 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
         </div>
       </div>
 
-      {student.role === 'student' && <PomodoroAnalyticsPanel analytics={pomodoroAnalytics} />}
+      {student.role === 'student' && <PomodoroAnalyticsPanel analytics={pomodoroAnalytics} showFocusScore />}
     </section>
   );
 }

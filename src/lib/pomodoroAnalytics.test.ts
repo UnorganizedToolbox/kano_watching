@@ -410,3 +410,126 @@ describe('累計', () => {
     expect(trends.cumulative.totalStudyMinutes).toBeCloseTo(50, 0);
   });
 });
+
+describe('セッション集中度スコア(暫定)', () => {
+  const start = '2026-09-19T01:00:00Z';
+
+  it('減点要素のない完走は100点で、BGMと予定時間はSTARTのmetadataから取り込む', () => {
+    const events = [
+      ev('a', 'WORK', 'START', start, { subject: '数学', bgm: 'pink', scheduled_seconds: 1500 }),
+      ev('a', 'WORK', 'COMPLETE', at(start, 1500)),
+    ];
+    const { focusScore } = analyzePomodoroEvents(events, { now: NOW });
+    expect(focusScore.recentSessions).toHaveLength(1);
+    expect(focusScore.recentSessions[0]).toMatchObject({ subject: '数学', bgm: 'pink', outcome: 'completed', score: 100 });
+    expect(focusScore.recentSessions[0].runningMin).toBeCloseTo(25);
+  });
+
+  it('予定時間を記録していない過去のログは25分として扱い、BGMはnullになる', () => {
+    const { focusScore } = analyzePomodoroEvents(workSegment('old', start), { now: NOW });
+    expect(focusScore.recentSessions[0].bgm).toBeNull();
+    expect(focusScore.recentSessions[0].score).toBe(100);
+  });
+
+  it('時間確認・一時停止は減点として反映し、減点の内訳も持つ', () => {
+    const events = [
+      ev('a', 'WORK', 'START', start, { scheduled_seconds: 1500 }),
+      ev('a', 'WORK', 'CHECK_REMAINING_TIME', at(start, 300)),
+      ev('a', 'WORK', 'PAUSE', at(start, 600)),
+      ev('a', 'WORK', 'START', at(start, 600), { scheduled_seconds: 1500 }), // 停止0秒で再開
+      ev('a', 'WORK', 'COMPLETE', at(start, 1500)),
+    ];
+    const s = analyzePomodoroEvents(events, { now: NOW }).focusScore.recentSessions[0];
+    expect(s.penalties.check).toBeCloseTo(10);
+    expect(s.penalties.pause).toBeCloseTo(15);
+    expect(s.score).toBeCloseTo(75);
+  });
+
+  it('一時停止中に中止した場合、動かしていた時間は一時停止した時点まで', () => {
+    const events = [
+      ev('a', 'WORK', 'START', start, { scheduled_seconds: 1500 }),
+      ev('a', 'WORK', 'PAUSE', at(start, 600)), // 10分動かして一時停止
+      ev('a', 'WORK', 'STOP', at(start, 600 + 3000)), // 50分放置してから中止
+    ];
+    const s = analyzePomodoroEvents(events, { now: NOW }).focusScore.recentSessions[0];
+    expect(s.outcome).toBe('stopped');
+    expect(s.runningMin).toBeCloseTo(10);
+  });
+
+  it('直前の完了した休憩から30分以内の開始だけ、遷移の遅れとして減点する', () => {
+    const b = '2026-09-19T00:30:00Z';
+    const within = [
+      ev('b1', 'BREAK', 'START', b), ev('b1', 'BREAK', 'COMPLETE', at(b, 300)),
+      ev('w1', 'WORK', 'START', at(b, 300 + 180), { scheduled_seconds: 1500 }), // 休憩完了の3分後
+      ev('w1', 'WORK', 'COMPLETE', at(b, 300 + 180 + 1500)),
+    ];
+    expect(analyzePomodoroEvents(within, { now: NOW }).focusScore.recentSessions[0].penalties.transition).toBeCloseTo(10);
+
+    const tooLate = [
+      ev('b1', 'BREAK', 'START', b), ev('b1', 'BREAK', 'COMPLETE', at(b, 300)),
+      ev('w1', 'WORK', 'START', at(b, 300 + 3600), { scheduled_seconds: 1500 }), // 1時間後は新しい学習の始まり
+      ev('w1', 'WORK', 'COMPLETE', at(b, 300 + 3600 + 1500)),
+    ];
+    expect(analyzePomodoroEvents(tooLate, { now: NOW }).focusScore.recentSessions[0].penalties.transition).toBe(0);
+  });
+
+  it('放置(終了記録なし)は係数0.1で、作業時間が測れないため0分として扱う', () => {
+    const events = [ev('a', 'WORK', 'START', start, { scheduled_seconds: 1500 })]; // 前日の開始のまま終了記録なし
+    const s = analyzePomodoroEvents(events, { now: NOW }).focusScore.recentSessions[0];
+    expect(s.outcome).toBe('unfinished');
+    expect(s.score).toBeCloseTo(10);
+    expect(s.runningMin).toBe(0);
+  });
+
+  it('日次は有効集中時間(集中度/100×時間)と時間加重平均を出し、進行中のセッションは含めない', () => {
+    const events = [
+      ...workSegment('a', '2026-09-19T01:00:00Z'), // 100点×25分
+      ...workSegment('b', '2026-09-19T03:00:00Z', { checks: 1 }), // 90点×25分
+      ev('c', 'WORK', 'START', '2026-09-20T02:50:00Z'), // 10分前に開始 → 進行中で除外
+    ];
+    const { daily } = analyzePomodoroEvents(events, { now: NOW }).focusScore;
+    const d = daily.find(x => x.date === '2026-09-19')!;
+    expect(d.sessions).toBe(2);
+    expect(d.effectiveFocusMin).toBeCloseTo(25 + 22.5);
+    expect(d.weightedAvg).toBeCloseTo(95);
+    expect(daily[daily.length - 1].sessions).toBe(0); // 今日(進行中のみ)
+    expect(daily).toHaveLength(14);
+  });
+
+  it('個人内ベースラインは完走セッションのみ・最新を除いて作り、いつもとの差をロバストZで出す', () => {
+    // 5件の完走(点数にばらつきを付ける)+最新1件
+    const events: PomodoroEventRow[] = [];
+    [0, 0, 1, 1, 0].forEach((checks, i) => {
+      events.push(...workSegment(`h${i}`, `2026-09-1${i + 1}T01:00:00Z`, { checks }));
+    });
+    events.push(...workSegment('latest', '2026-09-19T05:00:00Z')); // 100点
+    const { baseline, latestRobustZ } = analyzePomodoroEvents(events, { now: NOW }).focusScore;
+    expect(baseline).not.toBeNull();
+    expect(baseline!.n).toBe(5);
+    expect(baseline!.median).toBe(100);
+    expect(baseline!.iqr).toBeGreaterThan(0);
+    expect(latestRobustZ).toBeCloseTo(0); // 中央値と同じ100点なので「いつも通り」
+  });
+
+  it('完走が5件未満のうちは個人内ベースラインを作らない(コールドスタート)', () => {
+    const { baseline, latestRobustZ } = analyzePomodoroEvents(workSegment('a', start), { now: NOW }).focusScore;
+    expect(baseline).toBeNull();
+    expect(latestRobustZ).toBeNull();
+  });
+
+  it('BGM別に完走セッションの平均スコアを出す(BGM未記録は含めない)', () => {
+    const mk = (sid: string, day: string, bgm: string | null, checks: number) => {
+      const t = `${day}T01:00:00Z`;
+      const rows = [ev(sid, 'WORK', 'START', t, bgm ? { bgm, scheduled_seconds: 1500 } : { scheduled_seconds: 1500 })];
+      for (let i = 0; i < checks; i++) rows.push(ev(sid, 'WORK', 'CHECK_REMAINING_TIME', at(t, 60 * (i + 1))));
+      rows.push(ev(sid, 'WORK', 'COMPLETE', at(t, 1500)));
+      return rows;
+    };
+    const events = [...mk('a', '2026-09-15', 'white', 0), ...mk('b', '2026-09-16', 'white', 1), ...mk('c', '2026-09-17', 'brown', 0), ...mk('d', '2026-09-18', null, 3)];
+    const { byBgm } = analyzePomodoroEvents(events, { now: NOW }).focusScore;
+    expect(byBgm).toEqual([
+      { bgm: 'white', sessions: 2, avgScore: 95 },
+      { bgm: 'brown', sessions: 1, avgScore: 100 },
+    ]);
+  });
+});
