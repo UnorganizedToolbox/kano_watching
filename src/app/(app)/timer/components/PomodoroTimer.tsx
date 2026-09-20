@@ -11,6 +11,7 @@ import {
   advanceCycle,
   readCycleState,
   resolveCycleState,
+  shouldAutoEndIdleSession,
   writeCycleState,
 } from '@/lib/pomodoroCycle';
 
@@ -227,6 +228,9 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     if (mode === 'WORK') {
       speakText("ポモドーロが終了しました。集中度を評価してください。");
       setShowRatingModal(true);
+      // 作業完了の時点でもCookieを延長する(開始時に延長していても、長い作業のあとに
+      // 失効している可能性があるため。評価送信後は次の休憩基準で改めて設定される)。
+      touchActivity(WORK_TIME);
     } else {
       speakText("休憩が終わりました。次のポモドーロを開始しましょう。");
       setMode('WORK');
@@ -423,6 +427,10 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
       const sid = isFreshSegment ? crypto.randomUUID() : sessionId!;
       if (isFreshSegment) setSessionId(sid);
       setAwaitingDecision(false);
+      setAutoEndedNotice(null); // 新しく始めたら「自動終了しました」の表示は消す
+      // 開始・再開の時点でCookieを延長する。ここで延長しないと、決定待ちで長く待ってから
+      // 始めた場合や初回の作業で、実行中にCookieが無い/失効している状態になり得る。
+      touchActivity(durationFor(mode));
       setIsRunning(true);
       setTargetEndTime(Date.now() + timeLeft * 1000);
       void startAudioForSession(); // ユーザー操作のタイミングで BGM・アラームを解錠する
@@ -471,13 +479,18 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   // 決定待ち・一時停止の間だけ、大休憩サイクル用Cookie(pomodoroCycle.ts)の有効期限切れを
   // 定期的に確認する(実行中はWeb Worker側のタイマーが別途面倒を見ているので対象外)。
   useEffect(() => {
-    if (isRunning) return;
-    if (!sessionId && !awaitingDecision) return;
     const interval = setInterval(() => {
-      if (readCycleState() === null) endCurrentSession(true);
+      const shouldEnd = shouldAutoEndIdleSession({
+        isRunning,
+        hasSession: sessionId !== null,
+        awaitingDecision,
+        showRatingModal,
+        cycleAlive: readCycleState() !== null,
+      });
+      if (shouldEnd) endCurrentSession(true);
     }, 30 * 1000);
     return () => clearInterval(interval);
-  }, [isRunning, sessionId, awaitingDecision, endCurrentSession]);
+  }, [isRunning, sessionId, awaitingDecision, showRatingModal, endCurrentSession]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;

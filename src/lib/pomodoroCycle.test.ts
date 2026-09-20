@@ -5,6 +5,7 @@ import {
   parseCycleState,
   resolveCycleState,
   serializeCycleState,
+  shouldAutoEndIdleSession,
   CYCLE_EXPIRY_BUFFER_MS,
   POMOS_PER_LONG_BREAK,
   type PomodoroCycleState,
@@ -57,6 +58,31 @@ describe('cycleExpiryMs', () => {
 
   it('猶予の定数は25分', () => {
     expect(CYCLE_EXPIRY_BUFFER_MS).toBe(25 * 60 * 1000);
+  });
+});
+
+describe('shouldAutoEndIdleSession', () => {
+  const idle = { isRunning: false, hasSession: true, awaitingDecision: false, showRatingModal: false, cycleAlive: false };
+
+  it('一時停止中や決定待ち画面でCookieが失効していれば自動終了する', () => {
+    expect(shouldAutoEndIdleSession(idle)).toBe(true);
+    expect(shouldAutoEndIdleSession({ ...idle, hasSession: false, awaitingDecision: true })).toBe(true);
+  });
+
+  it('Cookieが生きていれば終了しない', () => {
+    expect(shouldAutoEndIdleSession({ ...idle, cycleAlive: true })).toBe(false);
+  });
+
+  it('実行中は、Cookieが無くても終了しない', () => {
+    expect(shouldAutoEndIdleSession({ ...idle, isRunning: true })).toBe(false);
+  });
+
+  it('集中度評価の入力中は、Cookieが無くても終了しない(作業完了直後に誤って終了していた不具合)', () => {
+    expect(shouldAutoEndIdleSession({ ...idle, showRatingModal: true })).toBe(false);
+  });
+
+  it('何も進行していない最初の待機画面では終了しない', () => {
+    expect(shouldAutoEndIdleSession({ ...idle, hasSession: false })).toBe(false);
   });
 });
 

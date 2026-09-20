@@ -65,6 +65,21 @@ export function advanceCycle(stored: PomodoroCycleState | null): { next: Pomodor
   };
 }
 
+// 決定待ち画面・一時停止画面を、Cookieの失効(=長時間の放置)を理由に自動終了すべきかどうか。
+// 実行中(Web Workerのタイマーが別に管理)・集中度評価の入力中(操作中)・何も進行していない
+// 最初の待機画面では、Cookieが無くても終了してはいけない。
+export function shouldAutoEndIdleSession(s: {
+  isRunning: boolean;
+  hasSession: boolean;
+  awaitingDecision: boolean;
+  showRatingModal: boolean;
+  cycleAlive: boolean;
+}): boolean {
+  if (s.isRunning || s.showRatingModal) return false;
+  if (!s.hasSession && !s.awaitingDecision) return false;
+  return !s.cycleAlive;
+}
+
 function escapeForCookieRegex(name: string): string {
   return name.replace(/[.$?*|{}()[\]\\/+^]/g, '\\$&');
 }
