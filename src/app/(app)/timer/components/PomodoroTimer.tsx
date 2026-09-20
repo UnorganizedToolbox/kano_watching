@@ -7,14 +7,25 @@ import { PartyPopper, Lock } from 'lucide-react';
 import { getSoundPref, getBgmPref, renderAlarmBlobUrl, renderNoiseBlobUrl, type SoundType, type BgmType, type NoiseType } from '@/lib/pomodoroAudio';
 import { getSubjectOptions, OTHER_SUBJECT, type GradeLevel } from '@/lib/subjects';
 import { useNavLock } from '../../components/NavLockContext';
+import {
+  advanceCycle,
+  isInterrupted,
+  readCycleState,
+  resolveCycleState,
+  touchCycleActivity,
+  writeCycleState,
+  INTERRUPTION_THRESHOLD_MS,
+} from '@/lib/pomodoroCycle';
 
 type TimerMode = 'WORK' | 'BREAK' | 'LONG_BREAK';
 
 const WORK_TIME = 25 * 60;
 const BREAK_TIME = 5 * 60;
 const LONG_BREAK_TIME = 15 * 60;
-const POMOS_PER_LONG_BREAK = 4;
-const ABANDON_THRESHOLD_MS = 20 * 60 * 1000; // Startしたまま20分超過放置でタブを閉じたとみなす
+// Startしたまま放置(実行中はタイマー終了予定時刻からの超過、決定待ち画面は最後の操作からの経過)で
+// 「タブを閉じた/中断した」とみなすしきい値。大休憩の判定サイクルもこれと同じ基準でリセットする
+// (詳細は pomodoroCycle.ts)。
+const ABANDON_THRESHOLD_MS = INTERRUPTION_THRESHOLD_MS;
 const STORAGE_KEY = 'learnflow_pomodoro_state_v1';
 
 function durationFor(mode: TimerMode) {
@@ -108,8 +119,25 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [awaitingDecision, setAwaitingDecision] = useState(false);
+  const [autoEndedNotice, setAutoEndedNotice] = useState<string | null>(null);
   const hasHydratedRef = useRef(false);
   const { lock, unlock } = useNavLock();
+
+  // 一時停止・中止・終了などの「今まさに操作した」タイミングで呼ぶ。放置検出(pomodoroCycle.ts)の
+  // 基準時刻を更新するだけで、大休憩までのカウント自体は変えない(中断済みなら自動で0に戻る)。
+  const touchActivity = useCallback(() => {
+    const now = new Date();
+    writeCycleState(touchCycleActivity(readCycleState(), now.getTime()), now);
+  }, []);
+
+  // 作業を1回完了した時点で、次が大休憩かどうかをCookie上のサイクルから判定し、
+  // Cookieを更新したうえで結果だけを返す(中断していれば0から数え直す)。
+  const advanceCycleForCompletion = useCallback((): boolean => {
+    const now = new Date();
+    const { next, isLongBreak } = advanceCycle(readCycleState(), now.getTime());
+    writeCycleState(next, now);
+    return isLongBreak;
+  }, []);
 
   const bgmAudioElRef = useRef<HTMLAudioElement | null>(null);
   const alarmAudioElRef = useRef<HTMLAudioElement | null>(null);
@@ -207,8 +235,11 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
       setTimeLeft(WORK_TIME);
       setTargetEndTime(null);
       setAwaitingDecision(true);
+      // 「次の学習を始める」決定待ち画面に入った瞬間を活動時刻として記録しておく。
+      // ここから長時間放置されたら、次に開いた時に中断とみなす(マウント時の復元処理を参照)。
+      touchActivity();
     }
-  }, [playAlarm, mode, sessionId]);
+  }, [playAlarm, mode, sessionId, touchActivity]);
 
   // 「今日: N 回」バッジは常にDB(pomodoro_logs)から取得する。localStorageの
   // pomoCountには一切依存しない(日をまたいでも古い回数が残ったり、逆に
@@ -219,38 +250,59 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   }, []);
 
   // 初回マウント時: リロード等で失われたタイマー状態(実行中セッション・
-  // 休憩の開始待ち状態)を localStorage から復元する。Start したまま
-  // ABANDON_THRESHOLD_MS 以上経過している場合は「タブを閉じた」とみなし、
-  // ABANDONED イベントを記録して破棄する(復元しない)。保存時の日付
-  // (dateKey)が今日と違う場合も、前日以前の状態とみなして破棄する。
+  // 休憩/次の学習の開始待ち状態)を localStorage から復元する。保存時の日付
+  // (dateKey)が今日と違う場合は、前日以前の状態とみなして破棄する。
+  //
+  // 放置(中断)の検出は2パターンある:
+  // ①実行中(isRunning)だった場合: タイマーの終了予定時刻から ABANDON_THRESHOLD_MS 以上
+  //   経過していれば「タブを閉じた」とみなし、ABANDONED イベントを記録して破棄する。
+  // ②決定待ち画面(休憩を始める/次の学習を始める、のボタン待ち)や一時停止のまま
+  //   だった場合: 従来は放置検出が一切なかった(いつまでも同じ画面が復元され続けた)。
+  //   ここでは Cookie(pomodoroCycle.ts)に記録している「最後に操作した時刻」を見て、
+  //   同じしきい値を超えていれば中断とみなし、新しい学習開始画面から始め直させる。
+  // どちらの場合も、大休憩までのサイクル(Cookie)は中断を検知した時点で0にリセットされる
+  // (pomodoroCycle.ts の resolveCycleState/touchCycleActivity)ため、「中断明けの1回目で
+  // また大休憩になる」という違和感は起きない。
   useEffect(() => {
     const saved = loadPersistedState();
+    const now = Date.now();
+
     if (saved) {
       const isStale = saved.dateKey !== todayKey();
 
       if (saved.isRunning && saved.targetEndTime) {
-        const overdueMs = Date.now() - saved.targetEndTime;
+        const overdueMs = now - saved.targetEndTime;
         if (overdueMs > ABANDON_THRESHOLD_MS || isStale) {
           if (saved.sessionId) {
             void logPomodoroEvent(saved.sessionId, saved.mode, 'ABANDONED', { overdue_seconds: Math.round(overdueMs / 1000) });
           }
           clearPersistedState();
+          if (!isStale) setAutoEndedNotice('長時間操作がなかったため、前回のセッションは自動的に終了しました。');
         } else {
           setMode(saved.mode);
           setSessionId(saved.sessionId);
           setTargetEndTime(saved.targetEndTime);
-          setTimeLeft(Math.max(0, Math.round((saved.targetEndTime - Date.now()) / 1000)));
+          setTimeLeft(Math.max(0, Math.round((saved.targetEndTime - now) / 1000)));
           setIsRunning(true);
         }
-      } else if (!isStale) {
+      } else if (!isStale && !isInterrupted(readCycleState(), now)) {
         setMode(saved.mode);
         setTimeLeft(saved.timeLeft);
         setSessionId(saved.sessionId);
         setAwaitingDecision(saved.awaitingDecision);
       } else {
+        if (!isStale && saved.sessionId) {
+          void logPomodoroEvent(saved.sessionId, saved.mode, 'QUIT', { declined_mode: saved.mode, auto: true });
+          setAutoEndedNotice('長時間操作がなかったため、前回のセッションは自動的に終了しました。');
+        }
         clearPersistedState();
       }
     }
+
+    // サイクル(次が大休憩かどうかの判定用カウント)も同じ基準で中断チェックしておく。
+    // タイマーを一切操作しなくても、日付が変わればCookie自体が失効して自然にリセットされる。
+    writeCycleState(resolveCycleState(readCycleState(), now), new Date(now));
+
     hasHydratedRef.current = true;
   }, []);
 
@@ -351,9 +403,10 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     if (sessionId) void logPomodoroEvent(sessionId, 'WORK', 'RATING_SUBMITTED', skipped ? { rating, skipped: true } : { rating });
 
     // 先に休憩画面へ切り替える。DB書き込み(logPomodoro/実績評価)の完了は待たない。
-    const nextPomoCount = pomoCount + 1;
-    const isLongBreak = nextPomoCount % POMOS_PER_LONG_BREAK === 0;
-    setPomoCount(nextPomoCount);
+    // 「今日: N回」バッジは引き続きDB(pomoCount)基準のまま。大休憩の判定だけは
+    // Cookie(pomodoroCycle.ts)上の連続回数で決める(中断していれば自動的に0から数え直す)。
+    const isLongBreak = advanceCycleForCompletion();
+    setPomoCount(pomoCount + 1);
     setMode(isLongBreak ? 'LONG_BREAK' : 'BREAK');
     setTimeLeft(isLongBreak ? LONG_BREAK_TIME : BREAK_TIME);
     setTargetEndTime(null);
@@ -385,6 +438,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
       workerRef.current?.postMessage('stop');
       stopSessionAudio();
       if (sessionId) void logPomodoroEvent(sessionId, mode, 'PAUSE');
+      touchActivity(); // 一時停止した瞬間を活動時刻として記録(この画面で放置されたら中断とみなす)
     }
   };
 
@@ -396,6 +450,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     setTimeLeft(durationFor(mode));
     setAwaitingDecision(false);
     setSessionId(null);
+    touchActivity();
   };
 
   const handleQuit = () => {
@@ -407,6 +462,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     setIsRunning(false);
     setSessionId(null);
     clearPersistedState();
+    touchActivity();
   };
 
   const minutes = Math.floor(timeLeft / 60);
@@ -435,6 +491,15 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
 
           <span className="text-xs font-bold text-slate-400 py-1 shrink-0">今日: {pomoCount} 回</span>
         </div>
+
+        {autoEndedNotice && (
+          <div className="w-full mb-4 px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-between gap-3 z-20">
+            <span>{autoEndedNotice}</span>
+            <button onClick={() => setAutoEndedNotice(null)} className="shrink-0 opacity-60 hover:opacity-100">
+              閉じる
+            </button>
+          </div>
+        )}
 
         {isWork && (
           <div className="mb-6 flex flex-col items-center gap-2 z-10 transition-opacity">

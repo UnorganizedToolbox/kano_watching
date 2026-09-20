@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { LatencyStats, PomodoroAnalytics } from "@/lib/pomodoroAnalytics";
+import type { LatencyStats, PomodoroAnalytics, TrendBucket } from "@/lib/pomodoroAnalytics";
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const CARD_CLASS = "card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-4";
@@ -15,6 +15,10 @@ function formatSeconds(sec: number | null): string {
 
 function percent(rate: number | null): string {
   return rate === null ? '—' : `${Math.round(rate * 100)}%`;
+}
+
+function rateOf(numerator: number, denominator: number): number | null {
+  return denominator === 0 ? null : numerator / denominator;
 }
 
 function decimal(value: number | null, digits = 1): string {
@@ -91,6 +95,45 @@ function ProgressRow({ label, done, total, rate }: { label: string; done: number
   );
 }
 
+function weekBucketLabel(label: string): string {
+  const [, m, d] = label.split('-');
+  return `${Number(m)}/${Number(d)}`;
+}
+
+function monthBucketLabel(label: string): string {
+  const [y, m] = label.split('-');
+  return `${y}/${Number(m)}`;
+}
+
+function TrendChart({ title, note, buckets, formatLabel, everyNth = 1 }: {
+  title: string;
+  note?: string;
+  buckets: TrendBucket[];
+  formatLabel: (label: string) => string;
+  everyNth?: number;
+}) {
+  const totalMinutes = buckets.reduce((sum, b) => sum + b.studyMinutes, 0);
+  return (
+    <div>
+      <div className="flex justify-between items-baseline gap-2 flex-wrap mb-2">
+        <p className="text-xs font-bold text-slate-600 dark:text-slate-300">{title}</p>
+        <p className="text-[11px] text-slate-400">合計 {(totalMinutes / 60).toFixed(1)}時間相当</p>
+      </div>
+      {buckets.length === 0 || buckets.every(b => b.completedWork === 0) ? (
+        <p className="text-xs text-slate-400">まだ集計できるデータがありません</p>
+      ) : (
+        <MiniBars
+          values={buckets.map(b => b.completedWork)}
+          labels={buckets.map((b, i) => (i % everyNth === 0 ? formatLabel(b.label) : ''))}
+          showValues={buckets.length <= 6}
+          ariaLabel={title}
+        />
+      )}
+      {note && <p className="text-[11px] text-slate-400 mt-2">{note}</p>}
+    </div>
+  );
+}
+
 const LATENCY_BUCKETS: { key: keyof LatencyStats['buckets']; label: string; className: string }[] = [
   { key: 'within10s', label: '10秒以内', className: 'bg-emerald-500' },
   { key: 'within1m', label: '1分以内', className: 'bg-sky-500' },
@@ -150,7 +193,7 @@ export default function PomodoroAnalyticsPanel({ analytics }: { analytics: Pomod
     );
   }
 
-  const { habit, transitions, completion, focus, bySubject, windowDays } = analytics;
+  const { habit, transitions, completion, focus, bySubject, trends, windowDays } = analytics;
   const weeks = habit.weeklyActiveDays.length;
   const weekLabels = habit.weeklyActiveDays.map((_, i) => (i === weeks - 1 ? '直近7日' : `${weeks - 1 - i}週前`));
   const hourLabels = habit.byHour.map((_, h) => (h % 6 === 0 ? String(h) : ''));
@@ -158,6 +201,13 @@ export default function PomodoroAnalyticsPanel({ analytics }: { analytics: Pomod
     ? focus.recentAvgRating - focus.previousAvgRating
     : null;
   const workInterruptions = completion.workStopped + completion.workAbandoned + completion.workUnfinished;
+
+  // 曜日別の完了率(サンプルが少ない曜日は除いて最低/最高だけ見せる)
+  const weekdayRates = WEEKDAY_LABELS
+    .map((label, i) => ({ label, started: habit.byWeekdayStarted[i], rate: rateOf(habit.byWeekday[i], habit.byWeekdayStarted[i]) }))
+    .filter((w): w is { label: string; started: number; rate: number } => w.started >= 3 && w.rate !== null);
+  const bestWeekday = weekdayRates.length > 0 ? weekdayRates.reduce((a, b) => (b.rate > a.rate ? b : a)) : null;
+  const worstWeekday = weekdayRates.length > 0 ? weekdayRates.reduce((a, b) => (b.rate < a.rate ? b : a)) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -187,6 +237,11 @@ export default function PomodoroAnalyticsPanel({ analytics }: { analytics: Pomod
           <div>
             <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">曜日別の完了数</p>
             <MiniBars values={habit.byWeekday} labels={WEEKDAY_LABELS} showValues ariaLabel="曜日ごとの完了数" />
+            {bestWeekday && worstWeekday && bestWeekday.label !== worstWeekday.label && (
+              <p className="text-[11px] text-slate-400 mt-2">
+                完了率が最も高いのは{bestWeekday.label}曜({percent(bestWeekday.rate)})、最も低いのは{worstWeekday.label}曜({percent(worstWeekday.rate)})です。
+              </p>
+            )}
           </div>
         </Card>
 
@@ -204,6 +259,10 @@ export default function PomodoroAnalyticsPanel({ analytics }: { analytics: Pomod
           <Card title="完了率" note="結果が確定した区間だけを数えています(実行中のものは含みません)">
             <ProgressRow label="作業を最後までやり切った割合" done={completion.workCompleted} total={completion.workStarted} rate={completion.workCompletionRate} />
             <ProgressRow label="休憩を最後まで取った割合" done={completion.breakCompleted} total={completion.breakStarted} rate={completion.breakCompletionRate} />
+            <div className="grid grid-cols-2 gap-3 -mt-1">
+              <Stat label="通常休憩(5分)の完了率" value={percent(completion.shortBreakCompletionRate)} />
+              <Stat label="大休憩(15分)の完了率" value={percent(completion.longBreakCompletionRate)} sub="低いと、せっかくの大休憩を取らず進んでいるかも" />
+            </div>
             <ul className="text-xs text-slate-500 dark:text-slate-400 flex flex-col gap-1">
               {workInterruptions > 0 && (
                 <li>
@@ -235,6 +294,25 @@ export default function PomodoroAnalyticsPanel({ analytics }: { analytics: Pomod
           </Card>
         </div>
       </div>
+
+      <Card title="週・月ごとの学習量の推移" note="取得できた履歴全体(最大90日分)で集計しています。直近の期間だけでなく、長い目で見た傾向の確認に使ってください">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <TrendChart title="週ごとの完了ポモドーロ数" buckets={trends.weekly} formatLabel={weekBucketLabel} everyNth={2} />
+          <TrendChart title="月ごとの完了ポモドーロ数" buckets={trends.monthly} formatLabel={monthBucketLabel} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Stat
+            label="連続記録の平均日数"
+            value={trends.streakLengths.averageDays === null ? '—' : `${decimal(trends.streakLengths.averageDays)}日`}
+            sub={trends.streakLengths.completedStreakCount > 0 ? `中央値 ${decimal(trends.streakLengths.medianDays)}日 / ${trends.streakLengths.completedStreakCount}回の記録` : '記録がまだありません'}
+          />
+          <Stat
+            label="累計の学習時間"
+            value={`${(trends.cumulative.totalStudyMinutes / 60).toFixed(1)}時間`}
+            sub={`完了したポモドーロ 累計${trends.cumulative.totalCompletedWork}回`}
+          />
+        </div>
+      </Card>
 
       <Card title="科目別の完了率と集中度">
         {bySubject.length === 0 ? (
@@ -272,6 +350,8 @@ export default function PomodoroAnalyticsPanel({ analytics }: { analytics: Pomod
           <li>切り替えの速さ = タイマー完了から次のスタートボタンまで。30分以内に次を始めなかった場合は「再開せず終了」として除外します。</li>
           <li>1回の学習 = 前の作業が終わってから1時間以内に次の作業を始めた、ひと続きのまとまり。</li>
           <li>集中度の平均には「スキップ(普通とする)」を含めません。ただしスキップの記録を始める前のデータは、本当の「3」と区別できません。</li>
+          <li>週・月ごとの推移と連続記録・累計は、上の指標(直近{windowDays}日)と違い、取得できた履歴全体(最大90日分)で集計しています。</li>
+          <li>学習時間は25分固定ではなく、実際の開始〜完了の時間から計算しています(将来ポモドーロの長さが変わっても正しく集計されるようにするため)。</li>
           <li>数値は行動の記録から見た傾向で、能力や意欲の優劣を示すものではありません。</li>
         </ul>
       </details>

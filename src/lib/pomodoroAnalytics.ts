@@ -31,6 +31,14 @@ export interface SubjectStat {
   avgRating: number | null;
 }
 
+export interface TrendBucket {
+  label: string; // 週: 最終日(JST, YYYY-MM-DD)。月: YYYY-MM
+  activeDays: number;
+  completedWork: number;
+  studyMinutes: number; // 開始〜完了の実測時間の合計(所要時間が将来変わっても正しく集計できるよう、固定25分では計算しない)
+  avgPomosPerActiveDay: number | null;
+}
+
 export interface PomodoroAnalytics {
   hasData: boolean;
   windowDays: number;
@@ -44,8 +52,9 @@ export interface PomodoroAnalytics {
     avgPomosPerSession: number | null;
     maxPomosInSession: number;
     byHour: number[]; // 長さ24(JST)。作業を始めた時間帯ごとの完了数
-    byWeekday: number[]; // 長さ7(0=日)
-    weeklyActiveDays: number[]; // 古い週→新しい週。各週の学習日数(0-7)
+    byWeekday: number[]; // 長さ7(0=日)。完了数
+    byWeekdayStarted: number[]; // 長さ7(0=日)。結果が確定した(進行中を除く)開始数。完了率 = byWeekday/byWeekdayStarted
+    weeklyActiveDays: number[]; // 古い週→新しい週。各週の学習日数(0-7、直近windowDays日分)
   };
   transitions: {
     workEndToBreakStart: LatencyStats; // 作業終了(タイマー完了)→休憩開始ボタン
@@ -63,6 +72,8 @@ export interface PomodoroAnalytics {
     breakStarted: number;
     breakCompleted: number;
     breakCompletionRate: number | null;
+    shortBreakCompletionRate: number | null; // 通常休憩(5分)だけの完了率
+    longBreakCompletionRate: number | null; // 大休憩(15分)だけの完了率。せっかくの休憩を取らず次に進んでいないか
     quitBeforeBreak: number; // 作業後に休憩を取らず終了した回数
     quitBeforeWork: number; // 休憩後に次の作業を始めず終了した回数
     avgPausesPerWork: number | null;
@@ -78,6 +89,21 @@ export interface PomodoroAnalytics {
     avgRatingWithChecks: number | null;
   };
   bySubject: SubjectStat[];
+  // 週・月ごとの学習量の推移、連続日数の傾向、累計。windowDaysに縛られず取得できた
+  // 履歴全体(最大HISTORY_DAYS日分)で集計する(短い直近ウィンドウでは傾向が見えないため)。
+  trends: {
+    weekly: TrendBucket[]; // 古い週→新しい週(直近7日間隔、最大 ceil(HISTORY_DAYS/7) 本)
+    monthly: TrendBucket[]; // 古い月→新しい月(カレンダー月、JST)
+    streakLengths: {
+      averageDays: number | null; // 連続学習日数(1日だけの「連続」も1本として含む)の平均
+      medianDays: number | null;
+      completedStreakCount: number; // 現在進行中の連続も1本として含む
+    };
+    cumulative: {
+      totalCompletedWork: number; // 履歴全体での完了数
+      totalStudyMinutes: number; // 履歴全体での実測学習時間の合計(分)
+    };
+  };
 }
 
 export const DEFAULT_WINDOW_DAYS = 28;
@@ -107,6 +133,19 @@ function jstHour(ms: number): number {
 // 1970-01-01(木)を起点とする日番号から曜日(0=日)を求める
 function weekdayOf(dayNumber: number): number {
   return (dayNumber + 4) % 7;
+}
+
+// jstDayNumberの逆変換。日番号からJSTでの暦日(YYYY-MM-DD)を求める。
+// dayNumber*DAY_MSは「その日のJST 0時」をUTC日時として読み替えた値と一致するため、
+// UTCのgetterでそのままJSTの年月日が取り出せる。
+function jstDateLabel(dayNumber: number): string {
+  const d = new Date(dayNumber * DAY_MS);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+function jstMonthLabel(dayNumber: number): string {
+  const d = new Date(dayNumber * DAY_MS);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function mean(xs: number[]): number | null {
@@ -286,6 +325,93 @@ function computeStreaks(activeDays: Set<number>, today: number): { current: numb
   return { current, longest };
 }
 
+// 学習した日(activeDays)を、連続した日のまとまり(=1本の連続記録)ごとの長さの配列にする。
+// 現在進行中の連続も、閉じた連続と同じように1本として含める(古い→新しい順)。
+function computeStreakRuns(activeDays: Set<number>): number[] {
+  const sorted = [...activeDays].sort((a, b) => a - b);
+  const runs: number[] = [];
+  let run = 0;
+  let prev: number | null = null;
+  for (const d of sorted) {
+    if (prev !== null && d === prev + 1) {
+      run++;
+    } else {
+      if (run > 0) runs.push(run);
+      run = 1;
+    }
+    prev = d;
+  }
+  if (run > 0) runs.push(run);
+  return runs;
+}
+
+function workDurationMinutes(s: Segment): number | null {
+  return s.completedAt === null ? null : (s.completedAt - s.startedAt) / 60000;
+}
+
+// 完了した作業(WORK)を、指定した日番号ごとにグルーピングするための共通の下ごしらえ。
+function bucketize(
+  segs: Segment[],
+  keyOf: (dayNumber: number) => string,
+): Map<string, { days: Set<number>; completed: number; minutes: number }> {
+  const buckets = new Map<string, { days: Set<number>; completed: number; minutes: number }>();
+  for (const s of segs) {
+    const day = jstDayNumber(s.startedAt);
+    const key = keyOf(day);
+    if (!buckets.has(key)) buckets.set(key, { days: new Set(), completed: 0, minutes: 0 });
+    const b = buckets.get(key)!;
+    b.days.add(day);
+    b.completed++;
+    b.minutes += workDurationMinutes(s) ?? 0;
+  }
+  return buckets;
+}
+
+function toTrendBucket(label: string, b: { days: Set<number>; completed: number; minutes: number } | undefined): TrendBucket {
+  const activeDays = b?.days.size ?? 0;
+  const completedWork = b?.completed ?? 0;
+  return {
+    label,
+    activeDays,
+    completedWork,
+    studyMinutes: Math.round(b?.minutes ?? 0),
+    avgPomosPerActiveDay: rate(completedWork, activeDays),
+  };
+}
+
+function computeWeeklyTrend(completedWorkAll: Segment[], today: number, historyDays: number): TrendBucket[] {
+  const weeks = Math.ceil(historyDays / 7);
+  const dayToWeekIndex = (day: number) => Math.floor((today - day) / 7); // 0=直近の週
+  const buckets = new Map<number, { days: Set<number>; completed: number; minutes: number }>();
+  for (const s of completedWorkAll) {
+    const day = jstDayNumber(s.startedAt);
+    const idx = dayToWeekIndex(day);
+    if (idx < 0 || idx >= weeks) continue;
+    if (!buckets.has(idx)) buckets.set(idx, { days: new Set(), completed: 0, minutes: 0 });
+    const b = buckets.get(idx)!;
+    b.days.add(day);
+    b.completed++;
+    b.minutes += workDurationMinutes(s) ?? 0;
+  }
+  return Array.from({ length: weeks }, (_, i) => {
+    const idx = weeks - 1 - i; // 古い週から並べる
+    const weekEnd = today - 7 * idx;
+    return toTrendBucket(jstDateLabel(weekEnd), buckets.get(idx));
+  });
+}
+
+function computeMonthlyTrend(completedWorkAll: Segment[], today: number, historyDays: number): TrendBucket[] {
+  const oldestDay = today - historyDays + 1;
+  const monthKeyOf = (day: number) => jstMonthLabel(day);
+  const buckets = bucketize(completedWorkAll, monthKeyOf);
+  const orderedKeys: string[] = [];
+  for (let d = oldestDay; d <= today; d++) {
+    const key = monthKeyOf(d);
+    if (orderedKeys[orderedKeys.length - 1] !== key) orderedKeys.push(key);
+  }
+  return orderedKeys.map(key => toTrendBucket(key, buckets.get(key)));
+}
+
 export function analyzePomodoroEvents(
   rows: PomodoroEventRow[],
   options: { now?: Date; windowDays?: number } = {},
@@ -336,6 +462,8 @@ export function analyzePomodoroEvents(
     prevCompletedAt = s.completedAt;
   }
 
+  const byWeekdayStarted = new Array<number>(7).fill(0);
+
   // --- 完了率 ---
   const workOutcomes = work.map(s => outcomeOf(s, now));
   const breakOutcomes = breaks.map(s => outcomeOf(s, now));
@@ -344,6 +472,10 @@ export function analyzePomodoroEvents(
   const decidedBreaks = breaks.filter((_, i) => breakOutcomes[i] !== 'inProgress');
   const workCompleted = countOf(workOutcomes, 'completed');
   const breakCompleted = countOf(breakOutcomes, 'completed');
+  for (const s of decidedWork) byWeekdayStarted[weekdayOf(jstDayNumber(s.startedAt))]++;
+
+  const decidedShortBreaks = decidedBreaks.filter(s => s.mode === 'BREAK');
+  const decidedLongBreaks = decidedBreaks.filter(s => s.mode === 'LONG_BREAK');
 
   let quitBeforeBreak = 0;
   let quitBeforeWork = 0;
@@ -380,6 +512,10 @@ export function analyzePomodoroEvents(
     })
     .sort((a, b) => b.segments - a.segments);
 
+  // --- 週・月ごとの推移、連続日数の傾向、累計(windowDaysに縛られず履歴全体で見る) ---
+  const streakRuns = computeStreakRuns(allActiveDays);
+  const totalStudyMinutes = completedWorkAll.reduce((sum, s) => sum + (workDurationMinutes(s) ?? 0), 0);
+
   return {
     hasData: events.length > 0,
     windowDays,
@@ -394,6 +530,7 @@ export function analyzePomodoroEvents(
       maxPomosInSession: sessionSizes.length > 0 ? Math.max(...sessionSizes) : 0,
       byHour,
       byWeekday,
+      byWeekdayStarted,
       weeklyActiveDays,
     },
     transitions: computeTransitions(events, now, windowStartDay),
@@ -408,6 +545,8 @@ export function analyzePomodoroEvents(
       breakStarted: decidedBreaks.length,
       breakCompleted,
       breakCompletionRate: rate(breakCompleted, decidedBreaks.length),
+      shortBreakCompletionRate: rate(decidedShortBreaks.filter(s => s.completedAt !== null).length, decidedShortBreaks.length),
+      longBreakCompletionRate: rate(decidedLongBreaks.filter(s => s.completedAt !== null).length, decidedLongBreaks.length),
       quitBeforeBreak,
       quitBeforeWork,
       avgPausesPerWork: mean(decidedWork.map(s => s.pauses)),
@@ -423,5 +562,18 @@ export function analyzePomodoroEvents(
       avgRatingWithChecks: canCompareChecks ? mean(ratingsOf(withChecks)) : null,
     },
     bySubject,
+    trends: {
+      weekly: computeWeeklyTrend(completedWorkAll, today, HISTORY_DAYS),
+      monthly: computeMonthlyTrend(completedWorkAll, today, HISTORY_DAYS),
+      streakLengths: {
+        averageDays: mean(streakRuns),
+        medianDays: median(streakRuns),
+        completedStreakCount: streakRuns.length,
+      },
+      cumulative: {
+        totalCompletedWork: completedWorkAll.length,
+        totalStudyMinutes: Math.round(totalStudyMinutes),
+      },
+    },
   };
 }

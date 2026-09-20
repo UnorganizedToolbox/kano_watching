@@ -267,5 +267,97 @@ describe('データなし', () => {
     expect(result.habit.byWeekday).toHaveLength(7);
     expect(result.transitions.workEndToBreakStart).toMatchObject({ count: 0, medianSec: null, noResumeCount: 0 });
     expect(result.bySubject).toEqual([]);
+    expect(result.trends.weekly.length).toBeGreaterThan(0);
+    // 履歴の範囲(最大90日)に含まれるカレンダー月は、データがなくても0埋めで並ぶ
+    expect(result.trends.monthly.length).toBeGreaterThan(0);
+    expect(result.trends.monthly.every(m => m.completedWork === 0)).toBe(true);
+    expect(result.trends.streakLengths).toEqual({ averageDays: null, medianDays: null, completedStreakCount: 0 });
+    expect(result.trends.cumulative).toEqual({ totalCompletedWork: 0, totalStudyMinutes: 0 });
+  });
+});
+
+describe('曜日別の完了率', () => {
+  it('完了数だけでなく開始数も出し、完了率を導出できるようにする', () => {
+    const events = [
+      ...workSegment('a', '2026-09-19T01:00:00Z'), // 土曜, 完了
+      ev('b', 'WORK', 'START', '2026-09-19T05:00:00Z'), // 土曜, 中止(開始のみ)
+      ev('b', 'WORK', 'STOP', '2026-09-19T05:03:00Z'),
+    ];
+    const { habit } = analyzePomodoroEvents(events, { now: NOW });
+    expect(habit.byWeekday[6]).toBe(1);
+    expect(habit.byWeekdayStarted[6]).toBe(2);
+  });
+});
+
+describe('休憩の種類別の完了率', () => {
+  it('通常休憩と大休憩を分けて完了率を出す', () => {
+    const events = [
+      ev('s1', 'BREAK', 'START', '2026-09-19T01:00:00Z'),
+      ev('s1', 'BREAK', 'COMPLETE', '2026-09-19T01:05:00Z'),
+      ev('s2', 'BREAK', 'START', '2026-09-19T02:00:00Z'),
+      ev('s2', 'BREAK', 'STOP', '2026-09-19T02:02:00Z'),
+      ev('s3', 'LONG_BREAK', 'START', '2026-09-19T03:00:00Z'),
+      ev('s3', 'LONG_BREAK', 'STOP', '2026-09-19T03:02:00Z'),
+    ];
+    const { completion } = analyzePomodoroEvents(events, { now: NOW });
+    expect(completion.shortBreakCompletionRate).toBe(0.5);
+    expect(completion.longBreakCompletionRate).toBe(0);
+  });
+});
+
+describe('週・月ごとの推移', () => {
+  const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`); // JST 10:00
+
+  it('直近の週ほど新しく並び、学習日数・完了数・時間を集計する', () => {
+    const events = [...dayAt('2026-09-20'), ...dayAt('2026-08-01')];
+    const { trends } = analyzePomodoroEvents(events, { now: NOW });
+    const last = trends.weekly[trends.weekly.length - 1];
+    expect(last.label).toBe('2026-09-20');
+    expect(last).toMatchObject({ activeDays: 1, completedWork: 1, avgPomosPerActiveDay: 1 });
+    expect(last.studyMinutes).toBeCloseTo(25, 0);
+    // windowDays(既定28日)を超えて、履歴全体(最大90日)を集計対象にする
+    expect(trends.weekly.some(w => w.completedWork > 0 && w.label !== last.label)).toBe(true);
+  });
+
+  it('直近7日間(今日から6日前まで)は同じ週バケットにまとめる', () => {
+    const events = [...dayAt('2026-09-20'), ...dayAt('2026-09-14')];
+    const { trends } = analyzePomodoroEvents(events, { now: NOW });
+    const last = trends.weekly[trends.weekly.length - 1];
+    expect(last).toMatchObject({ activeDays: 2, completedWork: 2 });
+  });
+
+  it('月ごとにカレンダー月で集計し、データがない月も0で含める', () => {
+    const events = [...dayAt('2026-09-20'), ...dayAt('2026-07-05')];
+    const { trends } = analyzePomodoroEvents(events, { now: NOW });
+    const byLabel = new Map(trends.monthly.map(m => [m.label, m]));
+    expect(byLabel.get('2026-09')).toMatchObject({ completedWork: 1 });
+    expect(byLabel.get('2026-07')).toMatchObject({ completedWork: 1 });
+    expect(byLabel.get('2026-08')).toMatchObject({ completedWork: 0, activeDays: 0 });
+    // 履歴の取得上限(90日)ぶんの月が古い→新しい順にすべて並ぶ(2026-09-20の90日前は2026-06)
+    expect(trends.monthly.map(m => m.label)).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
+  });
+});
+
+describe('連続日数の傾向', () => {
+  const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`);
+
+  it('複数の連続記録の長さから平均・中央値を出す(現在進行中も1本として含む)', () => {
+    const events = [
+      ...['2026-08-01', '2026-08-02', '2026-08-03'].flatMap(dayAt), // 3日連続(閉じている)
+      ...['2026-09-19', '2026-09-20'].flatMap(dayAt), // 2日連続(進行中)
+    ];
+    const { trends } = analyzePomodoroEvents(events, { now: NOW });
+    expect(trends.streakLengths).toEqual({ averageDays: 2.5, medianDays: 2.5, completedStreakCount: 2 });
+  });
+});
+
+describe('累計', () => {
+  const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`);
+
+  it('履歴全体での完了数と実測学習時間の合計を出す', () => {
+    const events = [...dayAt('2026-09-20'), ...dayAt('2026-09-18')];
+    const { trends } = analyzePomodoroEvents(events, { now: NOW });
+    expect(trends.cumulative.totalCompletedWork).toBe(2);
+    expect(trends.cumulative.totalStudyMinutes).toBeCloseTo(50, 0);
   });
 });
