@@ -346,9 +346,9 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   }, [isRunning, lock, unlock]);
 
 
-  const handleRatingSubmit = (rating: number) => {
+  const handleRatingSubmit = (rating: number, skipped = false) => {
     setShowRatingModal(false);
-    if (sessionId) void logPomodoroEvent(sessionId, 'WORK', 'RATING_SUBMITTED', { rating });
+    if (sessionId) void logPomodoroEvent(sessionId, 'WORK', 'RATING_SUBMITTED', skipped ? { rating, skipped: true } : { rating });
 
     // 先に休憩画面へ切り替える。DB書き込み(logPomodoro/実績評価)の完了は待たない。
     const nextPomoCount = pomoCount + 1;
@@ -592,7 +592,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
               ))}
             </div>
             <button 
-              onClick={() => handleRatingSubmit(3)} 
+              onClick={() => handleRatingSubmit(3, true)}
               className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline underline-offset-4"
             >
               スキップ（普通とする）

@@ -1,11 +1,14 @@
 import { createClient } from "@/utils/supabase/server";
+import { loadPomodoroAnalytics } from "@/lib/pomodoroAnalyticsLoader";
+import PomodoroAnalyticsPanel from "../components/PomodoroAnalyticsPanel";
 
 export default async function ProgressPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   const subjectStats: Record<string, { minutes: number, ratings: number[], avgRating: number }> = {};
-  
+  const analytics = user ? await loadPomodoroAnalytics(supabase, user.id) : null;
+
   if (user) {
     const { data: logs } = await supabase
       .from('student_activity_logs')
@@ -99,6 +102,8 @@ export default async function ProgressPage() {
         </div>
 
       </div>
+
+      <PomodoroAnalyticsPanel analytics={analytics} />
     </section>
   );
 }

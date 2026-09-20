@@ -6,6 +6,8 @@ import { ArrowLeft, Clock, BarChart2, MessageCircle } from "lucide-react";
 import AdminStudentControls from "../../components/AdminStudentControls";
 import StudentRuleOverrides from "../../components/StudentRuleOverrides";
 import GradeRegisterForm from "../../components/GradeRegisterForm";
+import PomodoroAnalyticsPanel from "../../../components/PomodoroAnalyticsPanel";
+import { loadPomodoroAnalytics } from "@/lib/pomodoroAnalyticsLoader";
 
 export default async function StudentDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -47,6 +49,8 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
     .select('*')
     .eq('student_uuid', studentId)
     .order('created_at', { ascending: false });
+
+  const pomodoroAnalytics = student.role === 'student' ? await loadPomodoroAnalytics(supabase, studentId) : null;
 
   // Fetch Diagnostic Results
   const { data: diagnostics } = await supabase
@@ -172,6 +176,8 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
           </div>
         </div>
       </div>
+
+      {student.role === 'student' && <PomodoroAnalyticsPanel analytics={pomodoroAnalytics} />}
     </section>
   );
 }
