@@ -286,7 +286,7 @@ export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = fal
         </Card>
 
         <div className="flex flex-col gap-6">
-          <Card title="切り替えの速さ" note="タイマーが終わってから、次のスタートボタンを押すまでの時間です">
+          <Card title="切り替えの速さ" note="タイマーが終わってから、次のスタートボタンを押すまでの時間です(押し間違いの開始は含みません)">
             <LatencyBlock title="作業が終わってから休憩を始めるまで" stats={transitions.workEndToBreakStart} />
             <LatencyBlock title="休憩が終わってから作業を始めるまで" stats={transitions.breakEndToWorkStart} />
             {transitions.ratingInputMedianSec !== null && (
@@ -460,7 +460,7 @@ export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = fal
         <summary className="cursor-pointer font-bold">指標の定義と注意点</summary>
         <ul className="list-disc pl-5 mt-2 flex flex-col gap-1">
           <li>完了 = タイマーが最後まで進んだ区間。中止・タブを閉じた・一時停止のまま放置(最後の操作から2時間以上)は「途中で終わった」として数えます。</li>
-          <li>実際に動かした時間(一時停止を除く)が1分未満の作業は、押し間違いとみなして完了率・集中度スコアなど作業区間の集計に含めません。動かした時間が測れない放置・タブを閉じた場合は除外せず数えます。</li>
+          <li>実際に動かした時間(一時停止を除く)が1分未満の作業は、押し間違いとみなして完了率・集中度スコア・切り替えの速さなど作業区間の集計に含めません。動かした時間が測れない放置・タブを閉じた場合は除外せず数えます。</li>
           <li>切り替えの速さ = タイマー完了から次のスタートボタンまで。30分以内に次を始めなかった場合は「再開せず終了」として除外します。</li>
           <li>1回の学習 = 前の作業が終わってから1時間以内に次の作業を始めた、ひと続きのまとまり。</li>
           <li>集中度の平均には「スキップ(普通とする)」を含めません。ただしスキップの記録を始める前のデータは、本当の「3」と区別できません。</li>

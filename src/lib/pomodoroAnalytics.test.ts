@@ -190,6 +190,40 @@ describe('押し間違い(作業時間が1分未満)は作業として数えな�
   });
 });
 
+describe('押し間違いは切り替えの速さにも影響しない', () => {
+  const b = '2026-09-19T00:30:00Z';
+  const breakDone = [
+    ev('b1', 'BREAK', 'START', b),
+    ev('b1', 'BREAK', 'COMPLETE', at(b, 300)), // 休憩完了
+  ];
+  const misclick = [
+    ev('oops', 'WORK', 'START', at(b, 300 + 20)), // 休憩完了の20秒後に誤って開始
+    ev('oops', 'WORK', 'STOP', at(b, 300 + 25)), // すぐ中止
+  ];
+
+  it('休憩後の押し間違いではなく、その後の本当の開始までの時間を測る', () => {
+    const events = [
+      ...breakDone, ...misclick,
+      ev('w1', 'WORK', 'START', at(b, 300 + 200)), // 本当の開始は休憩完了の200秒後
+      ev('w1', 'WORK', 'COMPLETE', at(b, 300 + 200 + 1500)),
+    ];
+    const { breakEndToWorkStart } = analyzePomodoroEvents(events, { now: NOW }).transitions;
+    expect(breakEndToWorkStart).toMatchObject({ count: 1, medianSec: 200, noResumeCount: 0 });
+  });
+
+  it('押し間違いのあと本当には始めなかった場合は、再開せず終了として数える(20秒で再開とは数えない)', () => {
+    const { breakEndToWorkStart } = analyzePomodoroEvents([...breakDone, ...misclick], { now: NOW }).transitions;
+    expect(breakEndToWorkStart.count).toBe(0);
+    expect(breakEndToWorkStart.noResumeCount).toBe(1);
+  });
+
+  it('動かした時間が測れない開始(終了記録なし・放置)は押し間違いとみなさず、再開として測る', () => {
+    const events = [...breakDone, ev('w1', 'WORK', 'START', at(b, 300 + 20))]; // 開始したまま終了記録なし
+    const { breakEndToWorkStart } = analyzePomodoroEvents(events, { now: NOW }).transitions;
+    expect(breakEndToWorkStart).toMatchObject({ count: 1, medianSec: 20 });
+  });
+});
+
 describe('学習習慣', () => {
   const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`); // JST 10:00
 

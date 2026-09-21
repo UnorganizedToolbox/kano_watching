@@ -596,7 +596,9 @@ export function analyzePomodoroEvents(
 
   const events = parseEvents(rows);
   // 押し間違い(動かした時間が1分未満の作業)は、以降のすべての作業区間の集計から外す
-  const segments = buildSegments(events).filter(s => !isAccidentalPress(s));
+  const allSegments = buildSegments(events);
+  const accidentalSessionIds = new Set(allSegments.filter(isAccidentalPress).map(s => s.sessionId));
+  const segments = allSegments.filter(s => !accidentalSessionIds.has(s.sessionId));
   const inWindow = segments.filter(s => jstDayNumber(s.startedAt) >= windowStartDay);
   const work = inWindow.filter(s => s.mode === 'WORK');
   const breaks = inWindow.filter(s => s.mode !== 'WORK');
@@ -717,7 +719,9 @@ export function analyzePomodoroEvents(
       byWeekdayStarted,
       weeklyActiveDays,
     },
-    transitions: computeTransitions(events, now, windowStartDay),
+    // 切り替えの速さは生イベントから直接計算するので、押し間違いの区間のイベントを取り除いて渡す
+    // (休憩完了→押し間違いの開始、が「再開」として測られないように)。QUITの集計は別に行う。
+    transitions: computeTransitions(events.filter(e => !accidentalSessionIds.has(e.sessionId)), now, windowStartDay),
     completion: {
       workStarted: decidedWork.length,
       workCompleted,
