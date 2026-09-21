@@ -141,6 +141,55 @@ describe('完了率', () => {
   });
 });
 
+describe('押し間違い(作業時間が1分未満)は作業として数えない', () => {
+  const day = '2026-09-19T01:00:00Z';
+  // 数学を25分完走 + 英語を開始して20秒で中止(押し間違い)
+  const events = [
+    ...workSegment('real', day, { subject: '数学' }),
+    ev('oops', 'WORK', 'START', at(day, 3600), { subject: '英語' }),
+    ev('oops', 'WORK', 'CHECK_REMAINING_TIME', at(day, 3610)),
+    ev('oops', 'WORK', 'PAUSE', at(day, 3615)),
+    ev('oops', 'WORK', 'START', at(day, 3616)),
+    ev('oops', 'WORK', 'STOP', at(day, 3620)),
+  ];
+
+  it('完了率・中止数・曜日別の開始数・科目別に含めない', () => {
+    const r = analyzePomodoroEvents(events, { now: NOW });
+    expect(r.completion).toMatchObject({ workStarted: 1, workCompleted: 1, workStopped: 0, workCompletionRate: 1 });
+    expect(r.habit.byWeekdayStarted.reduce((a, b) => a + b, 0)).toBe(1);
+    expect(r.bySubject.map(x => x.subject)).toEqual(['数学']);
+  });
+
+  it('一時停止・残り時間確認の平均にも含めない', () => {
+    const r = analyzePomodoroEvents(events, { now: NOW });
+    expect(r.completion.avgPausesPerWork).toBe(0);
+    expect(r.focus.avgTimeChecksPerWork).toBe(0);
+  });
+
+  it('ちょうど1分の中止は数える(1分未満のみ除外)', () => {
+    const r = analyzePomodoroEvents([
+      ev('a', 'WORK', 'START', day), ev('a', 'WORK', 'STOP', at(day, 60)),
+    ], { now: NOW });
+    expect(r.completion).toMatchObject({ workStarted: 1, workStopped: 1, workCompletionRate: 0 });
+  });
+
+  it('動かした時間が測れない放置・終了記録なし・タブ閉じは、除外せず数える', () => {
+    const r = analyzePomodoroEvents([
+      ev('u', 'WORK', 'START', day), // 終了記録なし
+      ev('c', 'WORK', 'START', at(day, 7200)), ev('c', 'WORK', 'ABANDONED', at(day, 9000), { overdue_seconds: 1500 }),
+    ], { now: NOW });
+    expect(r.completion).toMatchObject({ workStarted: 2, workUnfinished: 1, workAbandoned: 1, workCompleted: 0 });
+  });
+
+  it('押し間違いしかない場合は、完了率はnull(0%ではない)', () => {
+    const r = analyzePomodoroEvents([
+      ev('oops', 'WORK', 'START', day), ev('oops', 'WORK', 'STOP', at(day, 5)),
+    ], { now: NOW });
+    expect(r.completion.workStarted).toBe(0);
+    expect(r.completion.workCompletionRate).toBeNull();
+  });
+});
+
 describe('学習習慣', () => {
   const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`); // JST 10:00
 

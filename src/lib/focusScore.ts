@@ -19,11 +19,6 @@ export const FOCUS_SCORE_PARAMS = {
   abandonedFactor: 0.1, // 放置・終了記録なしの係数
 } as const;
 
-// 実際に動かした時間がこれ未満のものは「押し間違い」とみなし、集中度の計算に使わない
-// (誤って開始してすぐ中止したものが、点数の低い「作業」として数えられてしまうのを防ぐ)。
-// 放置・終了記録なしのように動かした時間が測れないものは、この判定の対象にしない。
-export const MIN_SCORABLE_RUNNING_MIN = 1;
-
 export type FocusOutcome = 'completed' | 'stopped' | 'abandoned' | 'unfinished';
 
 export interface FocusFeatures {

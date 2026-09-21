@@ -6,7 +6,6 @@ import {
   computeSessionFocusScore,
   durationWeightedMean,
   effectiveFocusMinutes,
-  MIN_SCORABLE_RUNNING_MIN,
   robustBaseline,
   robustZ,
   type Baseline,
@@ -164,6 +163,11 @@ const MIN_GROUP_SAMPLES = 3;
 const UNKNOWN_SUBJECT = '不明';
 // START時に予定時間を記録していない過去のログの作業は、当時の固定値(25分)とみなす
 const DEFAULT_WORK_SCHEDULED_SEC = 25 * 60;
+// 実際に動かした時間がこれ未満の作業は「押し間違い」とみなし、作業として数えない
+// (完了率・集中度スコアなど、作業区間を数えるすべての集計から外す)。誤って開始してすぐ中止した
+// ものが「中止した作業」として完了率を下げたり、点数の低い作業として数えられるのを防ぐ。
+// 放置・終了記録なしのように動かした時間が測れないものは、この判定の対象にしない。
+const MIN_COUNTABLE_WORK_MIN = 1;
 const FOCUS_DAILY_DAYS = 14;
 const RECENT_FOCUS_SESSIONS = 10;
 
@@ -496,13 +500,13 @@ function measuredRunningMin(s: Segment): number | null {
 function isAccidentalPress(s: Segment): boolean {
   if (s.mode !== 'WORK') return false;
   const m = measuredRunningMin(s);
-  return m !== null && m < MIN_SCORABLE_RUNNING_MIN;
+  return m !== null && m < MIN_COUNTABLE_WORK_MIN;
 }
 
 function computeFocusScores(segments: Segment[], now: number, today: number, windowStartDay: number): PomodoroAnalytics['focusScore'] {
-  // 押し間違いは、スコアを付けないだけでなく「直前の区間」の判定からも外す
-  // (休憩と本番の作業の間に挟まっていても、本番の「休憩後の再開の遅れ」が消えないように)
-  const sorted = [...segments].filter(s => !isAccidentalPress(s)).sort((a, b) => a.startedAt - b.startedAt);
+  // segmentsは呼び出し側で押し間違いを除外済み。「直前の区間」の判定にも押し間違いが入らないので、
+  // 休憩と本番の作業の間に挟まっていても、本番の「休憩後の再開の遅れ」が消えない。
+  const sorted = [...segments].sort((a, b) => a.startedAt - b.startedAt);
   const scored: (FocusSessionScore & { day: number })[] = [];
 
   sorted.forEach((s, i) => {
@@ -591,7 +595,8 @@ export function analyzePomodoroEvents(
   const windowStartDay = today - windowDays + 1;
 
   const events = parseEvents(rows);
-  const segments = buildSegments(events);
+  // 押し間違い(動かした時間が1分未満の作業)は、以降のすべての作業区間の集計から外す
+  const segments = buildSegments(events).filter(s => !isAccidentalPress(s));
   const inWindow = segments.filter(s => jstDayNumber(s.startedAt) >= windowStartDay);
   const work = inWindow.filter(s => s.mode === 'WORK');
   const breaks = inWindow.filter(s => s.mode !== 'WORK');
