@@ -6,6 +6,7 @@ import {
   computeSessionFocusScore,
   durationWeightedMean,
   effectiveFocusMinutes,
+  MIN_SCORABLE_RUNNING_MIN,
   robustBaseline,
   robustZ,
   type Baseline,
@@ -484,8 +485,24 @@ function computeMonthlyTrend(completedWorkAll: Segment[], today: number, history
   return orderedKeys.map(key => toTrendBucket(key, buckets.get(key)));
 }
 
+// 実際に動かした時間(分、一時停止を除く)。完了・中止以外(放置・終了記録なし等)は測れないのでnull。
+function measuredRunningMin(s: Segment): number | null {
+  if (s.completedAt !== null) return Math.max(0, s.completedAt - s.startedAt - s.pausedMs) / 60000;
+  if (s.stopped && s.stoppedRunningMs !== null) return Math.max(0, s.stoppedRunningMs) / 60000;
+  return null;
+}
+
+// 誤って押してすぐ止めたもの(動かした時間が測れていて、1分未満の作業)
+function isAccidentalPress(s: Segment): boolean {
+  if (s.mode !== 'WORK') return false;
+  const m = measuredRunningMin(s);
+  return m !== null && m < MIN_SCORABLE_RUNNING_MIN;
+}
+
 function computeFocusScores(segments: Segment[], now: number, today: number, windowStartDay: number): PomodoroAnalytics['focusScore'] {
-  const sorted = [...segments].sort((a, b) => a.startedAt - b.startedAt);
+  // 押し間違いは、スコアを付けないだけでなく「直前の区間」の判定からも外す
+  // (休憩と本番の作業の間に挟まっていても、本番の「休憩後の再開の遅れ」が消えないように)
+  const sorted = [...segments].filter(s => !isAccidentalPress(s)).sort((a, b) => a.startedAt - b.startedAt);
   const scored: (FocusSessionScore & { day: number })[] = [];
 
   sorted.forEach((s, i) => {
@@ -493,8 +510,7 @@ function computeFocusScores(segments: Segment[], now: number, today: number, win
     const outcome = outcomeOf(s, now);
     if (outcome === 'inProgress') return;
 
-    const runningMs = s.completedAt !== null ? s.completedAt - s.startedAt - s.pausedMs : (s.stoppedRunningMs ?? 0);
-    const runningMin = Math.max(0, runningMs) / 60000;
+    const runningMin = measuredRunningMin(s) ?? 0;
 
     // 直前の区間が「完了した休憩」で、そこから30分以内に始めた場合だけ遷移の遅れとして数える
     // (それより空いたものは新しい学習の始まりであり、休憩後の再開の遅れではない)

@@ -517,6 +517,60 @@ describe('セッション集中度スコア(暫定)', () => {
     expect(latestRobustZ).toBeNull();
   });
 
+  describe('押し間違い(作業時間が1分未満)の除外', () => {
+    it('開始してすぐ(1分未満で)中止したものは、スコアにも日次・ベースラインにも含めない', () => {
+      const events = [
+        ev('oops', 'WORK', 'START', start, { scheduled_seconds: 1500 }),
+        ev('oops', 'WORK', 'STOP', at(start, 30)),
+      ];
+      const { focusScore } = analyzePomodoroEvents(events, { now: NOW });
+      expect(focusScore.sessionCount).toBe(0);
+      expect(focusScore.recentSessions).toEqual([]);
+      expect(focusScore.weightedAvg).toBeNull();
+      expect(focusScore.daily.every(d => d.sessions === 0)).toBe(true);
+    });
+
+    it('ちょうど1分は押し間違いとみなさず、スコアを付ける(境界は「1分未満」のみ除外)', () => {
+      const events = [
+        ev('a', 'WORK', 'START', start, { scheduled_seconds: 1500 }),
+        ev('a', 'WORK', 'STOP', at(start, 60)),
+      ];
+      const { focusScore } = analyzePomodoroEvents(events, { now: NOW });
+      expect(focusScore.sessionCount).toBe(1);
+      expect(focusScore.recentSessions[0].outcome).toBe('stopped');
+    });
+
+    it('一時停止を除いた実際の作業時間で判定する(壁時計では1分以上でも、動かした時間が1分未満なら除外)', () => {
+      const events = [
+        ev('a', 'WORK', 'START', start, { scheduled_seconds: 1500 }),
+        ev('a', 'WORK', 'PAUSE', at(start, 20)), // 20秒だけ動かして一時停止
+        ev('a', 'WORK', 'STOP', at(start, 20 + 600)), // 10分放置してから中止
+      ];
+      expect(analyzePomodoroEvents(events, { now: NOW }).focusScore.sessionCount).toBe(0);
+    });
+
+    it('放置・終了記録なしは動かした時間が測れないため、1分未満扱いで除外はしない(本物の放置が消えないように)', () => {
+      const events = [ev('a', 'WORK', 'START', start, { scheduled_seconds: 1500 })]; // 前日の開始のまま終了記録なし
+      const { focusScore } = analyzePomodoroEvents(events, { now: NOW });
+      expect(focusScore.sessionCount).toBe(1);
+      expect(focusScore.recentSessions[0].outcome).toBe('unfinished');
+    });
+
+    it('休憩と本番の作業の間に押し間違いが挟まっても、本番の作業の「休憩後の再開の遅れ」は失われない', () => {
+      const b = '2026-09-19T00:30:00Z';
+      const events = [
+        ev('b1', 'BREAK', 'START', b), ev('b1', 'BREAK', 'COMPLETE', at(b, 300)),
+        ev('oops', 'WORK', 'START', at(b, 300 + 60), { scheduled_seconds: 1500 }), // 休憩後1分で誤って開始
+        ev('oops', 'WORK', 'STOP', at(b, 300 + 60 + 5)), // すぐ中止
+        ev('w1', 'WORK', 'START', at(b, 300 + 180), { scheduled_seconds: 1500 }), // 本当の開始は休憩完了の3分後
+        ev('w1', 'WORK', 'COMPLETE', at(b, 300 + 180 + 1500)),
+      ];
+      const { focusScore } = analyzePomodoroEvents(events, { now: NOW });
+      expect(focusScore.sessionCount).toBe(1);
+      expect(focusScore.recentSessions[0].penalties.transition).toBeCloseTo(10);
+    });
+  });
+
   it('BGM別に完走セッションの平均スコアを出す(BGM未記録は含めない)', () => {
     const mk = (sid: string, day: string, bgm: string | null, checks: number) => {
       const t = `${day}T01:00:00Z`;

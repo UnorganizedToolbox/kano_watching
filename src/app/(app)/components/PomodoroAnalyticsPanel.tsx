@@ -357,7 +357,7 @@ export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = fal
       {showFocusScore && (
         <Card
           title="集中度スコア(暫定)"
-          note="操作ログ(残り時間の確認・一時停止・休憩後の再開の遅れ・中断)だけから機械的に計算した、暫定のたたき台です。係数は実データがたまってから統計的に決め直す予定で、生徒への報酬(EXP等)には使っていません。"
+          note="操作ログ(残り時間の確認・一時停止・休憩後の再開の遅れ・中断)だけから機械的に計算した、暫定のたたき台です。係数は実データがたまってから統計的に決め直す予定で、生徒への報酬(EXP等)には使っていません。実際に動かした時間が1分未満のもの(押し間違い)は集計から除いています。"
         >
           <div className="grid grid-cols-2 gap-3">
             <Stat
