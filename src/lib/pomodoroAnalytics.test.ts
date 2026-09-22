@@ -105,7 +105,7 @@ describe('切り替えの速さ(反応時間)', () => {
   });
 });
 
-describe('完了率', () => {
+describe('完了率の内訳(completion)', () => {
   const events: PomodoroEventRow[] = [
     ...workSegment('a', '2026-09-19T01:00:00Z'),
     ev('b', 'WORK', 'START', '2026-09-19T02:00:00Z'),
@@ -122,7 +122,7 @@ describe('完了率', () => {
   ];
 
   it('作業区間を完了/中止/タブ閉じ/放置/進行中に分け、進行中は分母から除く', () => {
-    const { completion } = analyzePomodoroEvents(events, { now: NOW });
+    const { completion, periods } = analyzePomodoroEvents(events, { now: NOW });
     expect(completion).toMatchObject({
       workStarted: 4,
       workCompleted: 1,
@@ -130,14 +130,15 @@ describe('完了率', () => {
       workAbandoned: 1,
       workUnfinished: 1,
       workInProgress: 1,
-      workCompletionRate: 0.25,
     });
-    expect(completion.avgPausesPerWork).toBe(0.25);
+    expect(periods.cumulative.workCompletionRate).toBe(0.25);
+    expect(periods.cumulative.avgPausesPerWork).toBe(0.25);
   });
 
-  it('休憩の消化率も別に出す', () => {
-    const { completion } = analyzePomodoroEvents(events, { now: NOW });
-    expect(completion).toMatchObject({ breakStarted: 2, breakCompleted: 1, breakCompletionRate: 0.5 });
+  it('休憩の消化率も別に出す(periods.cumulative)', () => {
+    const { completion, periods } = analyzePomodoroEvents(events, { now: NOW });
+    expect(completion).toMatchObject({ breakStarted: 2, breakCompleted: 1 });
+    expect(periods.cumulative.breakCompletionRate).toBe(0.5);
   });
 });
 
@@ -155,22 +156,24 @@ describe('押し間違い(作業時間が1分未満)は作業として数えな�
 
   it('完了率・中止数・曜日別の開始数・科目別に含めない', () => {
     const r = analyzePomodoroEvents(events, { now: NOW });
-    expect(r.completion).toMatchObject({ workStarted: 1, workCompleted: 1, workStopped: 0, workCompletionRate: 1 });
+    expect(r.completion).toMatchObject({ workStarted: 1, workCompleted: 1, workStopped: 0 });
+    expect(r.periods.cumulative.workCompletionRate).toBe(1);
     expect(r.habit.byWeekdayStarted.reduce((a, b) => a + b, 0)).toBe(1);
     expect(r.bySubject.map(x => x.subject)).toEqual(['数学']);
   });
 
   it('一時停止・残り時間確認の平均にも含めない', () => {
     const r = analyzePomodoroEvents(events, { now: NOW });
-    expect(r.completion.avgPausesPerWork).toBe(0);
-    expect(r.focus.avgTimeChecksPerWork).toBe(0);
+    expect(r.periods.cumulative.avgPausesPerWork).toBe(0);
+    expect(r.periods.cumulative.avgTimeChecksPerWork).toBe(0);
   });
 
   it('ちょうど1分の中止は数える(1分未満のみ除外)', () => {
     const r = analyzePomodoroEvents([
       ev('a', 'WORK', 'START', day), ev('a', 'WORK', 'STOP', at(day, 60)),
     ], { now: NOW });
-    expect(r.completion).toMatchObject({ workStarted: 1, workStopped: 1, workCompletionRate: 0 });
+    expect(r.completion).toMatchObject({ workStarted: 1, workStopped: 1 });
+    expect(r.periods.cumulative.workCompletionRate).toBe(0);
   });
 
   it('動かした時間が測れない放置・終了記録なし・タブ閉じは、除外せず数える', () => {
@@ -186,7 +189,7 @@ describe('押し間違い(作業時間が1分未満)は作業として数えな�
       ev('oops', 'WORK', 'START', day), ev('oops', 'WORK', 'STOP', at(day, 5)),
     ], { now: NOW });
     expect(r.completion.workStarted).toBe(0);
-    expect(r.completion.workCompletionRate).toBeNull();
+    expect(r.periods.cumulative.workCompletionRate).toBeNull();
   });
 });
 
@@ -224,7 +227,7 @@ describe('押し間違いは切り替えの速さにも影響しない', () => {
   });
 });
 
-describe('学習習慣', () => {
+describe('学習習慣(パターン系、期間を問わない)', () => {
   const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`); // JST 10:00
 
   it('今日まだ学習していなくても昨日までの連続日数を現在の連続日数とする', () => {
@@ -251,18 +254,11 @@ describe('学習習慣', () => {
     expect(habit.byWeekday.reduce((a, b) => a + b, 0)).toBe(1);
   });
 
-  it('集計期間より前の学習は期間内の指標に含めず、連続日数(履歴)にだけ使う', () => {
-    const { habit } = analyzePomodoroEvents(dayAt('2026-08-01'), { now: NOW });
-    expect(habit.completedWorkCount).toBe(0);
-    expect(habit.activeDays).toBe(0);
+  it('90日より前の学習は集計対象外(履歴の取得上限)だが、連続日数(履歴)には影響しうる', () => {
+    const { habit, periods } = analyzePomodoroEvents(dayAt('2026-08-01'), { now: NOW });
+    // 2026-08-01は今日から90日以内なので、periodsの集計対象には入る
+    expect(periods.cumulative.completedWork).toBe(1);
     expect(habit.longestStreak).toBe(1);
-  });
-
-  it('週ごとの学習日数を古い週から並べる', () => {
-    const events = ['2026-09-20', '2026-09-19', '2026-09-13'].flatMap(day => workSegment(`s-${day}`, `${day}T01:00:00Z`));
-    const { habit } = analyzePomodoroEvents(events, { now: NOW });
-    // 直近7日(9/14-9/20)は2日、その前の7日(9/7-9/13)は1日
-    expect(habit.weeklyActiveDays).toEqual([0, 0, 1, 2]);
   });
 
   it('1時間以内の間隔で続けた作業を1回の学習セッションとしてまとめる', () => {
@@ -271,32 +267,23 @@ describe('学習習慣', () => {
       ...workSegment('s2', '2026-09-19T01:35:00Z'), // 10分後に開始 → 同じセッション
       ...workSegment('s3', '2026-09-19T05:00:00Z'), // 数時間後 → 別セッション
     ];
-    const { habit } = analyzePomodoroEvents(events, { now: NOW });
-    expect(habit).toMatchObject({
-      completedWorkCount: 3,
-      activeDays: 1,
-      avgPomosPerActiveDay: 3,
-      sessionCount: 2,
-      avgPomosPerSession: 1.5,
-      maxPomosInSession: 2,
-    });
+    const { habit, periods } = analyzePomodoroEvents(events, { now: NOW });
+    expect(periods.cumulative).toMatchObject({ completedWork: 3, activeDays: 1, avgPomosPerActiveDay: 3 });
+    expect(habit).toMatchObject({ sessionCount: 2, avgPomosPerSession: 1.5, maxPomosInSession: 2 });
   });
 });
 
-describe('集中の指標', () => {
+describe('集中の指標(focus、固有の比較分析)', () => {
   const mk = (prefix: string, base: string, ratings: number[], checks: number) =>
     ratings.flatMap((rating, i) => workSegment(`${prefix}${i}`, at(base, i * 3600), { rating, checks }));
 
-  it('直近7日とその前7日の評価平均、時間確認の有無別の平均を出す', () => {
+  it('時間確認の有無別の平均評価を比較する(各3件以上のときだけ)', () => {
     const events = [
-      ...mk('r', '2026-09-19T00:00:00Z', [5, 5, 4], 0), // 直近7日・時間確認なし
-      ...mk('p', '2026-09-10T00:00:00Z', [3, 3, 2], 2), // その前7日・時間確認2回
+      ...mk('r', '2026-09-19T00:00:00Z', [5, 5, 4], 0), // 時間確認なし
+      ...mk('p', '2026-09-10T00:00:00Z', [3, 3, 2], 2), // 時間確認2回
     ];
     const { focus } = analyzePomodoroEvents(events, { now: NOW });
     expect(focus.ratingCount).toBe(6);
-    expect(focus.recentAvgRating).toBeCloseTo(14 / 3);
-    expect(focus.previousAvgRating).toBeCloseTo(8 / 3);
-    expect(focus.avgTimeChecksPerWork).toBe(1);
     expect(focus.avgRatingWithoutChecks).toBeCloseTo(14 / 3);
     expect(focus.avgRatingWithChecks).toBeCloseTo(8 / 3);
   });
@@ -305,10 +292,10 @@ describe('集中の指標', () => {
     const skipped = workSegment('sk', '2026-09-19T10:00:00Z');
     skipped.push(ev('sk', 'WORK', 'RATING_SUBMITTED', '2026-09-19T10:26:00Z', { rating: 3, skipped: true }));
     const events = [...workSegment('r0', '2026-09-19T00:00:00Z', { rating: 5 }), ...skipped];
-    const { focus } = analyzePomodoroEvents(events, { now: NOW });
+    const { focus, periods } = analyzePomodoroEvents(events, { now: NOW });
     expect(focus.ratingCount).toBe(1);
     expect(focus.ratingSkippedCount).toBe(1);
-    expect(focus.avgRating).toBe(5);
+    expect(periods.cumulative.avgRating).toBe(5);
   });
 
   it('グループの件数が少ないうちは時間確認の有無別の比較を出さない', () => {
@@ -344,18 +331,17 @@ describe('データなし', () => {
   it('イベントが空でも例外を出さず、比率はnullで返す', () => {
     const result = analyzePomodoroEvents([], { now: NOW });
     expect(result.hasData).toBe(false);
-    expect(result.completion.workCompletionRate).toBeNull();
     expect(result.habit.currentStreak).toBe(0);
     expect(result.habit.byHour).toHaveLength(24);
     expect(result.habit.byWeekday).toHaveLength(7);
     expect(result.transitions.workEndToBreakStart).toMatchObject({ count: 0, medianSec: null, noResumeCount: 0 });
     expect(result.bySubject).toEqual([]);
-    expect(result.trends.weekly.length).toBeGreaterThan(0);
+    expect(result.periods.weekly.length).toBeGreaterThan(0);
     // 履歴の範囲(最大90日)に含まれるカレンダー月は、データがなくても0埋めで並ぶ
-    expect(result.trends.monthly.length).toBeGreaterThan(0);
-    expect(result.trends.monthly.every(m => m.completedWork === 0)).toBe(true);
-    expect(result.trends.streakLengths).toEqual({ averageDays: null, medianDays: null, completedStreakCount: 0 });
-    expect(result.trends.cumulative).toEqual({ totalCompletedWork: 0, totalStudyMinutes: 0 });
+    expect(result.periods.monthly.length).toBeGreaterThan(0);
+    expect(result.periods.monthly.every(m => m.completedWork === 0)).toBe(true);
+    expect(result.periods.streaks).toEqual([]);
+    expect(result.periods.cumulative).toMatchObject({ completedWork: 0, activeDays: 0, workCompletionRate: null });
   });
 });
 
@@ -388,52 +374,6 @@ describe('休憩の種類別の完了率', () => {
   });
 });
 
-describe('週・月ごとの推移', () => {
-  const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`); // JST 10:00
-
-  it('直近の週ほど新しく並び、学習日数・完了数・時間を集計する', () => {
-    const events = [...dayAt('2026-09-20'), ...dayAt('2026-08-01')];
-    const { trends } = analyzePomodoroEvents(events, { now: NOW });
-    const last = trends.weekly[trends.weekly.length - 1];
-    expect(last.label).toBe('2026-09-20');
-    expect(last).toMatchObject({ activeDays: 1, completedWork: 1, avgPomosPerActiveDay: 1 });
-    expect(last.studyMinutes).toBeCloseTo(25, 0);
-    // windowDays(既定28日)を超えて、履歴全体(最大90日)を集計対象にする
-    expect(trends.weekly.some(w => w.completedWork > 0 && w.label !== last.label)).toBe(true);
-  });
-
-  it('直近7日間(今日から6日前まで)は同じ週バケットにまとめる', () => {
-    const events = [...dayAt('2026-09-20'), ...dayAt('2026-09-14')];
-    const { trends } = analyzePomodoroEvents(events, { now: NOW });
-    const last = trends.weekly[trends.weekly.length - 1];
-    expect(last).toMatchObject({ activeDays: 2, completedWork: 2 });
-  });
-
-  it('月ごとにカレンダー月で集計し、データがない月も0で含める', () => {
-    const events = [...dayAt('2026-09-20'), ...dayAt('2026-07-05')];
-    const { trends } = analyzePomodoroEvents(events, { now: NOW });
-    const byLabel = new Map(trends.monthly.map(m => [m.label, m]));
-    expect(byLabel.get('2026-09')).toMatchObject({ completedWork: 1 });
-    expect(byLabel.get('2026-07')).toMatchObject({ completedWork: 1 });
-    expect(byLabel.get('2026-08')).toMatchObject({ completedWork: 0, activeDays: 0 });
-    // 履歴の取得上限(90日)ぶんの月が古い→新しい順にすべて並ぶ(2026-09-20の90日前は2026-06)
-    expect(trends.monthly.map(m => m.label)).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
-  });
-});
-
-describe('連続日数の傾向', () => {
-  const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`);
-
-  it('複数の連続記録の長さから平均・中央値を出す(現在進行中も1本として含む)', () => {
-    const events = [
-      ...['2026-08-01', '2026-08-02', '2026-08-03'].flatMap(dayAt), // 3日連続(閉じている)
-      ...['2026-09-19', '2026-09-20'].flatMap(dayAt), // 2日連続(進行中)
-    ];
-    const { trends } = analyzePomodoroEvents(events, { now: NOW });
-    expect(trends.streakLengths).toEqual({ averageDays: 2.5, medianDays: 2.5, completedStreakCount: 2 });
-  });
-});
-
 describe('実測学習時間(一時停止を除く)', () => {
   it('一時停止していた実時間は学習時間から差し引く', () => {
     const start = '2026-09-19T01:00:00Z';
@@ -443,9 +383,9 @@ describe('実測学習時間(一時停止を除く)', () => {
       ev('p1', 'WORK', 'START', at(start, 300 + 600)), // 10分休んでから再開
       ev('p1', 'WORK', 'COMPLETE', at(start, 300 + 600 + 1500)), // さらに25分で完了
     ];
-    const { trends } = analyzePomodoroEvents(events, { now: NOW });
+    const { periods } = analyzePomodoroEvents(events, { now: NOW });
     // 壁時計では 5+10+25=40分だが、一時停止していた10分を除くと実際の学習時間は30分
-    expect(trends.cumulative.totalStudyMinutes).toBeCloseTo(30, 0);
+    expect(periods.cumulative.studyMinutes).toBeCloseTo(30, 0);
   });
 
   it('複数回の一時停止も合算して差し引く', () => {
@@ -458,9 +398,9 @@ describe('実測学習時間(一時停止を除く)', () => {
       ev('p1', 'WORK', 'START', at(start, 300 + 120 + 300 + 180)), // 3分休憩
       ev('p1', 'WORK', 'COMPLETE', at(start, 300 + 120 + 300 + 180 + 900)),
     ];
-    const { trends } = analyzePomodoroEvents(events, { now: NOW });
+    const { periods } = analyzePomodoroEvents(events, { now: NOW });
     // 実作業時間の合計: 5+5+15=25分(一時停止2+3=5分は除く)
-    expect(trends.cumulative.totalStudyMinutes).toBeCloseTo(25, 0);
+    expect(periods.cumulative.studyMinutes).toBeCloseTo(25, 0);
   });
 });
 
@@ -483,14 +423,116 @@ describe('直近の完了一覧', () => {
   });
 });
 
-describe('累計', () => {
-  const dayAt = (day: string) => workSegment(`s-${day}`, `${day}T01:00:00Z`);
+describe('連続・累計・週毎・月毎(periods)', () => {
+  const dayAt = (day: string, opts?: { rating?: number; checks?: number }) => workSegment(`s-${day}`, `${day}T01:00:00Z`, opts);
 
-  it('履歴全体での完了数と実測学習時間の合計を出す', () => {
-    const events = [...dayAt('2026-09-20'), ...dayAt('2026-09-18')];
-    const { trends } = analyzePomodoroEvents(events, { now: NOW });
-    expect(trends.cumulative.totalCompletedWork).toBe(2);
-    expect(trends.cumulative.totalStudyMinutes).toBeCloseTo(50, 0);
+  describe('累計(cumulative)', () => {
+    it('履歴全体での完了数・実測学習時間の合計を出す', () => {
+      const events = [...dayAt('2026-09-20'), ...dayAt('2026-09-18')];
+      const { periods } = analyzePomodoroEvents(events, { now: NOW });
+      expect(periods.cumulative.completedWork).toBe(2);
+      expect(periods.cumulative.studyMinutes).toBeCloseTo(50, 0);
+      expect(periods.cumulative.label).toBe('cumulative');
+    });
+  });
+
+  describe('週毎(weekly)', () => {
+    it('直近の週ほど新しく並び、学習日数・完了数・時間を集計する', () => {
+      const events = [...dayAt('2026-09-20'), ...dayAt('2026-08-01')];
+      const { periods } = analyzePomodoroEvents(events, { now: NOW });
+      const last = periods.weekly[periods.weekly.length - 1];
+      expect(last.label).toBe('2026-09-20');
+      expect(last).toMatchObject({ activeDays: 1, completedWork: 1, avgPomosPerActiveDay: 1 });
+      expect(last.studyMinutes).toBeCloseTo(25, 0);
+      // windowDays(既定28日)を超えて、履歴全体(最大90日)を集計対象にする
+      expect(periods.weekly.some(w => w.completedWork > 0 && w.label !== last.label)).toBe(true);
+    });
+
+    it('直近7日間(今日から6日前まで)は同じ週バケットにまとめる', () => {
+      const events = [...dayAt('2026-09-20'), ...dayAt('2026-09-14')];
+      const { periods } = analyzePomodoroEvents(events, { now: NOW });
+      const last = periods.weekly[periods.weekly.length - 1];
+      expect(last).toMatchObject({ activeDays: 2, completedWork: 2 });
+    });
+
+    it('完了率・平均評価・平均集中度スコアもcumulativeと同じ計算方法で週ごとに出す', () => {
+      const events = [
+        ...dayAt('2026-09-20', { rating: 4 }),
+        ev('stop1', 'WORK', 'START', '2026-09-20T02:00:00Z'), ev('stop1', 'WORK', 'STOP', '2026-09-20T02:05:00Z'),
+      ];
+      const { periods } = analyzePomodoroEvents(events, { now: NOW });
+      const last = periods.weekly[periods.weekly.length - 1];
+      expect(last.workCompletionRate).toBe(0.5);
+      expect(last.avgRating).toBe(4);
+      expect(last.avgFocusScore).not.toBeNull();
+    });
+  });
+
+  describe('月毎(monthly)', () => {
+    it('カレンダー月で集計し、データがない月も0で含める', () => {
+      const events = [...dayAt('2026-09-20'), ...dayAt('2026-07-05')];
+      const { periods } = analyzePomodoroEvents(events, { now: NOW });
+      const byLabel = new Map(periods.monthly.map(m => [m.label, m]));
+      expect(byLabel.get('2026-09')).toMatchObject({ completedWork: 1 });
+      expect(byLabel.get('2026-07')).toMatchObject({ completedWork: 1 });
+      expect(byLabel.get('2026-08')).toMatchObject({ completedWork: 0, activeDays: 0 });
+      // 履歴の取得上限(90日)ぶんの月が古い→新しい順にすべて並ぶ(2026-09-20の90日前は2026-06)
+      expect(periods.monthly.map(m => m.label)).toEqual(['2026-06', '2026-07', '2026-08', '2026-09']);
+    });
+  });
+
+  describe('連続(streaks)', () => {
+    it('連続記録ごとに日付範囲と各種指標を出し、現在進行中かどうかも分かる', () => {
+      const events = [
+        ...['2026-08-01', '2026-08-02', '2026-08-03'].flatMap(d => dayAt(d)), // 3日連続(閉じている)
+        ...['2026-09-19', '2026-09-20'].flatMap(d => dayAt(d, { rating: 5 })), // 2日連続(進行中)
+      ];
+      const { periods } = analyzePomodoroEvents(events, { now: NOW });
+      expect(periods.streaks).toHaveLength(2);
+      expect(periods.streaks[0]).toMatchObject({ days: 3, startDate: '2026-08-01', endDate: '2026-08-03', completedWork: 3, ongoing: false });
+      expect(periods.streaks[1]).toMatchObject({ days: 2, startDate: '2026-09-19', endDate: '2026-09-20', completedWork: 2, avgRating: 5, ongoing: true });
+    });
+
+    it('昨日で途切れた連続はまだ進行中扱い、一昨日までで途切れた連続はもう進行中ではない', () => {
+      const yesterday = analyzePomodoroEvents(dayAt('2026-09-19'), { now: NOW }).periods.streaks;
+      expect(yesterday).toHaveLength(1);
+      expect(yesterday[0].ongoing).toBe(true);
+
+      const twoDaysAgo = analyzePomodoroEvents(dayAt('2026-09-18'), { now: NOW }).periods.streaks;
+      expect(twoDaysAgo).toHaveLength(1);
+      expect(twoDaysAgo[0].ongoing).toBe(false);
+    });
+
+    it('連続に属さない日(間が空いた単発の作業)の指標は、どの連続記録にも混ざらない', () => {
+      const events = [
+        ...dayAt('2026-08-01'), // 単発(前後と繋がっていない)
+        ...['2026-08-10', '2026-08-11'].flatMap(d => dayAt(d)), // 別の連続記録
+      ];
+      const { periods } = analyzePomodoroEvents(events, { now: NOW });
+      expect(periods.streaks).toHaveLength(2);
+      expect(periods.streaks[0]).toMatchObject({ days: 1, completedWork: 1 });
+      expect(periods.streaks[1]).toMatchObject({ days: 2, completedWork: 2 });
+    });
+
+    it('放置・中止など完了していない日は連続日数に数えないが、その日の作業自体は該当する連続記録内なら反映される', () => {
+      const events = [
+        ...dayAt('2026-09-19'),
+        ev('stop', 'WORK', 'START', '2026-09-19T05:00:00Z'), ev('stop', 'WORK', 'STOP', '2026-09-19T05:05:00Z'),
+        ...dayAt('2026-09-20'),
+      ];
+      const { periods } = analyzePomodoroEvents(events, { now: NOW });
+      expect(periods.streaks).toHaveLength(1);
+      expect(periods.streaks[0]).toMatchObject({ days: 2, completedWork: 2, workCompletionRate: 2 / 3 });
+    });
+  });
+
+  it('データが全くない期間(週・月)は各指標がnullになる(0ではない)', () => {
+    const { periods } = analyzePomodoroEvents([], { now: NOW });
+    for (const w of periods.weekly) {
+      expect(w.workCompletionRate).toBeNull();
+      expect(w.avgRating).toBeNull();
+      expect(w.avgFocusScore).toBeNull();
+    }
   });
 });
 
@@ -601,16 +643,17 @@ describe('セッション集中度スコア(暫定)', () => {
   });
 
   describe('押し間違い(作業時間が1分未満)の除外', () => {
-    it('開始してすぐ(1分未満で)中止したものは、スコアにも日次・ベースラインにも含めない', () => {
+    it('開始してすぐ(1分未満で)中止したものは、スコアにも日次・ベースライン・periodsにも含めない', () => {
       const events = [
         ev('oops', 'WORK', 'START', start, { scheduled_seconds: 1500 }),
         ev('oops', 'WORK', 'STOP', at(start, 30)),
       ];
-      const { focusScore } = analyzePomodoroEvents(events, { now: NOW });
-      expect(focusScore.sessionCount).toBe(0);
-      expect(focusScore.recentSessions).toEqual([]);
-      expect(focusScore.weightedAvg).toBeNull();
-      expect(focusScore.daily.every(d => d.sessions === 0)).toBe(true);
+      const r = analyzePomodoroEvents(events, { now: NOW });
+      expect(r.focusScore.sessionCount).toBe(0);
+      expect(r.focusScore.recentSessions).toEqual([]);
+      expect(r.focusScore.daily.every(d => d.sessions === 0)).toBe(true);
+      expect(r.periods.cumulative.completedWork).toBe(0);
+      expect(r.periods.cumulative.avgFocusScore).toBeNull();
     });
 
     it('ちょうど1分は押し間違いとみなさず、スコアを付ける(境界は「1分未満」のみ除外)', () => {

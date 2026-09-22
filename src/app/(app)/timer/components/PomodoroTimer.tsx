@@ -142,6 +142,11 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   const alarmAudioElRef = useRef<HTMLAudioElement | null>(null);
   const alarmUrlCacheRef = useRef<Partial<Record<SoundType, string>>>({});
   const noiseUrlCacheRef = useRef<Partial<Record<NoiseType, string>>>({});
+  // 「残り時間を確認する」で表示した時刻(mm:ss)を自動的に隠すまでの締切(絶対時刻)。
+  // 単発のsetTimeoutだけに頼ると、何らかの理由で発火しなかった場合に表示が
+  // 戻らなくなる不具合が報告されたため、下のwatchdog(1秒おき)でも締切を確認して
+  // 自己修復できるようにする(setTimeoutは即応性のための一次経路として残す)。
+  const showTimeUntilRef = useRef<number | null>(null);
 
   const getAlarmUrl = useCallback(async (type: SoundType) => {
     if (!alarmUrlCacheRef.current[type]) {
@@ -387,6 +392,34 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     };
   }, [isRunning, targetEndTime, mode, handleTimerComplete]);
 
+  // 見張り役(watchdog): 「残り時間を確認する」ボタンを押した後などに、何らかの理由で
+  // Web Workerからのtickメッセージ(または主経路のフォールバックinterval)が届かなくなり、
+  // 表示が一時停止→再開するまで固まったままになる不具合が報告されたための対策。
+  // targetEndTime(絶対時刻)を基準に1秒おきに表示を再計算するだけなので、主経路が
+  // 正常な場合はsetTimeLeftが同じ値を返すだけで実害はない。完了処理そのもの
+  // (handleTimerCompleteの呼び出し等)は主経路のtickに任せる(ここで二重に行うと
+  // mode/handleTimerCompleteへの依存が増え、Reactコンパイラの手動メモ化検証が壊れて
+  // 他のuseCallbackまで最適化がスキップされてしまうため、あえて含めない)。
+  // 主経路が本当に止まっている場合に備え、残り時間が0以下になった時点でWorkerへ
+  // 'start'を再送し、主経路自身に完了処理をさせるよう促す。
+  useEffect(() => {
+    if (!isRunning || !targetEndTime) return;
+    const watchdog = setInterval(() => {
+      const remaining = Math.max(0, Math.round((targetEndTime - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        workerRef.current?.postMessage('start');
+      }
+      // 「残り時間を確認する」の自動非表示(3秒後)も、単発setTimeoutの取りこぼしに
+      // 備えてここで自己修復する。
+      if (showTimeUntilRef.current !== null && Date.now() >= showTimeUntilRef.current) {
+        showTimeUntilRef.current = null;
+        setShowTime(false);
+      }
+    }, 1000);
+    return () => clearInterval(watchdog);
+  }, [isRunning, targetEndTime]);
+
   // タイマー実行中は他の画面へ移動されると集中が途切れるため、サイドバー等の
   // ナビゲーションを封じる(設定・不具合報告は例外)。
   useEffect(() => {
@@ -593,8 +626,15 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
           <button
             onClick={() => {
               setShowTime(true);
+              showTimeUntilRef.current = Date.now() + 3000;
+              // 念のためWorkerに'start'を再送する(冪等。内部のsetIntervalを張り直すだけなので、
+              // 正常に動いている場合は無害)。
+              workerRef.current?.postMessage('start');
               if (sessionId) void logPomodoroEvent(sessionId, mode, 'CHECK_REMAINING_TIME');
-              setTimeout(() => setShowTime(false), 3000);
+              setTimeout(() => {
+                showTimeUntilRef.current = null;
+                setShowTime(false);
+              }, 3000);
             }}
             className="mb-8 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-4 py-2 rounded-full hover:bg-slate-200 transition-colors"
           >

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import type { FocusSessionScore, LatencyStats, PomodoroAnalytics, TrendBucket } from "@/lib/pomodoroAnalytics";
+import type { FocusSessionScore, LatencyStats, PomodoroAnalytics } from "@/lib/pomodoroAnalytics";
+import PeriodStatsSwitcher from "./PeriodStatsSwitcher";
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 const CARD_CLASS = "card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-4";
@@ -23,13 +24,6 @@ function rateOf(numerator: number, denominator: number): number | null {
 
 function decimal(value: number | null, digits = 1): string {
   return value === null ? '—' : value.toFixed(digits);
-}
-
-// 丸めた結果が0になる差は「-0.0」ではなく「±0.0」と表示する
-function signedDelta(delta: number): string {
-  const rounded = Math.round(delta * 10) / 10;
-  if (rounded === 0) return '±0.0';
-  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(1)}`;
 }
 
 function Card({ title, note, children, className = '' }: { title: string; note?: string; children: ReactNode; className?: string }) {
@@ -78,62 +72,6 @@ function MiniBars({ values, labels, maxValue, showValues = false, ariaLabel }: {
   );
 }
 
-function ProgressRow({ label, done, total, rate }: { label: string; done: number; total: number; rate: number | null }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex justify-between items-baseline">
-        <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{label}</span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">
-          <span className="text-base font-black text-brand-600 dark:text-brand-400">{percent(rate)}</span>
-          <span className="ml-2">{done} / {total}</span>
-        </span>
-      </div>
-      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
-        <div className="bg-brand-500 h-full rounded-full" style={{ width: `${Math.round((rate ?? 0) * 100)}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function weekBucketLabel(label: string): string {
-  const [, m, d] = label.split('-');
-  return `${Number(m)}/${Number(d)}`;
-}
-
-function monthBucketLabel(label: string): string {
-  const [y, m] = label.split('-');
-  return `${y}/${Number(m)}`;
-}
-
-function TrendChart({ title, note, buckets, formatLabel, everyNth = 1 }: {
-  title: string;
-  note?: string;
-  buckets: TrendBucket[];
-  formatLabel: (label: string) => string;
-  everyNth?: number;
-}) {
-  const totalMinutes = buckets.reduce((sum, b) => sum + b.studyMinutes, 0);
-  return (
-    <div>
-      <div className="flex justify-between items-baseline gap-2 flex-wrap mb-2">
-        <p className="text-xs font-bold text-slate-600 dark:text-slate-300">{title}</p>
-        <p className="text-[11px] text-slate-400">合計 {(totalMinutes / 60).toFixed(1)}時間相当</p>
-      </div>
-      {buckets.length === 0 || buckets.every(b => b.completedWork === 0) ? (
-        <p className="text-xs text-slate-400">まだ集計できるデータがありません</p>
-      ) : (
-        <MiniBars
-          values={buckets.map(b => b.completedWork)}
-          labels={buckets.map((b, i) => (i % everyNth === 0 ? formatLabel(b.label) : ''))}
-          showValues={buckets.length <= 6}
-          ariaLabel={title}
-        />
-      )}
-      {note && <p className="text-[11px] text-slate-400 mt-2">{note}</p>}
-    </div>
-  );
-}
-
 const OUTCOME_LABEL: Record<FocusSessionScore['outcome'], string> = {
   completed: '完走',
   stopped: '中止',
@@ -163,11 +101,13 @@ function penaltyText(p: FocusSessionScore['penalties']): string {
 // ロバストZの目安を言葉にする(±0.5未満は「いつも通り」)
 function zLabel(z: number | null): string {
   if (z === null) return '—';
-  if (z >= 1) return `いつもより高い(${signedDelta(z)})`;
-  if (z >= 0.5) return `やや高い(${signedDelta(z)})`;
-  if (z > -0.5) return `いつも通り(${signedDelta(z)})`;
-  if (z > -1) return `やや低い(${signedDelta(z)})`;
-  return `いつもより低い(${signedDelta(z)})`;
+  const rounded = Math.round(z * 10) / 10;
+  const delta = rounded === 0 ? '±0.0' : `${rounded > 0 ? '+' : ''}${rounded.toFixed(1)}`;
+  if (z >= 1) return `いつもより高い(${delta})`;
+  if (z >= 0.5) return `やや高い(${delta})`;
+  if (z > -0.5) return `いつも通り(${delta})`;
+  if (z > -1) return `やや低い(${delta})`;
+  return `いつもより低い(${delta})`;
 }
 
 const LATENCY_BUCKETS: { key: keyof LatencyStats['buckets']; label: string; className: string }[] = [
@@ -215,7 +155,7 @@ function LatencyBlock({ title, stats }: { title: string; stats: LatencyStats }) 
 
 export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = false }: {
   analytics: PomodoroAnalytics | null;
-  // 暫定の集中度スコア(減点の内訳つき)を表示するか。生徒本人には出さず、教師・管理者向けの画面のみで使う
+  // 暫定の集中度スコアを表示するか。生徒本人には出さず、教師・管理者向けの画面のみで使う
   showFocusScore?: boolean;
 }) {
   if (!analytics) {
@@ -233,13 +173,8 @@ export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = fal
     );
   }
 
-  const { habit, transitions, completion, focus, bySubject, trends, focusScore, windowDays } = analytics;
-  const weeks = habit.weeklyActiveDays.length;
-  const weekLabels = habit.weeklyActiveDays.map((_, i) => (i === weeks - 1 ? '直近7日' : `${weeks - 1 - i}週前`));
+  const { habit, transitions, completion, focus, bySubject, periods, focusScore } = analytics;
   const hourLabels = habit.byHour.map((_, h) => (h % 6 === 0 ? String(h) : ''));
-  const ratingDelta = focus.recentAvgRating !== null && focus.previousAvgRating !== null
-    ? focus.recentAvgRating - focus.previousAvgRating
-    : null;
   const workInterruptions = completion.workStopped + completion.workAbandoned + completion.workUnfinished;
 
   // 曜日別の完了率(サンプルが少ない曜日は除いて最低/最高だけ見せる)
@@ -254,21 +189,19 @@ export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = fal
       <div>
         <h3 className="text-lg font-bold font-title text-slate-800 dark:text-white">学習習慣と集中の分析</h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          直近{windowDays}日間のポモドーロ操作ログから集計しています(時刻は日本時間)。
+          ポモドーロの操作ログから集計しています(時刻は日本時間)。
         </p>
       </div>
 
+      <Card title="連続・累計・週毎・月毎" note="完了率・学習時間・平均評価など、期間で区切って見られる指標はここで切り替えて確認できます">
+        <PeriodStatsSwitcher periods={periods} showFocusScore={showFocusScore} />
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="学習習慣" note="タイマーが最後まで進んだ作業の回数をもとにしています">
+        <Card title="学習習慣のパターン" note="時間帯・曜日・1回の学習でのまとまりなど、期間を区切らない傾向です">
           <div className="grid grid-cols-2 gap-3">
-            <Stat label="学習した日数" value={`${habit.activeDays} / ${windowDays}日`} />
-            <Stat label="現在の連続日数" value={`${habit.currentStreak}日`} sub={`最長 ${habit.longestStreak}日(直近90日)`} />
-            <Stat label="完了したポモドーロ" value={`${habit.completedWorkCount}回`} sub={`学習した日あたり ${decimal(habit.avgPomosPerActiveDay)}回`} />
+            <Stat label="現在の連続日数" value={`${habit.currentStreak}日`} sub={`最長 ${habit.longestStreak}日(履歴全体)`} />
             <Stat label="1回の学習での連続数" value={`平均 ${decimal(habit.avgPomosPerSession)}回`} sub={`最長 ${habit.maxPomosInSession}回(1時間以内の間隔で続けたもの)`} />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">週ごとの学習日数(7日中)</p>
-            <MiniBars values={habit.weeklyActiveDays} labels={weekLabels} maxValue={7} showValues ariaLabel="週ごとの学習日数" />
           </div>
           <div>
             <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">始めた時間帯(時)</p>
@@ -296,13 +229,7 @@ export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = fal
             )}
           </Card>
 
-          <Card title="完了率" note="結果が確定した区間だけを数えています(実行中のもの、および実際に動かした時間が1分未満の押し間違いは含みません)">
-            <ProgressRow label="作業を最後までやり切った割合" done={completion.workCompleted} total={completion.workStarted} rate={completion.workCompletionRate} />
-            <ProgressRow label="休憩を最後まで取った割合" done={completion.breakCompleted} total={completion.breakStarted} rate={completion.breakCompletionRate} />
-            <div className="grid grid-cols-2 gap-3 -mt-1">
-              <Stat label="通常休憩(5分)の完了率" value={percent(completion.shortBreakCompletionRate)} />
-              <Stat label="大休憩(15分)の完了率" value={percent(completion.longBreakCompletionRate)} sub="低いと、せっかくの大休憩を取らず進んでいるかも" />
-            </div>
+          <Card title="完了率の内訳" note="完了率そのものは上の「連続・累計・週毎・月毎」を、途中で終わった理由の内訳はここを見てください">
             <ul className="text-xs text-slate-500 dark:text-slate-400 flex flex-col gap-1">
               {workInterruptions > 0 && (
                 <li>
@@ -310,21 +237,18 @@ export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = fal
                   (中止 {completion.workStopped} / タブを閉じた等 {completion.workAbandoned} / 一時停止のまま放置など {completion.workUnfinished})
                 </li>
               )}
-              <li>作業1回あたりの一時停止 {decimal(completion.avgPausesPerWork)}回</li>
               <li>作業後に休憩を取らず終えた回数 {completion.quitBeforeBreak}回</li>
               <li>休憩後に次の作業を始めず終えた回数 {completion.quitBeforeWork}回</li>
             </ul>
+            <div className="grid grid-cols-2 gap-3">
+              <Stat label="通常休憩(5分)の完了率" value={percent(completion.shortBreakCompletionRate)} />
+              <Stat label="大休憩(15分)の完了率" value={percent(completion.longBreakCompletionRate)} sub="低いと、せっかくの大休憩を取らず進んでいるかも" />
+            </div>
           </Card>
 
-          <Card title="集中の指標" note="集中度の自己評価(1〜5)と、残り時間の確認回数から見ています">
+          <Card title="集中の指標" note="残り時間を確認した/しなかった作業で、自己申告の集中度評価に違いがあるかの比較です">
             <div className="grid grid-cols-2 gap-3">
-              <Stat label="集中度の平均" value={decimal(focus.avgRating)} sub={`評価 ${focus.ratingCount}回${focus.ratingSkippedCount > 0 ? ` / スキップ ${focus.ratingSkippedCount}回` : ''}`} />
-              <Stat
-                label="直近7日の平均"
-                value={decimal(focus.recentAvgRating)}
-                sub={ratingDelta === null ? '比較できるデータがまだありません' : `その前の7日 ${decimal(focus.previousAvgRating)}(${signedDelta(ratingDelta)})`}
-              />
-              <Stat label="残り時間の確認" value={`${decimal(focus.avgTimeChecksPerWork)}回`} sub="作業1回あたりの平均" />
+              <Stat label="集中度評価の件数" value={`${focus.ratingCount}回`} sub={focus.ratingSkippedCount > 0 ? `スキップ ${focus.ratingSkippedCount}回` : undefined} />
               <Stat
                 label="確認の有無で比べた集中度"
                 value={focus.avgRatingWithChecks === null ? '—' : `${decimal(focus.avgRatingWithoutChecks)} / ${decimal(focus.avgRatingWithChecks)}`}
@@ -335,44 +259,18 @@ export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = fal
         </div>
       </div>
 
-      <Card title="週・月ごとの学習量の推移" note="取得できた履歴全体(最大90日分)で集計しています。直近の期間だけでなく、長い目で見た傾向の確認に使ってください">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <TrendChart title="週ごとの完了ポモドーロ数" buckets={trends.weekly} formatLabel={weekBucketLabel} everyNth={2} />
-          <TrendChart title="月ごとの完了ポモドーロ数" buckets={trends.monthly} formatLabel={monthBucketLabel} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Stat
-            label="連続記録の平均日数"
-            value={trends.streakLengths.averageDays === null ? '—' : `${decimal(trends.streakLengths.averageDays)}日`}
-            sub={trends.streakLengths.completedStreakCount > 0 ? `中央値 ${decimal(trends.streakLengths.medianDays)}日 / ${trends.streakLengths.completedStreakCount}回の記録` : '記録がまだありません'}
-          />
-          <Stat
-            label="累計の学習時間"
-            value={`${(trends.cumulative.totalStudyMinutes / 60).toFixed(1)}時間`}
-            sub={`完了したポモドーロ 累計${trends.cumulative.totalCompletedWork}回`}
-          />
-        </div>
-      </Card>
-
       {showFocusScore && (
         <Card
-          title="集中度スコア(暫定)"
-          note="操作ログ(残り時間の確認・一時停止・休憩後の再開の遅れ・中断)だけから機械的に計算した、暫定のたたき台です。係数は実データがたまってから統計的に決め直す予定で、生徒への報酬(EXP等)には使っていません。実際に動かした時間が1分未満のもの(押し間違い)は集計から除いています。"
+          title="集中度スコア(暫定)の内訳"
+          note="操作ログ(残り時間の確認・一時停止・休憩後の再開の遅れ・中断)だけから機械的に計算した、暫定のたたき台です。係数は実データがたまってから統計的に決め直す予定で、生徒への報酬(EXP等)には使っていません。実際に動かした時間が1分未満のもの(押し間違い)は集計から除いています。平均値は上の「連続・累計・週毎・月毎」で確認できます。"
         >
-          <div className="grid grid-cols-2 gap-3">
-            <Stat
-              label={`直近${windowDays}日の集中度`}
-              value={focusScore.weightedAvg === null ? '—' : `${Math.round(focusScore.weightedAvg)}点`}
-              sub={`作業時間で重みを付けた平均 / ${focusScore.sessionCount}セッション`}
-            />
-            <Stat
-              label="最新の完走セッション(本人比)"
-              value={zLabel(focusScore.latestRobustZ)}
-              sub={focusScore.baseline
-                ? `本人の直近${focusScore.baseline.n}回の中央値 ${Math.round(focusScore.baseline.median)}点と比較`
-                : '完走が5回たまると本人基準で比較できます'}
-            />
-          </div>
+          <Stat
+            label="最新の完走セッション(本人比)"
+            value={zLabel(focusScore.latestRobustZ)}
+            sub={focusScore.baseline
+              ? `本人の直近${focusScore.baseline.n}回の中央値 ${Math.round(focusScore.baseline.median)}点と比較`
+              : '完走が5回たまると本人基準で比較できます'}
+          />
 
           <div>
             <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">日ごとの有効集中時間(分。集中度×作業時間の合計)</p>
@@ -464,7 +362,7 @@ export default function PomodoroAnalyticsPanel({ analytics, showFocusScore = fal
           <li>切り替えの速さ = タイマー完了から次のスタートボタンまで。30分以内に次を始めなかった場合は「再開せず終了」として除外します。</li>
           <li>1回の学習 = 前の作業が終わってから1時間以内に次の作業を始めた、ひと続きのまとまり。</li>
           <li>集中度の平均には「スキップ(普通とする)」を含めません。ただしスキップの記録を始める前のデータは、本当の「3」と区別できません。</li>
-          <li>週・月ごとの推移と連続記録・累計は、上の指標(直近{windowDays}日)と違い、取得できた履歴全体(最大90日分)で集計しています。</li>
+          <li>「連続・累計・週毎・月毎」は取得できた履歴全体(最大90日分)で集計しています。「連続」は活動が途切れず並んだ日の範囲ごと、「週毎」は直近7日間隔、「月毎」はカレンダー月です。</li>
           <li>学習時間は25分固定ではなく、実際の開始〜完了の時間から計算しています(将来ポモドーロの長さが変わっても正しく集計されるようにするため)。</li>
           <li>数値は行動の記録から見た傾向で、能力や意欲の優劣を示すものではありません。</li>
         </ul>

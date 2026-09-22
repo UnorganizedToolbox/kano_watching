@@ -140,10 +140,10 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
               学習時間 (ポモドーロ)
             </h3>
             <div className="text-4xl font-black text-slate-800 dark:text-white mb-2">
-              {pomodoroAnalytics?.trends.cumulative.totalCompletedWork ?? 0} <span className="text-sm text-slate-500 font-normal">回完了</span>
+              {pomodoroAnalytics?.periods.cumulative.completedWork ?? 0} <span className="text-sm text-slate-500 font-normal">回完了</span>
             </div>
             <p className="text-xs text-slate-400 mb-4">
-              学習時間(実測): {((pomodoroAnalytics?.trends.cumulative.totalStudyMinutes ?? 0) / 60).toFixed(1)} 時間(直近90日)
+              学習時間(実測): {((pomodoroAnalytics?.periods.cumulative.studyMinutes ?? 0) / 60).toFixed(1)} 時間(直近90日)
             </p>
 
             <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
