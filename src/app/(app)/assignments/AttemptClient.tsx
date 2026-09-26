@@ -17,17 +17,8 @@ export interface QuestionView {
 export interface ScoreBreakdown {
   rawScore: number;
   tier: ScoreAdjustmentTier;
-  multiplier: number;
-  adjustedScore: number;
   expAwarded: number | null;
 }
-
-const TIER_LABEL: Record<ScoreAdjustmentTier, string> = {
-  early: '早期提出ボーナス',
-  ontime: '',
-  late: '期限超過ペナルティ',
-  none: '',
-};
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -168,20 +159,19 @@ export default function AttemptClient({
               <span>誤り</span>
               <span>{Math.round(100 - scoreBreakdown.rawScore)}%</span>
             </div>
-            {TIER_LABEL[scoreBreakdown.tier] && (
-              <div className={`flex justify-between py-0.5 font-bold ${scoreBreakdown.tier === 'early' ? 'text-brand-600' : 'text-rose-500'}`}>
-                <span>{TIER_LABEL[scoreBreakdown.tier]}</span>
-                <span>{scoreBreakdown.tier === 'early' ? '+20%' : '-20%'}</span>
-              </div>
-            )}
             <div className="flex justify-between items-baseline font-bold text-slate-800 dark:text-white border-t border-slate-200 dark:border-slate-700 mt-2 pt-2">
               <span>スコア</span>
-              <span className="text-lg text-brand-600">{Math.round(scoreBreakdown.adjustedScore)}%</span>
+              <span className="text-lg text-brand-600">{Math.round(scoreBreakdown.rawScore)}%</span>
             </div>
             {scoreBreakdown.expAwarded !== null && (
-              <div className="flex justify-between items-baseline font-bold text-amber-600 dark:text-amber-400 mt-1">
-                <span>獲得EXP</span>
-                <span>+{Math.round(scoreBreakdown.expAwarded * 10) / 10}</span>
+              <div className="mt-1">
+                <div className="flex justify-between items-baseline font-bold text-amber-600 dark:text-amber-400">
+                  <span>獲得EXP</span>
+                  <span>+{Math.round(scoreBreakdown.expAwarded * 10) / 10}</span>
+                </div>
+                {scoreBreakdown.tier === 'late' && (
+                  <p className="text-[11px] text-rose-500 text-right mt-0.5">期限超過のため獲得EXPが20%減っています(スコア自体には影響しません)</p>
+                )}
               </div>
             )}
           </div>

@@ -9,18 +9,24 @@ import {
 } from './expReward';
 
 describe('computeDeadlineExp', () => {
-  it('scales base EXP by both the timing multiplier and the raw score', () => {
-    expect(computeDeadlineExp(100, 1.2, 20)).toBeCloseTo(24);
-    expect(computeDeadlineExp(100, 1.0, 20)).toBeCloseTo(20);
-    expect(computeDeadlineExp(100, 0.8, 20)).toBeCloseTo(16);
+  // 2026-09-26のCBT締切倍率是正: 素点そのものではなく自己ベストとの上昇分(%)を元にする
+  it('scales base EXP by the improvement over the previous best, not the raw score', () => {
+    expect(computeDeadlineExp(80, 70, 1.0, 100)).toBeCloseTo(10); // 70→80: 10%上昇 → 10%のEXP
+    expect(computeDeadlineExp(100, 0, 1.0, 20)).toBeCloseTo(20);
   });
 
-  it('gives zero EXP for a zero score regardless of multiplier', () => {
-    expect(computeDeadlineExp(0, 1.2, 20)).toBe(0);
+  it('applies the late-submission multiplier only to the improvement-based EXP', () => {
+    // 70→80: 本来10%のEXPが、遅延時(x0.8)は8%になる(CLAUDE.local.mdの例と一致)
+    expect(computeDeadlineExp(80, 70, 0.8, 100)).toBeCloseTo(8);
   });
 
-  it('scales proportionally with a partial score', () => {
-    expect(computeDeadlineExp(50, 1.0, 20)).toBeCloseTo(10);
+  it('never returns negative EXP when the score regresses, regardless of multiplier', () => {
+    expect(computeDeadlineExp(60, 80, 1.0, 20)).toBe(0);
+    expect(computeDeadlineExp(60, 80, 0.8, 20)).toBe(0);
+  });
+
+  it('gives zero EXP when there is no improvement over the previous best', () => {
+    expect(computeDeadlineExp(70, 70, 1.0, 20)).toBe(0);
   });
 });
 

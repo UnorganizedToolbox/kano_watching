@@ -46,6 +46,18 @@ async function loadAssignment(supabase: SupabaseClient, assignmentId: string): P
   return data as AssignmentRow;
 }
 
+// これまでの自己ベスト正答率(採点済みの過去挑戦の最大score)を取得する。
+// deadline/no_deadlineどちらもEXPは「自己ベストからの上昇分」を元に計算するため共通化した。
+async function loadPreviousBestScore(supabase: SupabaseClient, assignmentId: string, userId: string): Promise<number> {
+  const { data: priorAttempts } = await supabase
+    .from('problem_attempts')
+    .select('score')
+    .eq('assignment_id', assignmentId)
+    .eq('student_id', userId)
+    .eq('status', 'graded');
+  return (priorAttempts ?? []).reduce((max, a) => Math.max(max, (a.score as number | null) ?? 0), 0);
+}
+
 // exp_rates(管理者が調整可能なEXP係数テーブル)を読み込む。行が無いキーは
 // 実装イメージ文書(v4) 8.2節の既定値にフォールバックする。
 async function loadExpRates(supabase: SupabaseClient): Promise<ExpRatesConfig> {
@@ -286,19 +298,13 @@ export async function submitAttempt(input: SubmitAttemptInput): Promise<ActionRe
       if (assignment.delivery_mode === 'deadline') {
         const { multiplier } = computeScoreAdjustment({
           deliveryMode: assignment.delivery_mode,
-          createdAt: assignment.created_at,
           dueAt: assignment.due_at,
           submittedAt: now,
         });
-        expAwarded = computeDeadlineExp(score, multiplier, rates.assignmentBaseExp);
+        const previousBest = await loadPreviousBestScore(supabase, input.assignmentId, userId);
+        expAwarded = computeDeadlineExp(score, previousBest, multiplier, rates.assignmentBaseExp);
       } else if (assignment.delivery_mode === 'no_deadline') {
-        const { data: priorAttempts } = await supabase
-          .from('problem_attempts')
-          .select('score')
-          .eq('assignment_id', input.assignmentId)
-          .eq('student_id', userId)
-          .eq('status', 'graded');
-        const previousBest = (priorAttempts ?? []).reduce((max, a) => Math.max(max, (a.score as number | null) ?? 0), 0);
+        const previousBest = await loadPreviousBestScore(supabase, input.assignmentId, userId);
         expAwarded = computeNoDeadlineExp(score, previousBest, rates.assignmentBaseExp);
       } else {
         const { data: priorAttempts } = await supabase

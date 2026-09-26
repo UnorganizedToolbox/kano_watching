@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { renderProblem } from "@/lib/cbt/render";
 import { renderTypstToSvg } from "@/lib/typst";
-import { computeScoreAdjustment, applyScoreAdjustment } from "@/lib/cbt/scoreAdjustment";
+import { computeScoreAdjustment } from "@/lib/cbt/scoreAdjustment";
 import type { TemplateKind, SubQuestionDef, PairItem } from "@/lib/cbt/types";
 import type { QuestionInstance, SubResultRow } from "../actions";
 import StartAttemptButton from "../StartAttemptButton";
@@ -15,22 +15,22 @@ function buildProblemTypstSource(problemText: string): string {
   return `#set page(width: auto, height: auto, margin: 0.6em)\n#set text(size: 16pt)\n\n${problemText}\n`;
 }
 
-// 提出タイミングに応じたスコア倍率の内訳を組み立てる。問題自体の正答率
-// (problem_attempts.score)は書き換えず、表示用にここで導出するだけ。
+// 提出タイミングの遅延判定(tier)を組み立てる。2026-09-26以降、素点(problem_attempts.score)
+// には一切倍率をかけない(遅延ペナルティはEXP計算のみに反映。expReward.ts参照)ため、ここでは
+// 表示用にtierだけを導出する。
 function buildScoreBreakdown(
-  assignment: { delivery_mode: 'deadline' | 'no_deadline' | 'permanent'; due_at: string | null; created_at: string },
+  assignment: { delivery_mode: 'deadline' | 'no_deadline' | 'permanent'; due_at: string | null },
   rawScore: number | null,
   submittedAt: string | null,
   expAwarded: number | null,
 ): ScoreBreakdown | null {
   if (rawScore === null || !submittedAt) return null;
-  const { tier, multiplier } = computeScoreAdjustment({
+  const { tier } = computeScoreAdjustment({
     deliveryMode: assignment.delivery_mode,
-    createdAt: assignment.created_at,
     dueAt: assignment.due_at,
     submittedAt,
   });
-  return { rawScore, tier, multiplier, adjustedScore: applyScoreAdjustment(rawScore, multiplier), expAwarded };
+  return { rawScore, tier, expAwarded };
 }
 
 interface TemplateRow {

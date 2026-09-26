@@ -1,7 +1,8 @@
 // CBT課題の採点結果からEXPを計算する純粋関数群。
-// 実装イメージ文書(v4) 8章の計算式をそのまま実装する。配信区分(delivery_mode)ごとに
-// 計算式が異なる:
-//   - deadline(期限付き): 基礎EXP × 提出タイミング倍率(scoreAdjustment.ts) × (素点/100)
+// 実装イメージ文書(v4) 8章の計算式をベースに、2026-09-26のCBT締切倍率是正で一部変更した:
+//   - deadline(期限付き): no_deadlineと同じ「自己ベストとの差分(%)」を基礎EXPに対する割合
+//     として使い、締切超過時のみ提出タイミング倍率(scoreAdjustment.ts、×0.80)をかける。
+//     早期提出ボーナスは廃止済み(素点ベースの倍率計算からdiffベースの計算に変更)。
 //   - no_deadline(期限なし): 自己ベストとの差分(%)がそのままEXP%になる(倍率なし)
 //   - permanent(恒常/単問): 素点は使わず、基礎EXP + 連続日数ボーナス(上限あり)
 
@@ -19,8 +20,12 @@ export const DEFAULT_EXP_RATES: ExpRatesConfig = {
   assignmentBaseExp: 20,
 };
 
-export function computeDeadlineExp(rawScore: number, multiplier: number, baseExp: number): number {
-  return baseExp * multiplier * (rawScore / 100);
+// 計算式: max(0, 今回の正答率 − これまでの自己ベスト正答率) を基礎EXPに対する割合として使い、
+// 締切超過時のみmultiplier(0.80)をかける(素点自体には一切倍率をかけない。表示用のスコアは
+// 常にrawScoreそのまま)。例: 素点が70→80に上昇した場合、本来10%のEXPが、遅延提出時は8%になる。
+export function computeDeadlineExp(rawScore: number, previousBestScore: number, multiplier: number, baseExp: number): number {
+  const diff = Math.max(0, rawScore - previousBestScore);
+  return baseExp * multiplier * (diff / 100);
 }
 
 // 計算式: max(0, 今回の正答率 − これまでの自己ベスト正答率) を基礎EXPに対する割合として使う。

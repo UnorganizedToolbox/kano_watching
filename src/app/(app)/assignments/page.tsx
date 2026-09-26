@@ -2,7 +2,6 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { computeScoreAdjustment, applyScoreAdjustment } from "@/lib/cbt/scoreAdjustment";
 
 type DeliveryMode = 'deadline' | 'no_deadline' | 'permanent';
 
@@ -53,13 +52,8 @@ export default async function StudentAssignmentsPage() {
     if (!latest) return { text: '未着手', className: 'bg-slate-100 dark:bg-slate-800 text-slate-500' };
     if (latest.status === 'in_progress') return { text: '挑戦中', className: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' };
     if (a.grading_mode === 'auto_exact' && latest.score !== null && latest.submittedAt) {
-      const { multiplier } = computeScoreAdjustment({
-        deliveryMode: a.delivery_mode,
-        createdAt: a.created_at,
-        dueAt: a.due_at,
-        submittedAt: latest.submittedAt,
-      });
-      const rounded = Math.round(applyScoreAdjustment(latest.score, multiplier));
+      // 2026-09-26以降、一覧の表示スコアは常に素点(倍率は表示に反映しない。EXPのみに影響)。
+      const rounded = Math.round(latest.score);
       return rounded >= 100
         ? { text: `${rounded}%`, className: 'bg-brand-100 dark:bg-brand-900/30 text-brand-600' }
         : { text: `${rounded}%`, className: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600' };

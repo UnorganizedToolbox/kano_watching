@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { saveDeck, deleteDeck, listTemplatesForPicker, listDecksForPicker, type DeckInput, type DeckItemForm } from './actions';
 import type { DeckChildKind } from '@/lib/cbt/deck';
 import { DECK_MAX_QUESTIONS } from '@/lib/cbt/deck';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Info } from 'lucide-react';
 
 const EMPTY_ITEM: DeckItemForm = { childKind: 'template', childId: '', weight: 1 };
 
@@ -127,6 +127,17 @@ export default function DeckForm({
             </select>
           </div>
         )}
+      </div>
+
+      <div className="flex gap-2.5 items-start bg-sky-50 dark:bg-sky-900/20 border border-sky-100 dark:border-sky-800/50 rounded-2xl p-4 text-xs text-sky-800 dark:text-sky-300">
+        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+        <p>
+          <span className="font-bold">使い分けの目安:</span> 直後の演習用には同じ単元のテンプレートだけを
+          集めた「単一単元デッキ」で構いませんが、定期テスト対策や復習用のデッキは、複数の単元・解法
+          パターンを意図的に混ぜた「インターリーブ(交差)デッキ」にすると、まとめて同じ単元を解き続ける
+          より長期的な定着に効果が高いことが研究で示されています。上の構成欄に単元の異なる複数の
+          テンプレート/サブデッキを追加すると、そのままインターリーブ用デッキになります。
+        </p>
       </div>
 
       <div className="card-glass bg-white dark:bg-darkbg-secondary border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
