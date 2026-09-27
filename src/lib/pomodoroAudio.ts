@@ -132,15 +132,45 @@ export async function renderAlarmBlobUrl(type: SoundType): Promise<string> {
   return URL.createObjectURL(encodeWavBlob(rendered));
 }
 
-// ループ境界で振幅をゼロへテーパーし、繋ぎ目の「プツッ」というクリックノイズを除去する
-function applyLoopFadeEdges(output: Float32Array, fadeSamples: number) {
-  const n = output.length;
-  for (let i = 0; i < fadeSamples && i < n; i++) {
-    const gain = i / fadeSamples;
+// ループ境界を「末尾を先頭側の延長分とクロスフェードする」方式でつなぐ。
+// 以前は両端を無音(ゲイン0)へテーパーしていたが、これだと毎分の繋ぎ目に
+// 一瞬の無音区間ができてしまい(「毎分の無音区間の原因」)、それ自体が集中を
+// 途切れさせる要因になり得た。ここではraw(末尾にcrossfadeSamples分の「継続」を
+// 余分に生成したもの)の末尾区間を、その継続分と等パワー(cos/sinの二乗和が
+// 常に1)でブレンドする。ホワイト/ピンク/ブラウンノイズはいずれも定常な
+// 確率過程なので、無音へ落とすのではなく本物の継続波形とブレンドすることで、
+// 音量が一切落ちない・統計的にも自然な繋ぎ目になる。
+export function applyEqualPowerLoopCrossfade(raw: Float32Array, outLength: number, crossfadeSamples: number): Float32Array {
+  const output = raw.slice(0, outLength);
+  const cf = Math.min(crossfadeSamples, outLength);
+  for (let j = 0; j < cf; j++) {
+    const t = j / cf;
+    const fadeOut = Math.cos((t * Math.PI) / 2); // 1 -> 0
+    const fadeIn = Math.sin((t * Math.PI) / 2); // 0 -> 1
+    const idx = outLength - cf + j;
+    output[idx] = raw[idx] * fadeOut + raw[outLength + j] * fadeIn;
+  }
+  return output;
+}
+
+// 1分(=ループ1周)周期で音量が緩やかに上下する波を、あらかじめ波形サンプル自体に
+// 掛け合わせておく。iOSでは<audio>要素のvolumeプロパティが実行時に効かない機種が
+// あるため、再生後から音量を制御する手段に頼れず、波形そのものに埋め込む必要がある。
+// t=0とt=durationで値が完全に一致する(cosは周期durationの整数倍で連続)ため、
+// ループ境界にこの音量波自体が新たな段差を生むことはない。
+export function applyVolumeWave(output: Float32Array, sampleRate: number, durationSec: number, minGain: number) {
+  const mid = (1 + minGain) / 2;
+  const amp = (1 - minGain) / 2;
+  for (let i = 0; i < output.length; i++) {
+    const t = i / sampleRate;
+    const gain = mid + amp * Math.cos((2 * Math.PI * t) / durationSec);
     output[i] *= gain;
-    output[n - 1 - i] *= gain;
   }
 }
+
+// フェードイン/アウトの音量波の最小音量(最大を1.0とした比率)。0にはしない
+// (完全な無音区間を作らないことが目的のため)。
+export const VOLUME_WAVE_MIN_GAIN = 0.4;
 
 export async function renderNoiseBlobUrl(type: NoiseType): Promise<string> {
   const sampleRate = 44100;
@@ -149,24 +179,28 @@ export async function renderNoiseBlobUrl(type: NoiseType): Promise<string> {
   // 入ることがある)。波形側のフェードだけでは消せないため、ループ頻度そのものを
   // 下げて体感上の気になりを減らす。60秒でもファイルサイズは ~5MB程度で軽い。
   const duration = 60;
-  const fadeSamples = Math.floor(0.15 * sampleRate); // 150ms
+  const outLength = sampleRate * duration;
+  const crossfadeSamples = Math.floor(1 * sampleRate); // 1秒(等パワークロスフェード用)
+  // ループ境界のクロスフェードには「末尾より先の継続」が要るため、その分だけ
+  // 余分に生成してから末尾crossfadeSamples分をブレンドし、最終的にoutLengthへ切り詰める。
+  const rawLength = outLength + crossfadeSamples;
   const OfflineCtx = getOfflineAudioContextClass();
-  const offlineCtx = new OfflineCtx(1, sampleRate * duration, sampleRate);
-  const buffer = offlineCtx.createBuffer(1, sampleRate * duration, sampleRate);
-  const output = buffer.getChannelData(0);
+  const offlineCtx = new OfflineCtx(1, outLength, sampleRate);
+  const raw = new Float32Array(rawLength);
 
   if (type === 'silent') {
     // BGM「なし」でもバックグラウンド再生資格を維持するための、ほぼ聞こえない音量のループ
-    for (let i = 0; i < output.length; i++) {
-      output[i] = (Math.random() * 2 - 1) * 0.0008;
+    // (ほぼ無音なので音量波は不要)
+    for (let i = 0; i < rawLength; i++) {
+      raw[i] = (Math.random() * 2 - 1) * 0.0008;
     }
   } else {
     let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
     let lastOut = 0;
-    for (let i = 0; i < output.length; i++) {
+    for (let i = 0; i < rawLength; i++) {
       const white = Math.random() * 2 - 1;
       if (type === 'white') {
-        output[i] = white * 0.1;
+        raw[i] = white * 0.1;
       } else if (type === 'pink') {
         b0 = 0.99886 * b0 + white * 0.0555179;
         b1 = 0.99332 * b1 + white * 0.0750759;
@@ -174,16 +208,22 @@ export async function renderNoiseBlobUrl(type: NoiseType): Promise<string> {
         b3 = 0.86650 * b3 + white * 0.3104856;
         b4 = 0.55000 * b4 + white * 0.5329522;
         b5 = -0.7616 * b5 - white * 0.0168980;
-        output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + white * 0.5362) * 0.02;
+        raw[i] = (b0 + b1 + b2 + b3 + b4 + b5 + white * 0.5362) * 0.02;
       } else if (type === 'brown') {
         const out = (lastOut + (0.02 * white)) / 1.02;
         lastOut = out;
-        output[i] = out * 0.3;
+        raw[i] = out * 0.3;
       }
     }
   }
 
-  applyLoopFadeEdges(output, fadeSamples);
+  const output = applyEqualPowerLoopCrossfade(raw, outLength, crossfadeSamples);
+  if (type !== 'silent') {
+    applyVolumeWave(output, sampleRate, duration, VOLUME_WAVE_MIN_GAIN);
+  }
+
+  const buffer = offlineCtx.createBuffer(1, outLength, sampleRate);
+  buffer.getChannelData(0).set(output);
 
   const src = offlineCtx.createBufferSource();
   src.buffer = buffer;
