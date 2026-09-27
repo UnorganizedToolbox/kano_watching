@@ -37,6 +37,12 @@ type PersistedState = {
   timeLeft: number;
   sessionId: string | null;
   awaitingDecision: boolean;
+  // 作業完了直後、集中度評価モーダルの表示中にリロード/タブの再読み込みが起きても
+  // 「評価待ち」であることを見失わないようにするためのフラグ(2026-09-27追加)。
+  // これが無いと、リロード後は素の「開始」ボタンが出てしまい、押すと
+  // timeLeft=0のまま同じsession_idでSTARTが記録され、直後に(実質1秒未満で)
+  // 再度COMPLETEしてしまう「幽霊ポモドーロ」(二重カウント・二重EXP付与)が発生していた。
+  showRatingModal: boolean;
   dateKey: string;
 };
 
@@ -296,6 +302,11 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
         setTimeLeft(saved.timeLeft);
         setSessionId(saved.sessionId);
         setAwaitingDecision(saved.awaitingDecision);
+        // 集中度評価モーダルの表示中にリロードされた場合、これを復元しないと
+        // 「評価待ち」であることを見失い、素の「開始」ボタン(timeLeft=0のまま同じ
+        // session_idを再利用)が出てしまい、直後に再度COMPLETEしてしまう
+        // 「幽霊ポモドーロ」の原因になる(2026-09-27発見)。
+        setShowRatingModal(!!saved.showRatingModal);
         // 無事に復元できた=まだ操作中とみなし、このモードを基準に有効期限を延長し直す
         touchActivity(durationFor(saved.mode));
       } else {
@@ -314,8 +325,8 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   // (pomoCountは含めない。常にDBが正のため)
   useEffect(() => {
     if (!hasHydratedRef.current) return;
-    savePersistedState({ mode, targetEndTime, isRunning, timeLeft, sessionId, awaitingDecision, dateKey: todayKey() });
-  }, [mode, targetEndTime, isRunning, timeLeft, sessionId, awaitingDecision]);
+    savePersistedState({ mode, targetEndTime, isRunning, timeLeft, sessionId, awaitingDecision, showRatingModal, dateKey: todayKey() });
+  }, [mode, targetEndTime, isRunning, timeLeft, sessionId, awaitingDecision, showRatingModal]);
 
 
   // Setup Web Worker for accurate background timing (bypasses iOS Safari throttling)
@@ -456,16 +467,25 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
 
   const toggleTimer = () => {
     if (!isRunning) {
-      const isFreshSegment = !sessionId || awaitingDecision;
+      // timeLeftが0以下のまま「開始」が押されるケースへの防御(2026-09-27発見)。
+      // 本来は決定待ち画面/評価モーダルに遷移しているはずだが、リロード等でそれを
+      // 見失った状態で古いsession_id・timeLeft=0のまま再開されると、即座(1秒未満)に
+      // 再度COMPLETEしてしまう「幽霊ポモドーロ」(完了数の二重カウント・EXPの二重付与)
+      // が発生していた。この場合は新しいセッションとして、そのモードの満タンの時間
+      // から始め直す。
+      const needsFreshStart = timeLeft <= 0;
+      const isFreshSegment = !sessionId || awaitingDecision || needsFreshStart;
       const sid = isFreshSegment ? crypto.randomUUID() : sessionId!;
       if (isFreshSegment) setSessionId(sid);
+      const startTimeLeft = needsFreshStart ? durationFor(mode) : timeLeft;
+      if (needsFreshStart) setTimeLeft(startTimeLeft);
       setAwaitingDecision(false);
       setAutoEndedNotice(null); // 新しく始めたら「自動終了しました」の表示は消す
       // 開始・再開の時点でCookieを延長する。ここで延長しないと、決定待ちで長く待ってから
       // 始めた場合や初回の作業で、実行中にCookieが無い/失効している状態になり得る。
       touchActivity(durationFor(mode));
       setIsRunning(true);
-      setTargetEndTime(Date.now() + timeLeft * 1000);
+      setTargetEndTime(Date.now() + startTimeLeft * 1000);
       void startAudioForSession(); // ユーザー操作のタイミングで BGM・アラームを解錠する
       // scheduled_seconds: 予定時間(集中度スコアを作業時間非依存にするため。将来、時間が可変になっても
       // 比較できる)。bgm: このセッションで流したBGMの種類(BGMと集中度の関係を後から分析するため。
