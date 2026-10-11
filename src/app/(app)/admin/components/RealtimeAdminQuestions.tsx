@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react';
+import { useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 
 export default function RealtimeAdminQuestions() {
   const router = useRouter();
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -22,7 +23,10 @@ export default function RealtimeAdminQuestions() {
         table: 'questions'
       }, (payload) => {
         console.log('Realtime admin update received:', payload);
-        router.refresh();
+        // RealtimeQuestions.tsxと同じ理由でstartTransitionで包む(2026-10-11)
+        startTransition(() => {
+          router.refresh();
+        });
       })
       .subscribe();
 

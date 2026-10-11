@@ -125,6 +125,13 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
   const [awaitingDecision, setAwaitingDecision] = useState(false);
   const [autoEndedNotice, setAutoEndedNotice] = useState<string | null>(null);
   const hasHydratedRef = useRef(false);
+  // マウント直後(localStorageからの復元が終わるまで)は、本来のタイマー画面を描画しない。
+  // SSR中はwindow/localStorageが無いため、timeLeft等の初期値は常にデフォルト(25:00・停止中)
+  // になるが、これをそのまま描画してしまうと、何らかの理由でこのコンポーネントが再マウント
+  // された場合に「一瞬だけ25:00・停止中の画面が見える→直後に復元されて元に戻る」という
+  // 「タイマーがリセットされたように見える」症状の原因になる(2026-10-11調査)。代わりに
+  // 復元が終わるまでは中立なローディング表示に留め、間違った状態を一切描画しないようにする。
+  const [isHydrated, setIsHydrated] = useState(false);
   const { lock, unlock } = useNavLock();
 
   // 開始・一時停止・決定待ち画面に入る等、「今まさに操作した」タイミングで呼ぶ。
@@ -319,6 +326,7 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
     }
 
     hasHydratedRef.current = true;
+    setIsHydrated(true);
   }, [touchActivity]);
 
   // 現在のタイマー状態を localStorage に保存し、リロード後も復元できるようにする
@@ -557,6 +565,18 @@ export default function PomodoroTimer({ gradeLevel }: { gradeLevel: GradeLevel |
 
   const isWork = mode === 'WORK';
   const modeLabel = mode === 'WORK' ? '集中 (25分)' : mode === 'LONG_BREAK' ? '大休憩 (15分)' : '休憩 (5分)';
+
+  // localStorageからの復元が終わるまでは、デフォルト値(25:00・停止中)をそのまま出さない。
+  // 外枠のサイズ・配色は本来の画面と揃え、レイアウトのガタつきだけは避ける。
+  if (!isHydrated) {
+    return (
+      <div className="card-glass border rounded-3xl p-10 flex flex-col items-center justify-center shadow-lg relative overflow-hidden flex-1 min-h-[400px] bg-white dark:bg-darkbg-secondary border-slate-200 dark:border-slate-800">
+        <div className="w-64 h-64 rounded-full border-8 border-slate-100 dark:border-slate-800 flex items-center justify-center">
+          <span className="text-sm font-bold text-slate-300 dark:text-slate-700 animate-pulse">読み込み中…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
