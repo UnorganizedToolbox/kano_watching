@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { formatJstDateTime } from "@/lib/formatDate";
 
 type DeliveryMode = 'deadline' | 'no_deadline' | 'permanent';
 
@@ -89,7 +90,7 @@ export default async function StudentAssignmentsPage() {
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
                     {DELIVERY_MODE_LABEL[a.delivery_mode]}
-                    {a.delivery_mode === 'deadline' && a.due_at && ` ・ 締切 ${new Date(a.due_at).toLocaleString()}`}
+                    {a.delivery_mode === 'deadline' && a.due_at && ` ・ 締切 ${formatJstDateTime(a.due_at)}`}
                     {/* 完了済みなら「超過」の警告表示は出さない(未着手・挑戦中のときだけ意味がある) */}
                     {!isCompleted && isOverdue && <span className="text-rose-500 font-bold"> (締切超過)</span>}
                   </p>

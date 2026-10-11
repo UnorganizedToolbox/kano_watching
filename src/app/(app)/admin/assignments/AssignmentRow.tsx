@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Pencil, Trash2 } from 'lucide-react';
 import { deleteAssignment } from '../problems/[id]/deliver/actions';
+import { formatJstDate, formatJstDateTime } from '@/lib/formatDate';
 
 const DELIVERY_MODE_LABEL: Record<string, string> = {
   deadline: '期限あり',
@@ -56,7 +57,7 @@ export default function AssignmentRow({
         <p className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate">{title}</p>
         <p className="text-[10px] text-slate-400 mt-0.5">
           {organizationName} ・ {targetType === 'organization' ? '団体全員' : targetType === 'all' ? '全団体・全員' : `生徒${targetCount}名`} ・ {DELIVERY_MODE_LABEL[deliveryMode]}
-          {dueAt && ` (締切 ${new Date(dueAt).toLocaleString()})`} ・ {GRADING_MODE_LABEL[gradingMode]} ・ {new Date(createdAt).toLocaleDateString()}
+          {dueAt && ` (締切 ${formatJstDateTime(dueAt)})`} ・ {GRADING_MODE_LABEL[gradingMode]} ・ {formatJstDate(createdAt)}
         </p>
         {error && <p className="text-rose-500 text-xs font-bold mt-1">{error}</p>}
       </div>

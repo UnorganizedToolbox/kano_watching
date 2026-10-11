@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Send } from "lucide-react";
+import { formatJstDate } from "@/lib/formatDate";
 
 export default async function ProblemTemplatesPage() {
   const supabase = await createClient();
@@ -41,7 +42,7 @@ export default async function ProblemTemplatesPage() {
               <Link href={`/admin/problems/${t.id}/edit`} className="min-w-0 flex-1">
                 <p className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate">{t.title}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  {(t.organizations as unknown as { name: string } | null)?.name || '団体未設定'} ・ {new Date(t.created_at).toLocaleDateString()}
+                  {(t.organizations as unknown as { name: string } | null)?.name || '団体未設定'} ・ {formatJstDate(t.created_at)}
                 </p>
               </Link>
               <div className="flex items-center gap-4 shrink-0">

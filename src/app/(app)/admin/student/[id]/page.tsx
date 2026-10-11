@@ -8,6 +8,7 @@ import StudentRuleOverrides from "../../components/StudentRuleOverrides";
 import GradeRegisterForm from "../../components/GradeRegisterForm";
 import PomodoroAnalyticsPanel from "../../../components/PomodoroAnalyticsPanel";
 import { loadPomodoroAnalytics } from "@/lib/pomodoroAnalyticsLoader";
+import { formatJstDate } from "@/lib/formatDate";
 
 export default async function StudentDetailPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -83,7 +84,7 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
               </span>
             )}
           </div>
-          <p className="text-sm text-slate-500 font-mono mt-1">ID: {student.student_id} | 登録日: {new Date(student.created_at).toLocaleDateString()}</p>
+          <p className="text-sm text-slate-500 font-mono mt-1">ID: {student.student_id} | 登録日: {formatJstDate(student.created_at)}</p>
         </div>
       </div>
 
@@ -103,7 +104,7 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
                     <div className="text-2xl font-black text-brand-600 dark:text-brand-400">{diag.total_score}<span className="text-xs text-slate-400 font-normal">点</span></div>
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs text-slate-500 mb-1">受験日: {new Date(diag.created_at).toLocaleDateString()}</p>
+                    <p className="text-xs text-slate-500 mb-1">受験日: {formatJstDate(diag.created_at)}</p>
                     <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">弱点: {diag.weaknesses || '分析中'}</p>
                   </div>
                 </div>
@@ -150,7 +151,7 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
               {(pomodoroAnalytics?.recentCompletions ?? []).map(c => (
                 <div key={c.completedAt} className="text-xs flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                   <span className="text-slate-600 dark:text-slate-300">{c.subject ?? '学習'}</span>
-                  <span className="text-slate-400">{new Date(c.completedAt).toLocaleDateString()}</span>
+                  <span className="text-slate-400">{formatJstDate(c.completedAt)}</span>
                 </div>
               ))}
             </div>
@@ -170,7 +171,7 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
                     <span className="font-bold truncate max-w-[120px]" title={q.title}>{q.title}</span>
                     <span className={q.status === 'open' ? 'text-amber-500' : 'text-emerald-500'}>{q.status === 'open' ? '未回答' : '回答済'}</span>
                   </div>
-                  <span className="text-slate-400 text-[10px]">{new Date(q.created_at).toLocaleDateString()}</span>
+                  <span className="text-slate-400 text-[10px]">{formatJstDate(q.created_at)}</span>
                 </div>
               ))}
             </div>

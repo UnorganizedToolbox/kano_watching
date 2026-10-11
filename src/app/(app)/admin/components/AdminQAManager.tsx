@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from 'react';
 import { answerQuestion, addAdminReply } from '../actions';
 import { processQaImage } from '@/lib/imageProcessing';
+import { formatJstDate, formatJstDateTime } from '@/lib/formatDate';
 import { Star } from 'lucide-react';
 
 type Reply = {
@@ -173,7 +174,7 @@ export default function AdminQAManager({ questions }: { questions: Question[] })
                     <Star className="w-3.5 h-3.5 text-amber-500" fill="currentColor" />
                   )}
                 </div>
-                <span className="text-[10px] text-slate-400">{new Date(q.created_at).toLocaleDateString()}</span>
+                <span className="text-[10px] text-slate-400">{formatJstDate(q.created_at)}</span>
               </div>
               <h5 className="font-bold text-sm mb-1 text-slate-800 dark:text-slate-100">{q.title}</h5>
               <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-wrap">{q.body}</p>
@@ -200,7 +201,7 @@ export default function AdminQAManager({ questions }: { questions: Question[] })
                         : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 ml-4'
                     }`}>
                       <span className={`text-[10px] font-bold block mb-1 ${r.role === 'admin' ? 'text-brand-600 dark:text-brand-400' : 'text-slate-500'}`}>
-                        {r.role === 'admin' ? 'あなた' : q.profiles?.name || '生徒'} ({new Date(r.created_at).toLocaleString()}):
+                        {r.role === 'admin' ? 'あなた' : q.profiles?.name || '生徒'} ({formatJstDateTime(r.created_at)}):
                       </span>
                       {r.text && <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300">{r.text}</p>}
                       {r.image_url && (

@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plus, Send } from "lucide-react";
+import { formatJstDate } from "@/lib/formatDate";
 
 export default async function DecksPage() {
   const supabase = await createClient();
@@ -42,7 +43,7 @@ export default async function DecksPage() {
               <Link href={`/admin/decks/${d.id}/edit`} className="min-w-0 flex-1">
                 <p className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate">{d.title}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  {(d.organizations as unknown as { name: string } | null)?.name || '団体未設定'} ・ {new Date(d.created_at).toLocaleDateString()}
+                  {(d.organizations as unknown as { name: string } | null)?.name || '団体未設定'} ・ {formatJstDate(d.created_at)}
                 </p>
               </Link>
               <div className="flex items-center gap-4 shrink-0">

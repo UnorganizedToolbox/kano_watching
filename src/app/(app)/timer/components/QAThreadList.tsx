@@ -7,6 +7,7 @@ import { InlineMath, BlockMath } from 'react-katex';
 import { replyToQuestion, resolveQuestion, toggleQuestionFavorite } from '../actions';
 import { FAVORITE_QUESTION_LIMIT } from '@/lib/qaLimits';
 import { processQaImage } from '@/lib/imageProcessing';
+import { formatJstDate, formatJstTime } from '@/lib/formatDate';
 import { Star } from 'lucide-react';
 
 type Reply = {
@@ -138,7 +139,7 @@ export default function QAThreadList({ initialQuestions }: { initialQuestions: Q
                  : <><i className="fa-solid fa-check mr-1"></i> 回答済み (未解決)</>}
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-400">{new Date(q.created_at).toLocaleDateString()}</span>
+                <span className="text-[10px] text-slate-400">{formatJstDate(q.created_at)}</span>
                 <button
                   onClick={(e) => handleToggleFavorite(q.id, e)}
                   disabled={isPending}
@@ -184,7 +185,7 @@ export default function QAThreadList({ initialQuestions }: { initialQuestions: Q
                       : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 mr-4'
                   }`}>
                     <span className={`text-[10px] font-bold block mb-1 ${r.role === 'student' ? 'text-slate-500' : 'text-brand-600 dark:text-brand-400'}`}>
-                      {r.role === 'student' ? 'あなた' : '先生'} ({new Date(r.created_at).toLocaleTimeString()}):
+                      {r.role === 'student' ? 'あなた' : '先生'} ({formatJstTime(r.created_at)}):
                     </span>
                     {r.text && <div className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{renderTextWithMath(r.text)}</div>}
                     {r.image_url && (

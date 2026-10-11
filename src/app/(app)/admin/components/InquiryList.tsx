@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { replyToInquiry } from '../actions';
+import { formatJstDateTime } from '@/lib/formatDate';
 
 type Inquiry = {
   id: string;
@@ -66,7 +67,7 @@ export default function InquiryList({ inquiries, isAdmin }: { inquiries: Inquiry
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-wrap">{inq.body}</p>
-          <p className="text-[10px] text-slate-400 mt-1">{new Date(inq.created_at).toLocaleString()}</p>
+          <p className="text-[10px] text-slate-400 mt-1">{formatJstDateTime(inq.created_at)}</p>
 
           {inq.admin_reply && (
             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
