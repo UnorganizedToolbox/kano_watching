@@ -38,14 +38,11 @@ export default function PomodoroSimpleStats({ analytics }: { analytics: Pomodoro
 
   return (
     <Card title="学習の記録" note="ポモドーロの操作ログから集計しています(時刻は日本時間)">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Stat label="連続学習日数" value={`${habit.currentStreak}日`} />
         <Stat label="最高記録" value={`${habit.longestStreak}日`} sub="連続日数の最長" />
         <Stat label="累計学習日数" value={`${periods.cumulative.activeDays}日`} sub={`延べ${periods.cumulative.completedWork}回完了`} />
         <Stat label="最後に勉強した日" value={lastCompletedAt ? formatJstDate(lastCompletedAt) : '—'} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
         <Stat label="直近7日の完了数" value={recentWeek ? `${recentWeek.completedWork}回` : '—'} />
         <Stat label="今月の完了数" value={recentMonth ? `${recentMonth.completedWork}回` : '—'} sub="月初からの累計" />
       </div>
