@@ -13,16 +13,11 @@ export default async function OrganizationsPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single();
   if (profile?.role !== 'admin') redirect('/');
 
-  const { data: organizations } = await supabase
-    .from('organizations')
-    .select('id, name, created_at, member_limit')
-    .order('name');
-
-  const { data: members } = await supabase
-    .from('profiles')
-    .select('organization_id')
-    .eq('status', 'active')
-    .in('role', ['student', 'teacher']);
+  // organizations・membersは互いに独立しているため並列に取得する
+  const [{ data: organizations }, { data: members }] = await Promise.all([
+    supabase.from('organizations').select('id, name, created_at, member_limit').order('name'),
+    supabase.from('profiles').select('organization_id').eq('status', 'active').in('role', ['student', 'teacher']),
+  ]);
 
   const memberCounts = new Map<string, number>();
   for (const m of members || []) {

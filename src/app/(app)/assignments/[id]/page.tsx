@@ -47,11 +47,25 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: assignment, error } = await supabase
-    .from('problem_assignments')
-    .select('id, delivery_mode, due_at, grading_mode, created_at, problem_decks:deck_id (title)')
-    .eq('id', id)
-    .single();
+  // assignment・attemptsはどちらもid(ルートパラメータ)とuser.idだけに依存し、互いの結果を
+  // 必要としないため並列に取得する。
+  const [
+    { data: assignment, error },
+    { data: attempts },
+  ] = await Promise.all([
+    supabase
+      .from('problem_assignments')
+      .select('id, delivery_mode, due_at, grading_mode, created_at, problem_decks:deck_id (title)')
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('problem_attempts')
+      .select('id, questions, submitted_work, submitted_answers, status, sub_results, score, exp_awarded, submitted_at, started_at')
+      .eq('assignment_id', id)
+      .eq('student_id', user.id)
+      .order('attempt_number', { ascending: false })
+      .limit(1),
+  ]);
 
   if (error || !assignment) {
     return (
@@ -63,14 +77,6 @@ export default async function AssignmentAttemptPage(props: { params: Promise<{ i
   }
 
   const deckTitle = (assignment.problem_decks as unknown as { title: string } | null)?.title || '(タイトル未設定)';
-
-  const { data: attempts } = await supabase
-    .from('problem_attempts')
-    .select('id, questions, submitted_work, submitted_answers, status, sub_results, score, exp_awarded, submitted_at, started_at')
-    .eq('assignment_id', id)
-    .eq('student_id', user.id)
-    .order('attempt_number', { ascending: false })
-    .limit(1);
 
   const attempt = attempts?.[0] ?? null;
 

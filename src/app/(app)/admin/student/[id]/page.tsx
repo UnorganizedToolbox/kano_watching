@@ -16,16 +16,26 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: adminProfile } = await supabase.from('profiles').select('role').eq('id', user?.id).single();
+  // 以下はすべてuser.id・studentId(ルートパラメータ)だけに依存し互いに独立しているため
+  // 並列に取得する(以前は直列に5回問い合わせており、その分のレイテンシが積み重なっていた)。
+  // 認可チェック(adminProfile)より前にstudent等を取得するが、RLSが許可しない行は
+  // そもそも返らないため、未認可の閲覧者にデータが漏れることはない。
+  const [
+    { data: adminProfile },
+    { data: student, error: studentError },
+    { data: organizations },
+    { data: diagnostics },
+    { data: questions },
+  ] = await Promise.all([
+    supabase.from('profiles').select('role').eq('id', user?.id).single(),
+    supabase.from('profiles').select('*').eq('id', studentId).single(),
+    supabase.from('organizations').select('id, name').order('name'),
+    supabase.from('diagnostic_results').select('*').eq('student_uuid', studentId).order('created_at', { ascending: false }),
+    supabase.from('questions').select('*').eq('student_uuid', studentId).order('created_at', { ascending: false }),
+  ]);
+
   if (adminProfile?.role !== 'admin' && adminProfile?.role !== 'teacher') redirect('/');
   const viewerRole = adminProfile.role as 'admin' | 'teacher';
-
-  // Fetch student profile
-  const { data: student, error: studentError } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', studentId)
-    .single();
 
   if (studentError || !student) {
     return (
@@ -36,8 +46,6 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
     );
   }
 
-  const { data: organizations } = await supabase.from('organizations').select('id, name').order('name');
-
   let studentOrgRules: Record<string, unknown> = {};
   if (student.organization_id) {
     const { data: studentOrg } = await supabase.from('organizations').select('rules').eq('id', student.organization_id).single();
@@ -47,22 +55,8 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
   // ポモドーロの完了数・学習時間・最近の記録は、下部のPomodoroAnalyticsPanelと同じ
   // pomodoro_events由来の集計(pomodoroAnalytics)から取る。かつては別途pomodoro_logsを
   // 問い合わせていたが、2つのテーブルが別々のタイミングで書き込まれるため件数がずれる
-  // ことがあり、単一の集計結果に一本化した。
+  // ことがあり、単一の集計結果に一本化した。student.roleに依存するため上の並列取得には含めない。
   const pomodoroAnalytics = student.role === 'student' ? await loadPomodoroAnalytics(supabase, studentId) : null;
-
-  // Fetch Diagnostic Results
-  const { data: diagnostics } = await supabase
-    .from('diagnostic_results')
-    .select('*')
-    .eq('student_uuid', studentId)
-    .order('created_at', { ascending: false });
-
-  // Fetch Questions
-  const { data: questions } = await supabase
-    .from('questions')
-    .select('*')
-    .eq('student_uuid', studentId)
-    .order('created_at', { ascending: false });
 
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[1200px] mx-auto w-full px-6 pt-2 pb-6">

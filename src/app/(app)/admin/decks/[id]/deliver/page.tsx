@@ -10,14 +10,12 @@ export default async function DeliverDeckPage(props: { params: Promise<{ id: str
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase.from('profiles').select('role, organization_id').eq('id', user?.id).single();
+  // profile・deckはuser.id/id(ルートパラメータ)だけに依存し互いに独立しているため並列に取得する
+  const [{ data: profile }, { data: deck, error }] = await Promise.all([
+    supabase.from('profiles').select('role, organization_id').eq('id', user?.id).single(),
+    supabase.from('problem_decks').select('id, title, organization_id').eq('id', id).single(),
+  ]);
   if (profile?.role !== 'admin' && profile?.role !== 'teacher') redirect('/');
-
-  const { data: deck, error } = await supabase
-    .from('problem_decks')
-    .select('id, title, organization_id')
-    .eq('id', id)
-    .single();
 
   if (error || !deck) {
     return (

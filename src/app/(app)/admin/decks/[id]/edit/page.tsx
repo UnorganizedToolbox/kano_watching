@@ -12,16 +12,19 @@ export default async function EditDeckPage(props: { params: Promise<{ id: string
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single();
+  // profile・deck・itemRowsはuser.id/id(ルートパラメータ)だけに依存し互いに独立しているため並列に取得する
+  const [
+    { data: profile },
+    { data: deck, error },
+    { data: itemRows },
+  ] = await Promise.all([
+    supabase.from('profiles').select('role').eq('id', user?.id).single(),
+    supabase.from('problem_decks').select('id, title, organization_id').eq('id', id).single(),
+    supabase.from('deck_items').select('child_kind, child_deck_id, child_template_id, weight').eq('parent_deck_id', id).order('position'),
+  ]);
+
   if (profile?.role !== 'admin' && profile?.role !== 'teacher') redirect('/');
-
   const isAdmin = profile.role === 'admin';
-
-  const { data: deck, error } = await supabase
-    .from('problem_decks')
-    .select('id, title, organization_id')
-    .eq('id', id)
-    .single();
 
   if (error || !deck) {
     return (
@@ -31,12 +34,6 @@ export default async function EditDeckPage(props: { params: Promise<{ id: string
       </div>
     );
   }
-
-  const { data: itemRows } = await supabase
-    .from('deck_items')
-    .select('child_kind, child_deck_id, child_template_id, weight')
-    .eq('parent_deck_id', id)
-    .order('position');
 
   const items: DeckItemForm[] = (itemRows ?? []).map(row => ({
     childKind: row.child_kind as DeckChildKind,

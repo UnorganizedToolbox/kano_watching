@@ -10,14 +10,12 @@ export default async function DeliverProblemPage(props: { params: Promise<{ id: 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase.from('profiles').select('role, organization_id').eq('id', user?.id).single();
+  // profile・templateはuser.id/id(ルートパラメータ)だけに依存し互いに独立しているため並列に取得する
+  const [{ data: profile }, { data: template, error }] = await Promise.all([
+    supabase.from('profiles').select('role, organization_id').eq('id', user?.id).single(),
+    supabase.from('problem_templates').select('id, title, organization_id').eq('id', id).single(),
+  ]);
   if (profile?.role !== 'admin' && profile?.role !== 'teacher') redirect('/');
-
-  const { data: template, error } = await supabase
-    .from('problem_templates')
-    .select('id, title, organization_id')
-    .eq('id', id)
-    .single();
 
   if (error || !template) {
     return (

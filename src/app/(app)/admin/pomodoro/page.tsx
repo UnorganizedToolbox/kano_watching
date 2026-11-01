@@ -39,12 +39,19 @@ export default async function TeacherPomodoroPage() {
   const studentIds = (students || []).map(s => s.id);
   const safeIds = studentIds.length > 0 ? studentIds : ['00000000-0000-0000-0000-000000000000'];
 
-  const { data: recentEvents } = await supabase
-    .from('pomodoro_events')
-    .select('student_uuid, event_type, mode, metadata, created_at')
-    .in('student_uuid', safeIds)
-    .order('created_at', { ascending: false })
-    .limit(500);
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  // recentEvents・todayCountsはどちらもsafeIdsだけに依存し互いに独立しているため並列に取得する
+  const [{ data: recentEvents }, todayCounts] = await Promise.all([
+    supabase
+      .from('pomodoro_events')
+      .select('student_uuid, event_type, mode, metadata, created_at')
+      .in('student_uuid', safeIds)
+      .order('created_at', { ascending: false })
+      .limit(500),
+    countCompletedWorkByStudent(supabase, safeIds, startOfDay.toISOString()),
+  ]);
 
   type EventRow = { student_uuid: string; event_type: string; mode: string; metadata: { subject?: string } | null; created_at: string };
   const latestEventByStudent = new Map<string, EventRow>();
@@ -53,10 +60,6 @@ export default async function TeacherPomodoroPage() {
       latestEventByStudent.set(ev.student_uuid, ev);
     }
   }
-
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const todayCounts = await countCompletedWorkByStudent(supabase, safeIds, startOfDay.toISOString());
 
   return (
     <section className="flex-1 flex flex-col gap-6 max-w-[900px] mx-auto w-full px-6 pt-2 pb-6">

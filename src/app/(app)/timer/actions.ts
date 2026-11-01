@@ -351,15 +351,18 @@ export async function logPomodoro(subject: string, minutes: number = 25, concent
   if (concentrationRating) metadata.concentrationRating = concentrationRating;
   if (memo) metadata.memo = memo;
 
-  const { error: actErr } = await supabase.from('student_activity_logs').insert({
-    student_id: user.id,
-    activity_type: 'POMODORO_COMPLETED',
-    metadata
-  });
+  // activity_logsの記録と、更新前のtotal_study_minutesの読み取りは互いに独立しているため並列に行う
+  const [{ error: actErr }, { data: profile }] = await Promise.all([
+    supabase.from('student_activity_logs').insert({
+      student_id: user.id,
+      activity_type: 'POMODORO_COMPLETED',
+      metadata
+    }),
+    supabase.from('profiles').select('total_study_minutes').eq('id', user.id).single(),
+  ]);
   if (actErr) throw new Error('activity logs insert error: ' + actErr.message);
 
   // profiles の total_study_minutes を更新
-  const { data: profile } = await supabase.from('profiles').select('total_study_minutes').eq('id', user.id).single();
   if (profile) {
     const { error: profErr } = await supabase.from('profiles').update({
       total_study_minutes: (profile.total_study_minutes || 0) + minutes
