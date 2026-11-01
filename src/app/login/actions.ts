@@ -15,7 +15,7 @@ export async function login(formData: FormData) {
   const { data: signInData, error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
-    redirect('/login?error=ログインに失敗しました')
+    redirect('/login?error=' + encodeURIComponent('ログインに失敗しました'))
   }
 
   const { data: profile } = await supabase.from('profiles').select('status').eq('id', signInData.user.id).single();
