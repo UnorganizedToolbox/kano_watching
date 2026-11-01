@@ -4,6 +4,7 @@ import { getGoogleCalendarEvents } from "@/lib/google-calendar";
 import { countCompletedWork, loadPomodoroAnalytics } from "@/lib/pomodoroAnalyticsLoader";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import PomodoroSimpleStats from "./components/PomodoroSimpleStats";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -175,6 +176,8 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <PomodoroSimpleStats analytics={pomodoroAnalytics} />
     </section>
   );
 }

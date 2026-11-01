@@ -6,7 +6,7 @@ import { ArrowLeft, Clock, BarChart2, MessageCircle } from "lucide-react";
 import AdminStudentControls from "../../components/AdminStudentControls";
 import StudentRuleOverrides from "../../components/StudentRuleOverrides";
 import GradeRegisterForm from "../../components/GradeRegisterForm";
-import PomodoroAnalyticsPanel from "../../../components/PomodoroAnalyticsPanel";
+import PomodoroStatsSwitcher from "../../../components/PomodoroStatsSwitcher";
 import { loadPomodoroAnalytics } from "@/lib/pomodoroAnalyticsLoader";
 import { formatJstDate } from "@/lib/formatDate";
 
@@ -179,7 +179,7 @@ export default async function StudentDetailPage(props: { params: Promise<{ id: s
         </div>
       </div>
 
-      {student.role === 'student' && <PomodoroAnalyticsPanel analytics={pomodoroAnalytics} showFocusScore />}
+      {student.role === 'student' && <PomodoroStatsSwitcher analytics={pomodoroAnalytics} showFocusScore />}
     </section>
   );
 }

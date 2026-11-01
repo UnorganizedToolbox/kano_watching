@@ -26,7 +26,7 @@ function decimal(value: number | null, digits = 1): string {
   return value === null ? '—' : value.toFixed(digits);
 }
 
-function Card({ title, note, children, className = '' }: { title: string; note?: string; children: ReactNode; className?: string }) {
+export function Card({ title, note, children, className = '' }: { title: string; note?: string; children: ReactNode; className?: string }) {
   return (
     <div className={`${CARD_CLASS} ${className}`}>
       <div>
@@ -38,7 +38,7 @@ function Card({ title, note, children, className = '' }: { title: string; note?:
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+export function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/60 px-4 py-3">
       <p className="text-[11px] text-slate-500 dark:text-slate-400">{label}</p>
